@@ -164,22 +164,28 @@
             <section class="availability-panel coach-panel" data-coach-content="availabilityPanel">
               <div class="panel-heading">
                 <div>
-                  <p class="eyebrow">Availability method</p>
+                  <p class="eyebrow">Availability</p>
                   <h3>设置可预约时间</h3>
                 </div>
-                <div class="method-switch" role="tablist" aria-label="选择 availability 设置方式">
+              </div>
+              <p class="default-note">默认新 coach 周一到周五 6:00-16:00 对 all served rinks 可预约；其他时间默认 blocked。Calendar 和 Dropdown 使用同一套 availability 数据。</p>
+
+              <div class="availability-subnav" role="tablist" aria-label="Availability sections">
+                <button class="availability-subtab active" type="button" data-availability-section="regularAvailabilitySection" aria-selected="true">Regular availability</button>
+                <button class="availability-subtab" type="button" data-availability-section="exceptionsSection" aria-selected="false">Schedule</button>
+              </div>
+
+              <section id="regularAvailabilitySection" class="availability-section active" data-availability-content="regularAvailabilitySection">
+              <div class="panel-heading">
+                <div>
+                  <p class="eyebrow">Regular availability</p>
+                  <h3>固定开放时间</h3>
+                </div>
+                <div class="method-switch" role="tablist" aria-label="选择 regular availability 设置方式">
                   <button class="method-button active" type="button" data-method="calendarPanel" aria-selected="true">Calendar</button>
                   <button class="method-button" type="button" data-method="dropdownPanel" aria-selected="false">Dropdown</button>
                 </div>
               </div>
-              <p class="default-note">默认新 coach 周一到周五 9:00-16:00 可预约；其他时间默认 blocked。Calendar 和 Dropdown 使用同一套 availability 数据。</p>
-
-              <div class="availability-subnav" role="tablist" aria-label="Availability sections">
-                <button class="availability-subtab active" type="button" data-availability-section="regularAvailabilitySection" aria-selected="true">Regular availability</button>
-                <button class="availability-subtab" type="button" data-availability-section="exceptionsSection" aria-selected="false">Blocks & bookings</button>
-              </div>
-
-              <section id="regularAvailabilitySection" class="availability-section active" data-availability-content="regularAvailabilitySection">
               <div id="dropdownPanel" class="method-panel is-hidden" data-method-panel="dropdownPanel">
                 <form id="availabilityForm" class="form-panel">
                   <div>
@@ -193,8 +199,13 @@
                       <input id="slotDate" type="date" required />
                     </label>
                     <label>
-                      Lesson type
-                      <select id="lessonTypeSelect"></select>
+                      地点 / 上课方式
+                      <select id="locationType">
+                        <option value="Polar Ice Rink">Polar Ice Rink</option>
+                        <option value="Arcadia Ice Arena">Arcadia Ice Arena</option>
+                        <option value="Oceanside Ice Arena">Oceanside Ice Arena</option>
+                        <option value="Zoom">Zoom</option>
+                      </select>
                     </label>
                   </div>
 
@@ -208,16 +219,6 @@
                       <select id="endTime" required></select>
                     </label>
                   </div>
-
-                  <label>
-                    地点 / 上课方式
-                    <select id="locationType">
-                      <option value="Polar Ice Rink">Polar Ice Rink</option>
-                      <option value="Arcadia Ice Arena">Arcadia Ice Arena</option>
-                      <option value="Oceanside Ice Arena">Oceanside Ice Arena</option>
-                      <option value="Zoom">Zoom</option>
-                    </select>
-                  </label>
 
                   <label>
                     备注
@@ -265,41 +266,18 @@
                     Week of
                     <input id="calendarWeekStart" type="date" />
                   </label>
-                  <label>
-                    Edit action
-                    <select id="calendarEditMode">
-                      <option value="open">Open time</option>
-                      <option value="block">Block time</option>
-                    </select>
-                  </label>
-                  <label>
-                    Lesson type
-                    <select id="calendarLessonTypeSelect"></select>
-                  </label>
-                  <label>
-                    地点 / 上课方式
-                    <select id="calendarLocationType">
-                      <option value="Polar Ice Rink">Polar Ice Rink</option>
-                      <option value="Arcadia Ice Arena">Arcadia Ice Arena</option>
-                      <option value="Oceanside Ice Arena">Oceanside Ice Arena</option>
-                      <option value="Zoom">Zoom</option>
-                    </select>
-                  </label>
                 </div>
 
-                <label>
-                  Calendar 备注
-                  <input id="calendarNote" type="text" placeholder="例如：Freestyle ice only / Zoom off-ice review" />
-                </label>
-
-                <div class="calendar-legend" aria-label="Calendar color legend">
-                  <span><i class="legend-dot blocked"></i>Blocked</span>
-                  <span><i class="legend-dot editing"></i>Editing</span>
+                <div class="rink-picker" aria-label="选择开放给哪个 rink">
+                  <div class="rink-picker-label">开放给</div>
+                  <div id="calendarRinkOptions" class="rink-option-grid"></div>
+                  <select id="calendarLocationType" class="hidden-control" aria-hidden="true" tabindex="-1">
+                    <option value="Any served rink">All served rinks</option>
+                  </select>
                 </div>
-                <div id="rinkLegend" class="calendar-legend" aria-label="Rink color legend"></div>
 
                 <div class="calendar-help">
-                  先选 Edit action：Open time 开放时间，Block time 删除/blocked open 时间。蓝色是未保存改动；按住蓝色区域拖动可以取消这段 editing。
+                  先点上面的 rink 颜色，再直接拖灰色时间开放；有深色边框的是未保存改动，按住它拖动可以实时取消。
                 </div>
                 <div id="dragCalendar" class="drag-calendar" aria-label="拖选 availability calendar"></div>
               </div>
@@ -313,35 +291,28 @@
               <section id="exceptionsSection" class="availability-section" data-availability-content="exceptionsSection">
                 <div class="panel-heading">
                   <div>
-                    <p class="eyebrow">Blocks & bookings</p>
-                    <h3>临时不可用和学生预约</h3>
+                    <p class="eyebrow">Current schedule</p>
+                    <h3>Booked lessons & unavailable time</h3>
                   </div>
                 </div>
-                <p class="default-note">这里不会改变你的 regular availability。比如某天临时有事，就在这里加一个 block；学生预约也会显示在这里。</p>
 
-                <form id="blockExceptionForm" class="form-panel">
-                  <div class="two-column">
+                <div id="exceptionCalendarPanel" class="calendar-panel exception-method-panel" data-exception-method-panel="exceptionCalendarPanel">
+                  <div class="calendar-toolbar">
+                    <button id="openBlockDialog" class="danger-button" type="button">Block time slot</button>
+                    <button id="toggleExceptionCalendarHours" class="ghost-button" type="button">Show full 24 hours</button>
+                  </div>
+                  <div class="calendar-controls">
                     <label>
-                      日期
-                      <input id="blockDate" type="date" required />
-                    </label>
-                    <label>
-                      原因
-                      <input id="blockReason" type="text" placeholder="Personal conflict / rink unavailable" />
+                      Week of
+                      <input id="exceptionCalendarWeekStart" type="date" />
                     </label>
                   </div>
-                  <div class="two-column">
-                    <label>
-                      开始时间
-                      <select id="blockStartTime" required></select>
-                    </label>
-                    <label>
-                      结束时间
-                      <select id="blockEndTime" required></select>
-                    </label>
+                  <div id="scheduleLegend" class="calendar-legend schedule-legend" aria-label="Schedule calendar legend"></div>
+                  <div class="calendar-help">
+                    这里显示当前课表：regular open、student booked、以及你手动 block 的 unavailable time。
                   </div>
-                  <button class="danger-button" type="submit">Add block</button>
-                </form>
+                  <div id="exceptionDragCalendar" class="drag-calendar" aria-label="查看 schedule calendar"></div>
+                </div>
 
                 <div id="exceptionsList" class="slot-list" aria-live="polite"></div>
               </section>
@@ -406,6 +377,40 @@
           <textarea id="studentNote" rows="3" placeholder="想学习的内容、当前水平、问题等"></textarea>
         </label>
         <button class="primary-button" type="submit">确认预约</button>
+      </form>
+    </dialog>
+
+    <dialog id="blockDialog" class="booking-dialog">
+      <form id="blockDialogForm" method="dialog">
+        <div class="dialog-heading">
+          <div>
+            <p class="eyebrow">Schedule</p>
+            <h3>Block time slot</h3>
+          </div>
+          <button class="icon-button" type="button" id="closeBlockDialog" aria-label="关闭">×</button>
+        </div>
+        <div class="two-column">
+          <label>
+            日期
+            <input id="blockDialogDate" type="date" required />
+          </label>
+          <label>
+            开始时间
+            <select id="blockDialogStart" required></select>
+          </label>
+        </div>
+        <label>
+          结束时间
+          <select id="blockDialogEnd" required></select>
+        </label>
+        <label class="checkbox-row">
+          <input id="blockRepeatWeekly" type="checkbox" />
+          Repeat weekly
+        </label>
+        <div class="dialog-actions">
+          <button class="ghost-button" type="button" id="cancelBlockDialog">Cancel</button>
+          <button class="danger-button" type="submit">Confirm block</button>
+        </div>
       </form>
     </dialog>
 

@@ -393,7 +393,8 @@ h3 {
   align-items: end;
 }
 
-.method-switch {
+.method-switch,
+.exception-method-switch {
   display: inline-grid;
   grid-template-columns: 1fr 1fr;
   gap: 6px;
@@ -437,7 +438,8 @@ h3 {
   display: grid;
 }
 
-.method-button {
+.method-button,
+.exception-method-button {
   min-height: 38px;
   border: 0;
   border-radius: 6px;
@@ -447,9 +449,15 @@ h3 {
   font-weight: 900;
 }
 
-.method-button.active {
+.method-button.active,
+.exception-method-button.active {
   background: var(--blue);
   color: #ffffff;
+}
+
+.exception-method-panel {
+  display: grid;
+  gap: 14px;
 }
 
 .default-note {
@@ -608,6 +616,13 @@ h3 {
   gap: 12px;
 }
 
+.calendar-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 10px;
+}
+
 .calendar-help {
   padding: 10px 12px;
   border: 1px solid #bfdbfe;
@@ -638,6 +653,41 @@ h3 {
   gap: 6px;
 }
 
+.schedule-legend {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  align-items: stretch;
+  gap: 8px;
+}
+
+.schedule-legend-row {
+  display: grid;
+  align-content: start;
+  gap: 6px;
+  min-width: 0;
+  padding: 8px;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  background: #ffffff;
+}
+
+.schedule-legend-row strong {
+  color: #172033;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.schedule-legend-states {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+}
+
+.schedule-legend-states span {
+  min-width: 0;
+  white-space: nowrap;
+}
+
 .legend-dot {
   width: 14px;
   height: 14px;
@@ -662,6 +712,54 @@ h3 {
   background: #bfdbfe;
 }
 
+.rink-picker {
+  display: grid;
+  gap: 8px;
+}
+
+.rink-picker-label {
+  color: #334155;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.rink-option-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.rink-option {
+  display: inline-flex;
+  align-items: center;
+  min-height: 38px;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #172033;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.rink-option .legend-dot {
+  background: var(--rink-option-color);
+}
+
+.rink-option[data-rink="Unavailable"] .legend-dot {
+  background: #e2e8f0;
+}
+
+.rink-option.active {
+  border-color: #172033;
+  box-shadow: inset 0 0 0 2px #172033;
+}
+
+.hidden-control {
+  display: none;
+}
+
 .drag-calendar {
   display: grid;
   grid-template-columns: 64px repeat(7, minmax(86px, 1fr));
@@ -671,6 +769,7 @@ h3 {
   border-radius: 8px;
   background: #ffffff;
   touch-action: none;
+  user-select: none;
 }
 
 .calendar-corner,
@@ -738,11 +837,16 @@ h3 {
 }
 
 .calendar-cell.selecting {
-  background: #bfdbfe;
+  background: var(--selection-color, #bfdbfe);
+  box-shadow: inset 0 0 0 2px #172033;
 }
 
 .calendar-cell.blocking {
   background: #fecaca;
+}
+
+.calendar-cell.removing {
+  background: #e2e8f0;
 }
 
 .calendar-cell.reverting {
@@ -755,12 +859,44 @@ h3 {
 }
 
 .calendar-cell.has-booking {
-  background: #fed7aa;
+  background: var(--booked-rink-color, #f59e0b);
+}
+
+.calendar-cell.booking-start {
+  display: grid;
+  place-items: center;
+  padding: 2px;
+}
+
+.calendar-cell-label {
+  max-width: 100%;
+  overflow: hidden;
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 900;
+  line-height: 1.1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.calendar-cell.has-slot.selecting:not(.has-booking) {
+  background: var(--selection-color, #bfdbfe);
+}
+
+.calendar-cell.has-slot.removing:not(.has-booking) {
+  background: #e2e8f0;
 }
 
 .calendar-cell.is-editing {
-  background: #bfdbfe;
-  box-shadow: inset 0 0 0 2px #1d4ed8;
+  box-shadow: inset 0 0 0 2px rgba(23, 32, 51, 0.42);
+}
+
+.calendar-cell.has-slot.is-editing {
+  background: var(--rink-color, #bbf7d0);
+}
+
+.calendar-cell.has-blocked.is-editing {
+  background: #e2e8f0;
 }
 
 label {
@@ -779,6 +915,25 @@ label {
   border: 1px solid #cbd5e1;
   border-radius: 8px;
   background: #ffffff;
+}
+
+.checkbox-row {
+  display: flex;
+  grid-template-columns: none;
+  align-items: center;
+  gap: 10px;
+  width: fit-content;
+}
+
+.checkbox-row input {
+  width: 16px;
+  height: 16px;
+}
+
+.dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
 }
 
 .checkbox-stack label {

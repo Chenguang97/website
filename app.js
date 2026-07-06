@@ -14,16 +14,17 @@ const coaches = [
 ];
 
 const currentCoachId = "maya";
-const slotsStorageKey = "ice-skating-coach-booking-slots-v5";
-const profileStorageKey = "ice-skating-coach-profiles-v1";
+const slotsStorageKey = "ice-skating-coach-booking-slots-v6";
+const profileStorageKey = "ice-skating-coach-profiles-v2";
 const blockedStorageKey = "ice-skating-coach-blocked-exceptions-v1";
 const dayLabels = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const calendarStep = 30;
+const unavailableSelection = "Unavailable";
 const fullDayStart = "00:00";
 const fullDayEnd = "24:00";
 const coreDayStart = "06:00";
 const coreDayEnd = "18:00";
-const defaultStart = "09:00";
+const defaultStart = "06:00";
 const defaultEnd = "16:00";
 
 const elements = {
@@ -56,14 +57,10 @@ const elements = {
   slotDate: document.querySelector("#slotDate"),
   startTime: document.querySelector("#startTime"),
   endTime: document.querySelector("#endTime"),
-  lessonTypeSelect: document.querySelector("#lessonTypeSelect"),
-  calendarLessonTypeSelect: document.querySelector("#calendarLessonTypeSelect"),
   locationType: document.querySelector("#locationType"),
   calendarLocationType: document.querySelector("#calendarLocationType"),
-  rinkLegend: document.querySelector("#rinkLegend"),
+  calendarRinkOptions: document.querySelector("#calendarRinkOptions"),
   coachNote: document.querySelector("#coachNote"),
-  calendarNote: document.querySelector("#calendarNote"),
-  calendarEditMode: document.querySelector("#calendarEditMode"),
   toggleCalendarHours: document.querySelector("#toggleCalendarHours"),
   calendarWeekStart: document.querySelector("#calendarWeekStart"),
   dragCalendar: document.querySelector("#dragCalendar"),
@@ -71,11 +68,19 @@ const elements = {
   dropdownWeekSlots: document.querySelector("#dropdownWeekSlots"),
   saveAvailability: document.querySelector("#saveAvailability"),
   availabilitySaveMessage: document.querySelector("#availabilitySaveMessage"),
-  blockExceptionForm: document.querySelector("#blockExceptionForm"),
-  blockDate: document.querySelector("#blockDate"),
-  blockStartTime: document.querySelector("#blockStartTime"),
-  blockEndTime: document.querySelector("#blockEndTime"),
-  blockReason: document.querySelector("#blockReason"),
+  openBlockDialog: document.querySelector("#openBlockDialog"),
+  blockDialog: document.querySelector("#blockDialog"),
+  blockDialogForm: document.querySelector("#blockDialogForm"),
+  blockDialogDate: document.querySelector("#blockDialogDate"),
+  blockDialogStart: document.querySelector("#blockDialogStart"),
+  blockDialogEnd: document.querySelector("#blockDialogEnd"),
+  blockRepeatWeekly: document.querySelector("#blockRepeatWeekly"),
+  closeBlockDialog: document.querySelector("#closeBlockDialog"),
+  cancelBlockDialog: document.querySelector("#cancelBlockDialog"),
+  exceptionCalendarWeekStart: document.querySelector("#exceptionCalendarWeekStart"),
+  toggleExceptionCalendarHours: document.querySelector("#toggleExceptionCalendarHours"),
+  exceptionDragCalendar: document.querySelector("#exceptionDragCalendar"),
+  scheduleLegend: document.querySelector("#scheduleLegend"),
   exceptionsList: document.querySelector("#exceptionsList"),
   coachSlots: document.querySelector("#coachSlots"),
   studentSlots: document.querySelector("#studentSlots"),
@@ -100,6 +105,7 @@ let blockedExceptions = loadBlockedExceptions();
 let dragState = null;
 let hasUnsavedAvailabilityChanges = false;
 let calendarShowsFullDay = false;
+let exceptionCalendarShowsFullDay = false;
 const unsavedAddedSlotIds = new Set();
 const unsavedBlockedCellKeys = new Set();
 const unsavedBlockExceptionIds = new Set();
@@ -189,7 +195,7 @@ function createDefaultProfile(coachId) {
     coachId,
     rate,
     homeRink: rinks[index % rinks.length],
-    servedRinks: [rinks[index % rinks.length]],
+    servedRinks: [...rinks],
     travelsToOtherRinks: false,
     travelFee: 0,
     photoUrl: "",
@@ -237,8 +243,7 @@ function createDefaultProfiles() {
 function createDefaultSlots() {
   const generated = [];
   coaches.forEach((coach) => {
-    const profile = getProfile(coach.id);
-    const lesson = profile.lessonOptions[1] || profile.lessonOptions[0];
+    const lesson = getAvailabilityLesson(coach.id);
     for (let offset = 0; offset < 30; offset += 1) {
       const date = todayIso(offset);
       if (!isWeekday(date)) continue;
@@ -251,7 +256,7 @@ function createDefaultSlots() {
           minutesFromTime(defaultEnd),
           lesson,
           "Any served rink",
-          "Default M-F availability: 9:00-16:00.",
+          "Default M-F availability: 6:00-16:00 for all served rinks.",
           false
         )
       );
@@ -340,55 +345,54 @@ function coachOptions(includeAll = false) {
 function rinkOptionsForCoach(coachId) {
   const profile = getProfile(coachId);
   const servedRinks = profile.servedRinks && profile.servedRinks.length ? profile.servedRinks : [profile.homeRink || rinks[0]];
-  const allowedRinks = profile.travelsToOtherRinks ? rinks : servedRinks;
-  return ["Any served rink", ...allowedRinks, "Zoom"].map((rink) => `<option value="${rink}">${rink}</option>`).join("");
+  return [
+    `<option value="Any served rink">All served rinks</option>`,
+    ...servedRinks.map((rink) => `<option value="${rink}">${rink}</option>`),
+    `<option value="Zoom">Zoom</option>`,
+  ].join("");
 }
 
 function populateCoachSelects() {
   elements.studentCoachFilter.innerHTML = coachOptions(true);
 }
 
-function populateLessonTypeSelects() {
-  const profile = getProfile(currentCoachId);
-  const options = profile.lessonOptions
-    .map((lesson) => `<option value="${lesson.id}">${lesson.name} · ${lesson.duration} min · $${lesson.price}</option>`)
-    .join("");
-
-  elements.lessonTypeSelect.innerHTML = options;
-  elements.calendarLessonTypeSelect.innerHTML = options;
-}
-
-function getLessonById(lessonId) {
-  const profile = getProfile(currentCoachId);
-  return profile.lessonOptions.find((lesson) => lesson.id === lessonId) || profile.lessonOptions[0];
-}
-
-function hasLesson(lessonId) {
-  return getProfile(currentCoachId).lessonOptions.some((lesson) => lesson.id === lessonId);
+function getAvailabilityLesson(coachId = currentCoachId) {
+  const profile = getProfile(coachId);
+  const lesson30 = profile.lessonOptions.find((lesson) => Number(lesson.duration) === 30);
+  const baseLesson = lesson30 || profile.lessonOptions[0];
+  return {
+    ...baseLesson,
+    duration: calendarStep,
+  };
 }
 
 function populateTimeSelects() {
   const startMinutes = minutesFromTime(fullDayStart);
   const endMinutes = minutesFromTime(fullDayEnd);
   const startOptions = [];
-  const endOptions = [];
 
   for (let minutes = startMinutes; minutes < endMinutes; minutes += calendarStep) {
     startOptions.push(`<option value="${timeFromMinutes(minutes)}">${timeFromMinutes(minutes)}</option>`);
   }
 
-  for (let minutes = startMinutes + calendarStep; minutes <= endMinutes; minutes += calendarStep) {
-    endOptions.push(`<option value="${timeFromMinutes(minutes)}">${timeFromMinutes(minutes)}</option>`);
+  elements.startTime.innerHTML = startOptions.join("");
+  elements.blockDialogStart.innerHTML = startOptions.join("");
+  elements.startTime.value = defaultStart;
+  elements.blockDialogStart.value = defaultStart;
+  syncEndTimeOptions(elements.startTime, elements.endTime, "12:00");
+  syncEndTimeOptions(elements.blockDialogStart, elements.blockDialogEnd, "12:00");
+}
+
+function syncEndTimeOptions(startSelect, endSelect, preferredEnd = endSelect.value) {
+  const minimumEnd = minutesFromTime(startSelect.value) + calendarStep;
+  const options = [];
+
+  for (let minutes = minimumEnd; minutes <= minutesFromTime(fullDayEnd); minutes += calendarStep) {
+    options.push(`<option value="${timeFromMinutes(minutes)}">${timeFromMinutes(minutes)}</option>`);
   }
 
-  elements.startTime.innerHTML = startOptions.join("");
-  elements.endTime.innerHTML = endOptions.join("");
-  elements.blockStartTime.innerHTML = startOptions.join("");
-  elements.blockEndTime.innerHTML = endOptions.join("");
-  elements.startTime.value = defaultStart;
-  elements.endTime.value = "12:00";
-  elements.blockStartTime.value = defaultStart;
-  elements.blockEndTime.value = "12:00";
+  endSelect.innerHTML = options.join("");
+  endSelect.value = minutesFromTime(preferredEnd) >= minimumEnd ? preferredEnd : timeFromMinutes(minimumEnd);
 }
 
 function slotSort(a, b) {
@@ -399,7 +403,6 @@ function render() {
   slots.sort(slotSort);
   syncProfileForm();
   syncPhotoForm();
-  syncLessonTypeSelects();
   syncLocationOptions();
   renderCoachSlots();
   renderStudentSlots();
@@ -408,6 +411,7 @@ function render() {
   renderDropdownWeekSlots();
   renderExceptionsList();
   renderCalendarAvailability();
+  renderExceptionCalendarAvailability();
 }
 
 function renderStats() {
@@ -461,30 +465,82 @@ function syncPhotoForm() {
   }
 }
 
-function syncLessonTypeSelects() {
-  const previousDropdown = elements.lessonTypeSelect.value;
-  const previousCalendar = elements.calendarLessonTypeSelect.value;
-  populateLessonTypeSelects();
-  if (hasLesson(previousDropdown)) elements.lessonTypeSelect.value = previousDropdown;
-  if (hasLesson(previousCalendar)) elements.calendarLessonTypeSelect.value = previousCalendar;
-}
-
 function syncLocationOptions() {
+  const dropdownLocation = elements.locationType.value || "Any served rink";
+  const calendarLocation = elements.calendarLocationType.value || "Any served rink";
   elements.locationType.innerHTML = rinkOptionsForCoach(currentCoachId);
-  elements.calendarLocationType.innerHTML = rinkOptionsForCoach(currentCoachId);
-  renderRinkLegend();
+  elements.calendarLocationType.innerHTML = `${rinkOptionsForCoach(currentCoachId)}<option value="${unavailableSelection}">Unavailable</option>`;
+  elements.locationType.value = dropdownLocation;
+  elements.calendarLocationType.value = calendarLocation;
+  if (!elements.locationType.value) elements.locationType.value = "Any served rink";
+  if (!elements.calendarLocationType.value) elements.calendarLocationType.value = "Any served rink";
+  renderCalendarRinkOptions();
+  renderScheduleLegend();
 }
 
-function renderRinkLegend() {
+function renderCalendarRinkOptions() {
   const profile = getProfile(currentCoachId);
   const servedRinks = profile.servedRinks && profile.servedRinks.length ? profile.servedRinks : [profile.homeRink || rinks[0]];
-  elements.rinkLegend.innerHTML = ["Any served rink", ...servedRinks, "Zoom"]
-    .map((rink) => `<span><i class="legend-dot" style="background:${getRinkColor(rink)}"></i>${rink}</span>`)
+  const options = [
+    ["Any served rink", "All served rinks"],
+    ...servedRinks.map((rink) => [rink, rink]),
+    ["Zoom", "Zoom"],
+    [unavailableSelection, "Unavailable"],
+  ];
+
+  elements.calendarRinkOptions.innerHTML = options
+    .map(([value, label]) => {
+      const isActive = elements.calendarLocationType.value === value;
+      return `
+        <button class="rink-option ${isActive ? "active" : ""}" type="button" data-rink="${value}" style="--rink-option-color:${getRinkColor(value)}">
+          <i class="legend-dot" aria-hidden="true"></i>
+          <span>${label}</span>
+        </button>
+      `;
+    })
     .join("");
 }
 
 function getRinkColor(location) {
   return rinkColors[location] || "#bbf7d0";
+}
+
+function getBookedRinkColor(location) {
+  const bookedColors = {
+    "Polar Ice Rink": "#22c55e",
+    "Arcadia Ice Arena": "#3b82f6",
+    "Oceanside Ice Arena": "#f59e0b",
+    "Any served rink": "#8b5cf6",
+    Zoom: "#0ea5e9",
+  };
+  return bookedColors[location] || "#22c55e";
+}
+
+function getScheduleLegendItems() {
+  const profile = getProfile(currentCoachId);
+  const servedRinks = profile.servedRinks && profile.servedRinks.length ? profile.servedRinks : [profile.homeRink || rinks[0]];
+  return [
+    ["Any served rink", "All served rinks"],
+    ...servedRinks.map((rink) => [rink, rink]),
+    ["Zoom", "Zoom"],
+  ];
+}
+
+function renderScheduleLegend() {
+  elements.scheduleLegend.innerHTML = [
+    ...getScheduleLegendItems().map(([value, label]) => {
+      return `
+        <div class="schedule-legend-row">
+          <strong>${label}</strong>
+          <div class="schedule-legend-states">
+            <span><i class="legend-dot" style="background:${getRinkColor(value)}"></i>open</span>
+            <span><i class="legend-dot" style="background:${getBookedRinkColor(value)}"></i>booked</span>
+          </div>
+        </div>
+      `;
+    }),
+    `<div class="schedule-legend-row compact"><strong>Unavailable</strong><div class="schedule-legend-states"><span><i class="legend-dot blocked"></i>blocked</span></div></div>`,
+  ].join("");
 }
 
 function renderCoachSlots() {
@@ -527,27 +583,43 @@ function renderExceptionsList() {
   const blocks = blockedExceptions.filter((block) => block.coachId === currentCoachId);
 
   if (!booked.length && !blocks.length) {
-    elements.exceptionsList.innerHTML = `<p class="empty-state">还没有 temporary block 或学生预约。</p>`;
+    elements.exceptionsList.innerHTML = `<p class="empty-state">还没有 booked lessons 或 unavailable time。</p>`;
     return;
   }
 
   const blockCards = blocks.map((block) => {
     return `
-      <article class="slot-card blocked-card">
-        <div class="slot-top">
-          <div>
-            <div class="slot-time">${block.start} - ${block.end}</div>
-            <div class="slot-meta">${formatDate(block.date)} · Temporary block</div>
-          </div>
-          <span class="pill booked">Blocked</span>
+      <article class="open-slot-row booked">
+        <div>
+          <strong>${block.start} - ${block.end}</strong>
+          <span>${formatDate(block.date)} · Blocked</span>
         </div>
-        <p class="slot-note">${block.reason || "Coach unavailable."}</p>
+        <div>
+          <strong>${block.reason || "Unavailable time"}</strong>
+          <span>Unavailable time</span>
+        </div>
         <button class="danger-button" type="button" data-action="delete-block" data-id="${block.id}">Delete</button>
       </article>
     `;
   });
 
-  elements.exceptionsList.innerHTML = [...blockCards, ...booked.map(renderCoachSlotCard)].join("");
+  const bookedCards = booked.map((slot) => {
+    return `
+      <article class="open-slot-row booked">
+        <div>
+          <strong>${slot.start} - ${slot.end}</strong>
+          <span>${formatDate(slot.date)} · Booked</span>
+        </div>
+        <div>
+          <strong>${slot.location}</strong>
+          <span>${slot.student ? `${slot.student.name} · ${slot.student.email}` : "Student booking"}</span>
+        </div>
+        <button class="ghost-button" type="button" data-action="cancel" data-id="${slot.id}">取消预约</button>
+      </article>
+    `;
+  });
+
+  elements.exceptionsList.innerHTML = [...blockCards, ...bookedCards].join("");
 }
 
 function getSlotsForDate(date) {
@@ -615,8 +687,8 @@ function renderDropdownOpenSlots() {
             <span>${group.type === "booked" ? "Booked" : "Available"}</span>
           </div>
           <div>
-            <strong>${group.lessonName || "Private lesson"} · $${group.lessonPrice}</strong>
-            <span>${group.location}</span>
+            <strong>${group.location}</strong>
+            <span>Open availability</span>
           </div>
           ${
             group.type === "booked"
@@ -725,9 +797,49 @@ function renderDragCalendar() {
   renderCalendarAvailability();
 }
 
+function renderExceptionDragCalendar() {
+  const weekStart = startOfWeekIso(elements.exceptionCalendarWeekStart.value || elements.calendarWeekStart.value || todayIso());
+  elements.exceptionCalendarWeekStart.value = weekStart;
+  const displayStart = exceptionCalendarShowsFullDay ? fullDayStart : coreDayStart;
+  const displayEnd = exceptionCalendarShowsFullDay ? fullDayEnd : coreDayEnd;
+
+  const header = [
+    `<div class="calendar-corner"></div>`,
+    ...dayLabels.map((label, index) => {
+      const date = addDaysIso(weekStart, index);
+      return `<div class="calendar-day">${label}<span>${formatDate(date)}</span></div>`;
+    }),
+  ].join("");
+
+  const rows = [];
+  for (let minutes = minutesFromTime(displayStart); minutes < minutesFromTime(displayEnd); minutes += calendarStep) {
+    rows.push(`<div class="calendar-time">${timeFromMinutes(minutes)}</div>`);
+    for (let dayIndex = 0; dayIndex < 7; dayIndex += 1) {
+      rows.push(`
+        <button
+          class="calendar-cell"
+          type="button"
+          data-day-index="${dayIndex}"
+          data-minutes="${minutes}"
+          aria-label="${dayLabels[dayIndex]} ${timeFromMinutes(minutes)}"
+        ></button>
+      `);
+    }
+  }
+
+  elements.exceptionDragCalendar.innerHTML = header + rows.join("");
+  renderExceptionCalendarAvailability();
+}
+
 function findSlotAt(coachId, date, minutes) {
   return slots.find((item) => {
     return item.coachId === coachId && item.date === date && minutes >= minutesFromTime(item.start) && minutes < minutesFromTime(item.end);
+  });
+}
+
+function findBlockAt(date, minutes) {
+  return blockedExceptions.find((block) => {
+    return block.coachId === currentCoachId && block.date === date && minutes >= minutesFromTime(block.start) && minutes < minutesFromTime(block.end);
   });
 }
 
@@ -756,23 +868,57 @@ function renderCalendarAvailability() {
   });
 }
 
+function renderExceptionCalendarAvailability() {
+  if (!elements.exceptionDragCalendar || !elements.exceptionDragCalendar.children.length) return;
+
+  const weekStart = elements.exceptionCalendarWeekStart.value;
+  const cells = elements.exceptionDragCalendar.querySelectorAll(".calendar-cell");
+  cells.forEach((cell) => {
+    const date = addDaysIso(weekStart, Number(cell.dataset.dayIndex));
+    const minutes = Number(cell.dataset.minutes);
+    const slot = findSlotAt(currentCoachId, date, minutes);
+    const block = findBlockAt(date, minutes);
+    const isUnsavedBlock = Boolean(block && unsavedBlockExceptionIds.has(block.id));
+    const studentName = slot && slot.booked && slot.student ? slot.student.name : "";
+    const isBookingStart = Boolean(studentName && minutes === minutesFromTime(slot.start));
+
+    cell.textContent = "";
+    cell.style.removeProperty("--rink-color");
+    cell.style.removeProperty("--booked-rink-color");
+    if (slot && !block) {
+      cell.style.setProperty("--rink-color", getRinkColor(slot.location));
+      cell.style.setProperty("--booked-rink-color", getBookedRinkColor(slot.location));
+    }
+    cell.classList.toggle("has-slot", Boolean(slot && !block));
+    cell.classList.toggle("has-booking", Boolean(slot && slot.booked));
+    cell.classList.toggle("has-blocked", !slot || Boolean(block));
+    cell.classList.toggle("is-editing", isUnsavedBlock);
+    cell.classList.toggle("booking-start", isBookingStart);
+    if (isBookingStart) {
+      cell.innerHTML = `<span class="calendar-cell-label">${studentName}</span>`;
+    }
+    cell.title = block ? `${block.start}-${block.end} Blocked` : slot ? `${slot.start}-${slot.end} ${slot.location}${studentName ? ` · ${studentName}` : ""}` : "Blocked";
+    cell.setAttribute("aria-label", cell.title);
+  });
+}
+
 function addAvailability(event) {
   event.preventDefault();
   const startMinutes = minutesFromTime(elements.startTime.value);
   const endMinutes = minutesFromTime(elements.endTime.value);
-  const lesson = getLessonById(elements.lessonTypeSelect.value);
+  const lesson = getAvailabilityLesson();
 
   if (endMinutes <= startMinutes) {
     showFormMessage("结束时间需要晚于开始时间。", true);
     return;
   }
 
-  if (endMinutes - startMinutes < lesson.duration) {
-    showFormMessage(`这个时间范围少于 ${lesson.duration} 分钟，无法生成 ${lesson.name}。`, true);
+  if (endMinutes - startMinutes < calendarStep) {
+    showFormMessage(`这个时间范围少于 ${calendarStep} 分钟，无法生成 availability。`, true);
     return;
   }
 
-  const newSlots = createSlotsFromRange(
+  const { newSlots, overwritten } = replaceAvailabilityRange(
     currentCoachId,
     elements.slotDate.value,
     startMinutes,
@@ -783,15 +929,13 @@ function addAvailability(event) {
   );
 
   if (!newSlots.length) {
-    showFormMessage("这段时间已经是 available；不用重复添加。");
+    showFormMessage("这段时间没有可覆盖的 open availability，可能已经被预约。");
     return;
   }
 
-  slots = [...slots, ...newSlots];
-  newSlots.forEach(markAddedSlot);
   elements.coachNote.value = "";
   refreshAvailabilityDirty();
-  showFormMessage(`已添加 ${newSlots.length} 个可预约滑冰时间。`);
+  showFormMessage(overwritten.length ? `已更新 ${overwritten.length} 个旧 availability，并添加 ${newSlots.length} 个新时间。` : `已添加 ${newSlots.length} 个可预约滑冰时间。`);
   render();
 }
 
@@ -801,30 +945,60 @@ function toggleCalendarHours() {
   renderDragCalendar();
 }
 
+function toggleExceptionCalendarHours() {
+  exceptionCalendarShowsFullDay = !exceptionCalendarShowsFullDay;
+  elements.toggleExceptionCalendarHours.textContent = exceptionCalendarShowsFullDay ? "Show 6:00-18:00" : "Show full 24 hours";
+  renderExceptionDragCalendar();
+}
+
+function openBlockTimeDialog() {
+  elements.blockDialogDate.value = elements.exceptionCalendarWeekStart.value || elements.slotDate.value || nextWeekdayIso();
+  elements.blockDialogStart.value = defaultStart;
+  syncEndTimeOptions(elements.blockDialogStart, elements.blockDialogEnd, "12:00");
+  elements.blockRepeatWeekly.checked = false;
+  elements.blockDialog.showModal();
+}
+
+function closeBlockTimeDialog() {
+  elements.blockDialog.close();
+}
+
 function addBlockException(event) {
   event.preventDefault();
-  const start = elements.blockStartTime.value;
-  const end = elements.blockEndTime.value;
+  const start = elements.blockDialogStart.value;
+  const end = elements.blockDialogEnd.value;
+  const date = elements.blockDialogDate.value;
 
   if (minutesFromTime(end) <= minutesFromTime(start)) {
-    showFormMessage("Block 的结束时间需要晚于开始时间。", true);
+    showFormMessage("结束时间需要晚于开始时间。", true);
     return;
   }
 
+  const repeatCount = elements.blockRepeatWeekly.checked ? 12 : 1;
+  for (let index = 0; index < repeatCount; index += 1) {
+    addBlockExceptionRange(addDaysIso(date, index * 7), minutesFromTime(start), minutesFromTime(end));
+  }
+
+  elements.blockDialog.close();
+  showFormMessage(elements.blockRepeatWeekly.checked ? "已添加每周重复 unavailable time，记得 Save Availability。" : "已添加 unavailable time，记得 Save Availability。");
+  render();
+}
+
+function addBlockExceptionRange(date, start, end, reason = "Unavailable time") {
   const block = {
     id: createId(),
     coachId: currentCoachId,
-    date: elements.blockDate.value,
-    start,
-    end,
-    reason: elements.blockReason.value.trim(),
+    date,
+    start: timeFromMinutes(start),
+    end: timeFromMinutes(end),
+    reason,
   };
   blockedExceptions.push(block);
   unsavedBlockExceptionIds.add(block.id);
-  elements.blockReason.value = "";
+  for (let minutes = start; minutes < end; minutes += calendarStep) {
+    unsavedBlockedCellKeys.add(cellKey(date, minutes));
+  }
   refreshAvailabilityDirty("Unsaved block");
-  showFormMessage("已添加 temporary block，记得 Save Availability。");
-  render();
 }
 
 function createSlotsFromRange(coachId, date, startMinutes, endMinutes, lesson, location, note, checkExisting = true) {
@@ -837,6 +1011,44 @@ function createSlotsFromRange(coachId, date, startMinutes, endMinutes, lesson, l
     }
   }
   return newSlots;
+}
+
+function replaceAvailabilityRange(coachId, date, startMinutes, endMinutes, lesson, location, note) {
+  const overwritten = slots.filter((slot) => {
+    return (
+      slot.coachId === coachId &&
+      slot.date === date &&
+      !slot.booked &&
+      rangesOverlap(minutesFromTime(slot.start), minutesFromTime(slot.end), startMinutes, endMinutes)
+    );
+  });
+  const overwrittenIds = new Set(overwritten.map((slot) => slot.id));
+
+  overwritten.forEach(markDeletedSlot);
+  slots = slots.filter((slot) => !overwrittenIds.has(slot.id));
+
+  const newSlots = createSlotsFromRange(coachId, date, startMinutes, endMinutes, lesson, location, note);
+  slots = [...slots, ...newSlots];
+  newSlots.forEach(markAddedSlot);
+
+  return { newSlots, overwritten };
+}
+
+function removeAvailabilityRange(coachId, date, startMinutes, endMinutes) {
+  const removed = slots.filter((slot) => {
+    return (
+      slot.coachId === coachId &&
+      slot.date === date &&
+      !slot.booked &&
+      rangesOverlap(minutesFromTime(slot.start), minutesFromTime(slot.end), startMinutes, endMinutes)
+    );
+  });
+  const removedIds = new Set(removed.map((slot) => slot.id));
+
+  removed.forEach(markDeletedSlot);
+  slots = slots.filter((slot) => !removedIds.has(slot.id));
+
+  return removed;
 }
 
 function showFormMessage(message, isError = false) {
@@ -976,7 +1188,6 @@ function handleLessonOptionChange(event) {
   lesson.price = Number(row.querySelector(".lesson-price-input").value || lesson.price);
   lesson.custom = true;
   coachProfiles[currentCoachId] = profile;
-  syncLessonTypeSelects();
   saveProfiles();
 }
 
@@ -1168,7 +1379,7 @@ function startCalendarDrag(event) {
     dayIndex: Number(cell.dataset.dayIndex),
     start: minutes,
     end: minutes,
-    mode: isEditing ? "undo" : elements.calendarEditMode.value,
+    mode: isEditing ? "undo" : "open",
   };
   cell.setPointerCapture(event.pointerId);
   paintDragSelection();
@@ -1194,46 +1405,40 @@ function finishCalendarDrag() {
 
   if (dragState.mode === "undo") {
     undoEditingRange(date, start, end);
-  } else if (dragState.mode === "block") {
-    const block = {
-      id: createId(),
-      coachId: currentCoachId,
-      date,
-      start: timeFromMinutes(start),
-      end: timeFromMinutes(end),
-      reason: "Blocked from calendar",
-    };
-    blockedExceptions.push(block);
-    unsavedBlockExceptionIds.add(block.id);
-    for (let minutes = start; minutes < end; minutes += calendarStep) {
-      unsavedBlockedCellKeys.add(cellKey(date, minutes));
+  } else if (elements.calendarLocationType.value === unavailableSelection) {
+    const removed = removeAvailabilityRange(currentCoachId, date, start, end);
+    if (removed.length) {
+      refreshAvailabilityDirty();
+      showFormMessage(`已删除 ${removed.length} 个 availability，记得 Save Availability。`);
+    } else {
+      showFormMessage("这段没有可删除的 open availability，可能已经被预约或本来就是 unavailable。");
     }
-    refreshAvailabilityDirty();
-    showFormMessage("已添加 temporary block，记得 Save Availability。");
   } else {
-    const lesson = getLessonById(elements.calendarLessonTypeSelect.value);
-    if (end - start < lesson.duration) {
-      showFormMessage(`拖选范围少于 ${lesson.duration} 分钟，无法生成 ${lesson.name}。`, true);
+    const lesson = getAvailabilityLesson();
+    if (end - start < calendarStep) {
+      showFormMessage(`拖选范围少于 ${calendarStep} 分钟，无法生成 availability。`, true);
       dragState = null;
       clearDragSelection();
       return;
     }
 
-    const newSlots = createSlotsFromRange(
+    const { newSlots, overwritten } = replaceAvailabilityRange(
       currentCoachId,
       date,
       start,
       end,
       lesson,
       elements.calendarLocationType.value,
-      elements.calendarNote.value.trim() || "Added from calendar."
+      `Added from calendar for ${elements.calendarLocationType.value}.`
     );
-    slots = [...slots, ...newSlots];
     if (newSlots.length) {
-      newSlots.forEach(markAddedSlot);
       refreshAvailabilityDirty();
     }
-    showFormMessage(newSlots.length ? `Calendar 已添加 ${newSlots.length} 个 availability。` : "这段时间已经是 available；不用重复添加。");
+    if (newSlots.length) {
+      showFormMessage(overwritten.length ? `Calendar 已覆盖 ${overwritten.length} 个旧 availability，颜色已更新。` : `Calendar 已添加 ${newSlots.length} 个 availability。`);
+    } else {
+      showFormMessage("这段时间已被预约或无法覆盖。");
+    }
   }
 
   dragState = null;
@@ -1244,21 +1449,37 @@ function finishCalendarDrag() {
 function paintDragSelection() {
   const start = Math.min(dragState.start, dragState.end);
   const end = Math.max(dragState.start, dragState.end);
+  const isRemovingAvailability = elements.calendarLocationType.value === unavailableSelection;
+  const selectionColor = isRemovingAvailability ? "#e2e8f0" : getRinkColor(elements.calendarLocationType.value);
   elements.dragCalendar.querySelectorAll(".calendar-cell").forEach((cell) => {
-    cell.classList.remove("selecting", "blocking", "reverting");
+    cell.classList.remove("selecting", "blocking", "reverting", "removing");
     const sameDay = Number(cell.dataset.dayIndex) === dragState.dayIndex;
     const minutes = Number(cell.dataset.minutes);
     const inRange = sameDay && minutes >= start && minutes <= end;
+    if (inRange && dragState.mode === "open") {
+      cell.style.setProperty("--selection-color", selectionColor);
+    } else {
+      cell.style.removeProperty("--selection-color");
+    }
     cell.classList.toggle("selecting", inRange && dragState.mode === "open");
-    cell.classList.toggle("blocking", inRange && dragState.mode === "block");
+    cell.classList.toggle("removing", inRange && dragState.mode === "open" && isRemovingAvailability);
     cell.classList.toggle("reverting", inRange && dragState.mode === "undo");
   });
 }
 
 function clearDragSelection() {
   elements.dragCalendar.querySelectorAll(".calendar-cell").forEach((cell) => {
-    cell.classList.remove("selecting", "blocking", "reverting");
+    cell.classList.remove("selecting", "blocking", "reverting", "removing");
+    cell.style.removeProperty("--selection-color");
   });
+}
+
+function selectCalendarRink(event) {
+  const button = event.target.closest("button[data-rink]");
+  if (!button) return;
+
+  elements.calendarLocationType.value = button.dataset.rink;
+  renderCalendarRinkOptions();
 }
 
 function switchView(event) {
@@ -1332,7 +1553,7 @@ function resetDemoData() {
   saveSlots();
   setAvailabilityDirty(false, "Saved reset data");
   render();
-  showFormMessage("已重置：默认周一到周五 9:00-16:00 可预约。");
+  showFormMessage("已重置：默认周一到周五 6:00-16:00 对 all served rinks 可预约。");
 }
 
 function bindEvents() {
@@ -1350,8 +1571,15 @@ function bindEvents() {
     elements.travelFeeLabel.classList.toggle("is-hidden", elements.travelsToOtherRinks.value !== "yes");
   });
   elements.availabilityForm.addEventListener("submit", addAvailability);
-  elements.blockExceptionForm.addEventListener("submit", addBlockException);
+  elements.openBlockDialog.addEventListener("click", openBlockTimeDialog);
+  elements.blockDialogForm.addEventListener("submit", addBlockException);
+  elements.closeBlockDialog.addEventListener("click", closeBlockTimeDialog);
+  elements.cancelBlockDialog.addEventListener("click", closeBlockTimeDialog);
+  elements.calendarRinkOptions.addEventListener("click", selectCalendarRink);
+  elements.startTime.addEventListener("change", () => syncEndTimeOptions(elements.startTime, elements.endTime));
+  elements.blockDialogStart.addEventListener("change", () => syncEndTimeOptions(elements.blockDialogStart, elements.blockDialogEnd));
   elements.toggleCalendarHours.addEventListener("click", toggleCalendarHours);
+  elements.toggleExceptionCalendarHours.addEventListener("click", toggleExceptionCalendarHours);
   elements.slotDate.addEventListener("change", () => {
     elements.calendarWeekStart.value = startOfWeekIso(elements.slotDate.value);
     renderDragCalendar();
@@ -1364,6 +1592,7 @@ function bindEvents() {
     renderDragCalendar();
     renderDropdownWeekSlots();
   });
+  elements.exceptionCalendarWeekStart.addEventListener("change", renderExceptionDragCalendar);
   elements.coachSlots.addEventListener("click", handleSlotAction);
   elements.exceptionsList.addEventListener("click", handleSlotAction);
   elements.dropdownOpenSlots.addEventListener("click", handleSlotAction);
@@ -1386,11 +1615,13 @@ function init() {
   populateTimeSelects();
   const initialDate = nextWeekdayIso();
   elements.slotDate.value = initialDate;
-  elements.blockDate.value = initialDate;
+  elements.blockDialogDate.value = initialDate;
   elements.studentDateFilter.value = initialDate;
   elements.calendarWeekStart.value = startOfWeekIso(initialDate);
+  elements.exceptionCalendarWeekStart.value = startOfWeekIso(initialDate);
   bindEvents();
   renderDragCalendar();
+  renderExceptionDragCalendar();
   render();
 }
 

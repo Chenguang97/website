@@ -1,0 +1,226 @@
+.student-controls {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+.primary-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 11px 16px;
+  background: var(--blue);
+  color: #ffffff;
+}
+
+.primary-button:hover {
+  background: var(--blue-dark);
+}
+
+.ghost-button,
+.danger-button {
+  padding: 10px 14px;
+  background: #ffffff;
+  border: 1px solid var(--line);
+  color: var(--text);
+}
+
+.danger-button {
+  color: var(--red);
+}
+
+.icon-button {
+  width: 42px;
+  min-height: 42px;
+  background: #eff6ff;
+  color: var(--text);
+  font-size: 24px;
+}
+
+.form-message {
+  min-height: 20px;
+  margin: 0;
+  color: var(--green);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.slot-list,
+.booking-grid {
+  display: grid;
+  gap: 12px;
+}
+
+.booking-grid {
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+}
+
+.slot-card {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.slot-card.booked {
+  background: #fff7ed;
+  border-color: #fed7aa;
+}
+
+.student-booking-group {
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.student-booking-group summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.student-booking-group summary::-webkit-details-marker {
+  display: none;
+}
+
+.student-booking-group summary strong,
+.student-booking-location h4,
+.student-booking-row strong {
+  color: #172033;
+}
+
+.student-booking-group summary span,
+.student-booking-row span {
+  display: block;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.student-booking-locations {
+  display: grid;
+  gap: 12px;
+  padding: 0 14px 14px;
+}
+
+.student-booking-location {
+  display: grid;
+  gap: 8px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+
+.student-booking-location h4 {
+  margin: 0;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.booking-location-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: var(--booking-location-booked-color, var(--booking-location-color));
+  flex: 0 0 auto;
+}
+
+.booking-row-list {
+  display: grid;
+  gap: 8px;
+}
+
+.student-booking-row {
+  display: grid;
+  grid-template-columns: 10px minmax(0, 1fr);
+  gap: 12px;
+  align-items: center;
+  padding: 10px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.booking-location-mark {
+  width: 10px;
+  height: 100%;
+  min-height: 44px;
+  border-radius: 999px;
+  background: var(--booking-location-booked-color, var(--booking-location-color));
+}
+
+.slot-top {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.slot-time {
+  font-size: 18px;
+  font-weight: 900;
+}
+
+.slot-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 4px 9px;
+  border-radius: 999px;
+  background: var(--surface-strong);
+  color: #1e3a8a;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.pill.booked {
+  background: #ffedd5;
+  color: #9a3412;
+}
+
+.slot-note,
+.empty-state {
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.slot-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.student-controls {
+  margin-bottom: 18px;
+  padding: 16px;
+}
+
+.booking-dialog {
+  width: min(480px, calc(100vw - 32px));
+  border: 0;
+  border-radius: 8px;
+  padding: 0;
+  box-shadow: var(--shadow);
+}
+
+.booking-dialog::backdrop {
+  background: rgba(15, 23, 42, 0.48);
+}
+

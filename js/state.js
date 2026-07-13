@@ -1,0 +1,16 @@
+var coachProfiles = loadProfiles();
+var slots = loadSlots();
+var blockedExceptions = loadBlockedExceptions();
+var dragState = null;
+var hasUnsavedAvailabilityChanges = false;
+var hasUnsavedProfileChanges = false;
+var pendingPhotoDataUrl = "";
+var calendarShowsFullDay = false;
+var exceptionCalendarShowsFullDay = false;
+var unsavedAddedSlotIds = new Set();
+var unsavedBlockedCellKeys = new Set();
+var unsavedRecurringCellKeys = new Set();
+var unsavedBlockExceptionIds = new Set();
+var pendingDeletedSlots = new Map();
+var undoStack = [];
+var undoStackLimit = 30;

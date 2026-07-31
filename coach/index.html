@@ -1,0 +1,522 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Ice Skating Coach Booking</title>
+    <script>
+      (() => {
+        try {
+          const savedPanel = localStorage.getItem("ice-skating-coach-active-panel-v1");
+          if (savedPanel) {
+            document.documentElement.dataset.activeCoachPanel = savedPanel;
+          }
+        } catch (error) {
+          document.documentElement.dataset.activeCoachPanel = "profilePanel";
+        }
+      })();
+    </script>
+    <link rel="stylesheet" href="../css/base.css" />
+    <link rel="stylesheet" href="../css/coach-profile.css" />
+    <link rel="stylesheet" href="../css/calendar.css" />
+    <link rel="stylesheet" href="../css/forms-dialogs.css" />
+    <link rel="stylesheet" href="../css/student-bookings.css" />
+    <link rel="stylesheet" href="../css/responsive.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <aside class="sidebar" aria-label="Application navigation">
+        <div class="brand">
+          <div class="brand-mark" aria-hidden="true">
+            <svg viewBox="0 0 48 48" role="img">
+              <path d="M10 30c0-9.4 6.6-17 14-17s14 7.6 14 17v4.5c0 2.5-2 4.5-4.5 4.5h-19C12 39 10 37 10 34.5V30Z" fill="#1d4ed8" />
+              <path d="M17 24.5c4.7-4.9 9.4-4.9 14 0" fill="none" stroke="#f8fafc" stroke-width="3.5" stroke-linecap="round" />
+              <path d="M20 32h8" fill="none" stroke="#fbbf24" stroke-width="3.5" stroke-linecap="round" />
+            </svg>
+          </div>
+          <div>
+            <p class="eyebrow">冰场预约</p>
+            <h1>教练后台</h1>
+          </div>
+        </div>
+
+        <nav class="role-page-nav" aria-label="页面导航">
+          <a class="role-home-link" href="../index.html">← 返回教练列表</a>
+          <a class="role-home-link" href="../student/index.html?access=full">查看公开主页</a>
+        </nav>
+
+        <section class="sidebar-panel" aria-label="今日概览">
+          <p class="panel-label">本周状态</p>
+          <div class="stat-grid">
+            <div>
+              <strong id="availableCount">0</strong>
+              <span>小时可预约</span>
+            </div>
+            <div>
+              <strong id="bookedCount">0</strong>
+              <span>节课已预约</span>
+            </div>
+          </div>
+        </section>
+      </aside>
+
+      <section class="workspace">
+        <section id="adminView" class="view" aria-labelledby="adminHeading">
+          <div class="section-header">
+            <div>
+              <p class="eyebrow">Admin dashboard</p>
+              <h2 id="adminHeading">平台管理</h2>
+            </div>
+            <button id="resetDemo" class="ghost-button" type="button">重置示例数据</button>
+          </div>
+
+          <div class="admin-grid">
+            <article class="admin-card">
+              <p class="eyebrow">Coaches</p>
+              <strong>3</strong>
+              <span>管理教练资料、照片、授课地点和课程价格。</span>
+            </article>
+            <article class="admin-card">
+              <p class="eyebrow">Bookings</p>
+              <strong id="adminBookedCount">0</strong>
+              <span>查看学生预约、取消记录和临时不可预约时段。</span>
+            </article>
+            <article class="admin-card">
+              <p class="eyebrow">Rinks</p>
+              <strong>3</strong>
+              <span>维护可授课冰场列表和后续扩展规则。</span>
+            </article>
+          </div>
+        </section>
+
+        <section id="coachView" class="view active" aria-labelledby="coachHeading">
+          <div class="section-header">
+            <div>
+              <p class="eyebrow">教练后台</p>
+              <h2 id="coachHeading">编辑教练主页</h2>
+              <p class="heading-note">更新学生在预约页面看到的信息</p>
+            </div>
+            <div class="header-actions">
+              <a class="ghost-button" href="../student/index.html?access=full">预览主页</a>
+              <button class="primary-button" type="submit" form="coachProfileForm">保存更改</button>
+            </div>
+          </div>
+
+          <div class="coach-tabs" role="tablist" aria-label="Coach settings">
+            <button class="coach-tab active" type="button" data-coach-panel="profilePanel" aria-selected="true">基本资料</button>
+            <button class="coach-tab" type="button" data-coach-panel="photoPanel" aria-selected="false">照片</button>
+            <button class="coach-tab" type="button" data-coach-panel="bookingsPanel" aria-selected="false">预约日历</button>
+            <button class="coach-tab" type="button" data-coach-panel="availabilityPanel" aria-selected="false">开放时间</button>
+          </div>
+
+          <div class="coach-layout">
+            <form id="coachProfileForm" class="profile-panel coach-panel active" data-coach-content="profilePanel">
+              <div class="current-coach-card compact-profile-card">
+                <div class="mini-avatar">MC</div>
+                <div>
+                  <strong>Maya Chen</strong>
+                  <span>花样滑冰教练</span>
+                </div>
+                <a class="ghost-button compact-edit-link" href="#photoPanel">编辑公开资料</a>
+              </div>
+
+              <section class="teaching-location-panel" aria-label="授课地点">
+                <h4>授课地点</h4>
+                <div class="teaching-location-grid">
+                  <label class="profile-field profile-field-rinks">
+                    可授课冰场
+                    <div id="servedRinks" class="checkbox-stack">
+                      <label><input type="checkbox" name="servedRinks" value="Polar Ice Rink" checked /> Polar Ice Rink</label>
+                      <label><input type="checkbox" name="servedRinks" value="Arcadia Ice Arena" /> Arcadia Ice Arena</label>
+                      <label><input type="checkbox" name="servedRinks" value="Oceanside Ice Arena" /> Oceanside Ice Arena</label>
+                    </div>
+                  </label>
+                  <div class="profile-field profile-field-travel">
+                    <label>
+                      其他冰场预约
+                      <select id="travelsToOtherRinks">
+                        <option value="no">不接受</option>
+                        <option value="yes">接受，需额外收费</option>
+                      </select>
+                    </label>
+                    <label id="travelFeeLabel" class="profile-field profile-field-fee is-hidden">
+                      额外出行费
+                      <span class="money-input">
+                        <span>$</span>
+                        <input id="travelFee" type="number" min="0" step="5" placeholder="25" />
+                        <span>/ booking</span>
+                      </span>
+                    </label>
+                  </div>
+                </div>
+              </section>
+
+              <section class="lesson-rate-panel" aria-label="Private lesson rates">
+                <div class="panel-heading">
+                  <div>
+                    <p class="eyebrow">私教课程</p>
+                    <h3>课程时长和价格</h3>
+                  </div>
+                </div>
+                <div class="lesson-rate-layout">
+                  <div class="rate-summary-card">
+                    <label class="profile-field profile-field-rate">
+                      基础时薪
+                      <span class="field-hint">用于自动计算新课程价格，不会覆盖你已经修改的课程。</span>
+                      <span class="money-input">
+                        <span>$</span>
+                        <input id="coachRate" type="number" min="0" step="5" placeholder="120" />
+                        <span>/小时</span>
+                      </span>
+                    </label>
+                  </div>
+                  <div class="lesson-options-area">
+                    <p class="default-note">不同课程时长可以独立定价；新增课程会参考基础时薪自动填入价格。</p>
+                    <div id="lessonOptionsList" class="lesson-options-list"></div>
+                    <div class="lesson-add-card">
+                      <p class="lesson-add-title">添加课程选项</p>
+                      <div class="lesson-option-form">
+                        <label>
+                          名称
+                          <input id="lessonName" type="text" placeholder="例如：45 分钟私教" />
+                        </label>
+                        <label>
+                          分钟
+                          <input id="lessonDuration" type="number" min="15" step="15" placeholder="例如：45" />
+                        </label>
+                        <label>
+                          价格
+                          <input id="lessonPrice" type="number" min="0" step="5" placeholder="例如：90" />
+                        </label>
+                        <button id="addLessonOption" class="ghost-button" type="button">添加</button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </section>
+
+              <button id="saveProfileChanges" class="primary-button profile-save-button" type="submit">保存更改</button>
+              <p id="profileMessage" class="form-message" role="status"></p>
+            </form>
+
+            <section id="photoPanel" class="photo-panel coach-panel" data-coach-content="photoPanel">
+              <div class="panel-heading">
+                <div>
+                  <p class="eyebrow">Coach photo</p>
+                  <h3>头像和展示图</h3>
+                </div>
+              </div>
+              <div class="photo-layout">
+                <div class="photo-preview" aria-label="Coach photo preview">
+                  <div id="coachPhotoPreview" class="avatar-preview">MC</div>
+                </div>
+                <form id="coachPhotoForm" class="photo-form">
+                  <label>
+                    上传本地照片
+                    <input id="coachPhotoFile" type="file" accept="image/*" />
+                  </label>
+                  <label>
+                    或使用照片 URL
+                    <input id="coachPhotoUrl" type="url" placeholder="https://example.com/photo.jpg" />
+                  </label>
+                  <button class="primary-button" type="submit">保存照片</button>
+                  <p id="photoMessage" class="form-message" role="status"></p>
+                </form>
+              </div>
+            </section>
+
+            <section class="availability-panel coach-panel" data-coach-content="availabilityPanel">
+              <div class="panel-heading">
+                <div>
+                  <p class="eyebrow">可预约时间</p>
+                  <h3>设置每周固定开放时间</h3>
+                  <p class="heading-note">老师每周重复开放给学生预约的时间。默认周一到周五 6:00-16:00 对不限冰场开放。</p>
+                </div>
+                <div class="method-switch" role="tablist" aria-label="选择可预约时间设置方式">
+                  <button class="method-button active" type="button" data-method="calendarPanel" aria-selected="true">日历</button>
+                  <button class="method-button" type="button" data-method="dropdownPanel" aria-selected="false">下拉选择</button>
+                </div>
+              </div>
+
+              <section id="regularAvailabilitySection" class="availability-section active" data-availability-content="regularAvailabilitySection">
+              <div id="dropdownPanel" class="method-panel is-hidden" data-method-panel="dropdownPanel">
+                <form id="availabilityForm" class="form-panel">
+                  <div>
+                    <p class="eyebrow">下拉选择</p>
+                    <h3>用下拉选时间</h3>
+                  </div>
+
+                  <div class="two-column">
+                    <label>
+                      日期
+                      <input id="slotDate" type="date" required />
+                    </label>
+                    <label>
+                      地点 / 上课方式
+                      <select id="locationType">
+                        <option value="Polar Ice Rink">Polar Ice Rink</option>
+                        <option value="Arcadia Ice Arena">Arcadia Ice Arena</option>
+                        <option value="Oceanside Ice Arena">Oceanside Ice Arena</option>
+                        <option value="Zoom">Zoom</option>
+                      </select>
+                    </label>
+                  </div>
+
+                  <div class="two-column">
+                    <label>
+                      开始时间
+                      <select id="startTime" required></select>
+                    </label>
+                    <label>
+                      结束时间
+                      <select id="endTime" required></select>
+                    </label>
+                  </div>
+
+                  <label>
+                    备注
+                    <textarea id="coachNote" rows="3" placeholder="例如：Beginner edges / private lesson / competition prep"></textarea>
+                  </label>
+
+                  <button class="primary-button" type="submit">
+                    <span class="button-icon" aria-hidden="true">+</span>
+                    添加可预约时间
+                  </button>
+                </form>
+
+                <section class="dropdown-open-panel" aria-label="所选日期开放时间">
+                  <div class="panel-heading compact-heading">
+                    <div>
+                      <p class="eyebrow">所选日期</p>
+                      <h3>已开放时间</h3>
+                      <p id="selectedDateMeta" class="date-meta"></p>
+                    </div>
+                  </div>
+                  <div id="dropdownOpenSlots" class="dropdown-open-list" aria-live="polite"></div>
+                </section>
+
+                <section class="dropdown-open-panel" aria-label="每周可预约时间总览">
+                  <div class="panel-heading compact-heading">
+                    <div>
+                      <p class="eyebrow">本周总览</p>
+                      <h3>本周开放总览</h3>
+                    </div>
+                  </div>
+                  <div id="dropdownWeekSlots" class="week-open-grid" aria-live="polite"></div>
+                </section>
+              </div>
+
+              <div id="calendarPanel" class="calendar-panel method-panel" data-method-panel="calendarPanel">
+                <div class="panel-heading">
+                <div>
+                  <p class="eyebrow">日历选择</p>
+                  <h3>在日历上拖选</h3>
+                </div>
+                <button id="toggleCalendarHours" class="ghost-button" type="button">显示全天</button>
+                </div>
+
+                <div class="calendar-controls">
+                  <div class="week-jump-control">
+                    <label>
+                      本周开始日期
+                      <input id="calendarWeekStart" type="date" />
+                    </label>
+                    <button id="todayCalendarWeek" class="calendar-today-button" type="button">今天</button>
+                  </div>
+                </div>
+
+                <div class="rink-picker" aria-label="选择开放地点">
+                  <div class="rink-picker-label">选择开放地点</div>
+                  <div id="calendarRinkOptions" class="rink-option-grid"></div>
+                  <select id="calendarLocationType" class="hidden-control" aria-hidden="true" tabindex="-1">
+                    <option value="Any served rink">不限冰场</option>
+                  </select>
+                </div>
+
+                <div class="calendar-help">
+                  选择授课地点，然后在日历的灰色区域拖动以设置可预约时间。深色边框表示尚未保存的更改，可拖动调整或取消。
+                </div>
+                <div class="calendar-legend weekly-availability-legend" aria-label="可预约时间图例">
+                  <span><i class="legend-dot status-open-sample"></i>场馆颜色：可预约</span>
+                  <span><i class="legend-dot status-booked-sample"></i>灰色斜纹：已预约</span>
+                  <span><i class="legend-dot blocked"></i>灰色：未开放</span>
+                </div>
+                <div class="calendar-week-frame">
+                  <button id="previousCalendarWeek" class="calendar-side-arrow" type="button" aria-label="Previous week">‹</button>
+                  <div id="dragCalendar" class="drag-calendar" aria-label="拖选可预约时间日历"></div>
+                  <button id="nextCalendarWeek" class="calendar-side-arrow" type="button" aria-label="Next week">›</button>
+                </div>
+              </div>
+              <div class="availability-actions">
+                <button id="saveAvailability" class="primary-button" type="button">保存</button>
+                <span id="availabilitySaveMessage" class="save-status">没有未保存修改</span>
+              </div>
+              <p id="formMessage" class="form-message" role="status"></p>
+              </section>
+
+            </section>
+
+            <section class="bookings-panel coach-panel" data-coach-content="bookingsPanel">
+              <div class="panel-heading">
+                <div>
+                  <p class="eyebrow">课表</p>
+                  <h3>预约课表</h3>
+                </div>
+                <div class="method-switch" role="tablist" aria-label="课表视图">
+                  <button class="method-button booking-subtab active" type="button" data-booking-section="bookingCalendarSection" aria-selected="true">日历</button>
+                  <button class="method-button booking-subtab" type="button" data-booking-section="bookingListSection" aria-selected="false">学生列表</button>
+                </div>
+              </div>
+
+              <section id="bookingCalendarSection" class="booking-section active" data-booking-content="bookingCalendarSection">
+                <div id="exceptionCalendarPanel" class="calendar-panel exception-method-panel" data-exception-method-panel="exceptionCalendarPanel">
+                  <div class="calendar-toolbar">
+                    <button id="openBlockDialog" class="danger-button" type="button">添加不可预约时间</button>
+                    <button id="toggleExceptionCalendarHours" class="ghost-button" type="button">显示全天</button>
+                  </div>
+                  <div class="calendar-controls">
+                    <div class="week-jump-control">
+                      <label>
+                        本周开始日期
+                        <input id="exceptionCalendarWeekStart" type="date" />
+                      </label>
+                      <button id="todayScheduleWeek" class="calendar-today-button" type="button">今天</button>
+                    </div>
+                  </div>
+                  <div id="scheduleLegend" class="calendar-legend schedule-legend" aria-label="课表图例"></div>
+                  <div class="calendar-help">
+                    查看可预约时间、学生预约和临时不可预约时段。
+                  </div>
+                  <div class="calendar-week-frame">
+                    <button id="previousScheduleWeek" class="calendar-side-arrow" type="button" aria-label="上一周">‹</button>
+                    <div id="exceptionDragCalendar" class="drag-calendar" aria-label="查看 schedule calendar"></div>
+                    <button id="nextScheduleWeek" class="calendar-side-arrow" type="button" aria-label="下一周">›</button>
+                  </div>
+                </div>
+              </section>
+
+              <section id="bookingListSection" class="booking-section" data-booking-content="bookingListSection">
+                <div id="coachSlots" class="slot-list" aria-live="polite"></div>
+              </section>
+            </section>
+          </div>
+        </section>
+
+        <section id="studentView" class="view" aria-labelledby="studentHeading">
+          <div class="section-header">
+            <div>
+              <p class="eyebrow">Student booking</p>
+              <h2 id="studentHeading">选择可预约时间</h2>
+              <p id="studentAccessMessage" class="heading-note">未登录时只显示未来 3 小时内是否有可预约时间；登录后可查看教练、场馆、价格并预约。</p>
+            </div>
+            <a id="studentLoginPrompt" class="primary-button" href="login/index.html">登录 / 注册后查看完整时间表</a>
+          </div>
+
+          <div id="studentControls" class="student-controls">
+            <label>
+              Coach
+              <select id="studentCoachFilter"></select>
+            </label>
+            <label>
+              日期
+              <input id="studentDateFilter" type="date" />
+            </label>
+          </div>
+
+          <div id="studentSlots" class="booking-grid" aria-live="polite"></div>
+        </section>
+      </section>
+    </main>
+
+    <dialog id="bookingDialog" class="booking-dialog">
+      <form id="bookingForm" method="dialog">
+        <div class="dialog-heading">
+          <div>
+            <p class="eyebrow">Confirm booking</p>
+            <h3 id="dialogTitle">预约时间</h3>
+          </div>
+          <button class="icon-button" type="button" id="closeDialog" aria-label="关闭">×</button>
+        </div>
+        <input id="bookingSlotId" type="hidden" />
+        <label id="bookingLocationLabel" class="is-hidden">
+          Lesson location
+          <select id="bookingLocation"></select>
+        </label>
+        <label>
+          学生姓名
+          <input id="studentName" type="text" autocomplete="name" required />
+        </label>
+        <label>
+          Email
+          <input id="studentEmail" type="email" autocomplete="email" required />
+        </label>
+        <label>
+          给 coach 的备注
+          <textarea id="studentNote" rows="3" placeholder="想学习的内容、当前水平、问题等"></textarea>
+        </label>
+        <button class="primary-button" type="submit">确认预约</button>
+      </form>
+    </dialog>
+
+    <dialog id="bookingDetailsDialog" class="booking-dialog">
+      <form method="dialog">
+        <div class="dialog-heading">
+          <div>
+            <p class="eyebrow">预约详情</p>
+            <h3 id="bookingDetailsTitle">已预约课程</h3>
+          </div>
+          <button class="icon-button" type="button" id="closeBookingDetails" aria-label="关闭">×</button>
+        </div>
+        <div id="bookingDetailsBody" class="details-list"></div>
+        <div class="dialog-actions">
+          <button class="danger-button" type="button" id="removeBookingDetails">取消预约</button>
+          <button class="primary-button" type="submit">关闭</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="blockDialog" class="booking-dialog">
+      <form id="blockDialogForm" method="dialog">
+        <div class="dialog-heading">
+          <div>
+            <p class="eyebrow">课表日历</p>
+            <h3>添加不可预约时间</h3>
+          </div>
+          <button class="icon-button" type="button" id="closeBlockDialog" aria-label="关闭">×</button>
+        </div>
+        <div class="two-column">
+          <label>
+            日期
+            <input id="blockDialogDate" type="date" required />
+          </label>
+          <label>
+            开始时间
+            <select id="blockDialogStart" required></select>
+          </label>
+        </div>
+        <label>
+          结束时间
+          <select id="blockDialogEnd" required></select>
+        </label>
+        <label class="checkbox-row">
+          <input id="blockRepeatWeekly" type="checkbox" />
+          Repeat weekly
+        </label>
+        <div class="dialog-actions">
+          <button class="ghost-button" type="button" id="cancelBlockDialog">Cancel</button>
+          <button class="danger-button" type="submit">Confirm block</button>
+        </div>
+      </form>
+    </dialog>
+
+    <script src="../js/config.js"></script>
+    <script src="../js/elements.js"></script>
+    <script src="../js/utils-data.js"></script>
+    <script src="../js/state.js"></script>
+    <script src="../js/undo.js"></script>
+    <script src="../js/render.js"></script>
+    <script src="../js/actions.js"></script>
+    <script src="../js/navigation.js"></script>
+    <script src="../app.js"></script>
+  </body>
+</html>

@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>学生登录 · Ice Skating Coach Booking</title>
+    <link rel="stylesheet" href="../../css/base.css" />
+    <link rel="stylesheet" href="../../css/coach-profile.css" />
+    <link rel="stylesheet" href="../../css/responsive.css" />
+  </head>
+  <body class="landing-body">
+    <main class="student-auth-shell" aria-labelledby="authHeading">
+      <header class="student-auth-header">
+        <div class="student-auth-brand">
+          <div class="student-auth-logo" aria-hidden="true">
+            <svg viewBox="0 0 48 48" role="img">
+              <path d="M10 30c0-9.4 6.6-17 14-17s14 7.6 14 17v4.5c0 2.5-2 4.5-4.5 4.5h-19C12 39 10 37 10 34.5V30Z" fill="#2563eb" />
+              <path d="M17 24.5c4.7-4.9 9.4-4.9 14 0" fill="none" stroke="#f8fafc" stroke-width="3.5" stroke-linecap="round" />
+              <path d="M20 32h8" fill="none" stroke="#fbbf24" stroke-width="3.5" stroke-linecap="round" />
+            </svg>
+          </div>
+          <div>
+            <strong>冰场预约</strong>
+            <span>专业滑冰教学预约平台</span>
+          </div>
+        </div>
+        <a class="auth-back-link student-page-back" href="../../index.html">⌂ 返回首页</a>
+      </header>
+      <section class="student-auth-hero">
+
+        <div class="student-auth-copy">
+          <h1 id="authHeading">预约<span>滑冰</span>课程</h1>
+          <p>公开时间表随时可看，想真正上课时再注册。</p>
+        </div>
+
+        <a class="primary-button public-preview-button" href="../index.html">不注册，先看公开时间表</a>
+
+        <div class="access-summary-list">
+          <div class="access-summary-item">
+            <span class="access-icon public-access-icon" aria-hidden="true">□</span>
+            <div>
+              <strong>未注册</strong>
+              <p>可查看未来 3 小时是否有空档，暂不显示具体教练。</p>
+            </div>
+          </div>
+          <div class="access-summary-item">
+            <span class="access-icon full-access-icon" aria-hidden="true">✓</span>
+            <div>
+              <strong>已登录</strong>
+              <p>解锁完整教练、场馆、价格，可直接预约上课。</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="student-auth-benefits">
+          <div>
+            <span>◇</span>
+            <strong>安全隐私</strong>
+            <small>保护你的信息</small>
+          </div>
+          <div>
+            <span>○</span>
+            <strong>灵活预约</strong>
+            <small>随时随地预约</small>
+          </div>
+          <div>
+            <span>☆</span>
+            <strong>优质教练</strong>
+            <small>专业用心教学</small>
+          </div>
+        </div>
+      </section>
+
+      <section class="auth-panel student-login-panel">
+        <div class="auth-copy">
+          <div class="student-login-mark" aria-hidden="true">
+            <svg viewBox="0 0 48 48" role="img">
+              <path d="M10 30c0-9.4 6.6-17 14-17s14 7.6 14 17v4.5c0 2.5-2 4.5-4.5 4.5h-19C12 39 10 37 10 34.5V30Z" fill="none" stroke="#2563eb" stroke-width="3" />
+              <path d="M17 24.5c4.7-4.9 9.4-4.9 14 0" fill="none" stroke="#2563eb" stroke-width="3" stroke-linecap="round" />
+              <path d="M20 32h8" fill="none" stroke="#2563eb" stroke-width="3" stroke-linecap="round" />
+            </svg>
+          </div>
+          <h2>欢迎回来</h2>
+          <p>登录后查看完整教练与场馆信息并预约。</p>
+        </div>
+
+        <form class="auth-form">
+          <label>
+            邮箱
+            <span class="auth-input-wrap auth-input-email">
+              <input type="email" placeholder="student@example.com" autocomplete="email" />
+            </span>
+          </label>
+          <label>
+            密码
+            <span class="auth-input-wrap auth-input-password">
+              <input type="password" placeholder="输入密码" autocomplete="current-password" />
+              <span class="auth-eye" aria-hidden="true">◎</span>
+            </span>
+          </label>
+          <div class="password-help-row">
+            <a class="forgot-password-link" href="../index.html">忘记密码？</a>
+          </div>
+          <div class="auth-form-row">
+            <label class="checkbox-row">
+              <input type="checkbox" />
+              记住我
+            </label>
+          </div>
+          <a class="primary-button auth-button" href="../index.html?access=full">登录</a>
+          <div class="auth-divider"><span>或</span></div>
+          <a class="ghost-button auth-button" href="../index.html?access=full">创建学生账号</a>
+        </form>
+      </section>
+    </main>
+  </body>
+</html>

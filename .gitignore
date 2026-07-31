@@ -1,2 +1,18 @@
 node_modules/
 .DS_Store
+
+# Local editor / IDE files
+.idea/
+*.iml
+
+# Local environment files
+.env
+.env.*
+
+# Logs and temporary files
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.tmp/
+tmp/

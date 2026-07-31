@@ -309,7 +309,7 @@ function isQuotaError(error) {
 }
 
 function cleanupLegacyAppStorage() {
-  const keepKeys = new Set([slotsStorageKey, profileStorageKey, blockedStorageKey, activeCoachPanelStorageKey]);
+  const keepKeys = new Set([slotsStorageKey, profileStorageKey, blockedStorageKey, activeCoachPanelStorageKey, activeStudentPanelStorageKey]);
   const prefixes = [
     "ice-skating-coach-booking-slots-",
     "ice-skating-coach-profiles-",

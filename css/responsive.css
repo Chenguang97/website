@@ -1,6 +1,9 @@
 @media (max-width: 920px) {
   .app-shell,
   .coach-layout,
+  .admin-grid,
+  .role-card-grid,
+  .landing-hero,
   .hero-strip,
   .teaching-location-grid,
   .lesson-rate-layout,
@@ -9,6 +12,21 @@
   .lesson-option-form,
   .calendar-controls {
     grid-template-columns: 1fr;
+  }
+
+  .student-auth-shell {
+    grid-template-columns: 1fr;
+    padding: 56px 24px 24px;
+  }
+
+  .student-auth-header {
+    top: 22px;
+    left: 24px;
+    right: 24px;
+  }
+
+  .student-auth-hero {
+    min-height: auto;
   }
 
   .sidebar {
@@ -50,6 +68,52 @@
 
   .calendar-art span {
     width: 100%;
+  }
+
+  .role-landing {
+    padding: 20px;
+    align-items: start;
+  }
+
+  .landing-hero {
+    padding: 22px;
+    min-height: auto;
+  }
+
+  .landing-ice-scene,
+  .snowflake {
+    display: none;
+  }
+
+  .role-card {
+    min-height: 160px;
+    padding: 22px 22px 54px;
+  }
+
+  .role-card strong {
+    font-size: 24px;
+  }
+
+  .role-card-icon {
+    width: 64px;
+    height: 64px;
+  }
+
+  .role-card-icon span {
+    transform: scale(0.78);
+  }
+
+  .student-auth-copy h1 {
+    font-size: 42px;
+  }
+
+  .student-auth-benefits {
+    grid-template-columns: 1fr;
+  }
+
+  .student-auth-benefits div + div {
+    border-top: 1px solid rgba(203, 213, 225, 0.7);
+    border-left: 0;
   }
 
   .calendar-week-frame {

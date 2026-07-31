@@ -126,6 +126,34 @@
   display: grid;
 }
 
+.admin-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.admin-card {
+  display: grid;
+  gap: 8px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow: 0 8px 28px rgba(23, 32, 51, 0.08);
+}
+
+.admin-card strong {
+  color: #172033;
+  font-size: 30px;
+}
+
+.admin-card span {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.45;
+}
+
 html[data-active-coach-panel="photoPanel"] .coach-layout > .coach-panel.active:not([data-coach-content="photoPanel"]),
 html[data-active-coach-panel="bookingsPanel"] .coach-layout > .coach-panel.active:not([data-coach-content="bookingsPanel"]),
 html[data-active-coach-panel="availabilityPanel"] .coach-layout > .coach-panel.active:not([data-coach-content="availabilityPanel"]) {
@@ -206,11 +234,11 @@ html[data-active-coach-panel="availabilityPanel"] .coach-tab[data-coach-panel="a
 .teaching-location-panel,
 .lesson-rate-panel {
   display: grid;
-  gap: 12px;
-  padding: 16px;
+  gap: 14px;
+  padding: 18px;
   border: 1px solid var(--line);
   border-radius: 8px;
-  background: #f8fafc;
+  background: #ffffff;
 }
 
 .teaching-location-panel h4 {
@@ -228,14 +256,25 @@ html[data-active-coach-panel="availabilityPanel"] .coach-tab[data-coach-panel="a
 
 .lesson-rate-layout {
   display: grid;
-  grid-template-columns: minmax(180px, 1fr) minmax(0, 3fr);
-  gap: 14px;
+  grid-template-columns: minmax(220px, 0.7fr) minmax(0, 2.3fr);
+  gap: 18px;
   align-items: start;
+}
+
+.rate-summary-card {
+  padding: 14px;
+  border: 1px solid #dbe5f1;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.profile-field-rate {
+  gap: 10px;
 }
 
 .lesson-options-area {
   display: grid;
-  gap: 10px;
+  gap: 12px;
   min-width: 0;
 }
 
@@ -273,28 +312,212 @@ html[data-active-coach-panel="availabilityPanel"] .coach-tab[data-coach-panel="a
 
 .lesson-options-list {
   display: grid;
-  gap: 10px;
+  gap: 0;
+  overflow: hidden;
+  border: 1px solid #dbe5f1;
+  border-radius: 8px;
+  background: #ffffff;
 }
 
 .lesson-option-header {
   display: grid;
-  grid-template-columns: minmax(180px, 1.4fr) minmax(90px, 0.6fr) minmax(90px, 0.6fr) auto;
-  gap: 10px;
+  grid-template-columns: minmax(220px, 1.5fr) minmax(96px, 0.55fr) minmax(96px, 0.55fr) 82px;
+  gap: 12px;
+  padding: 10px 12px;
+  border-bottom: 1px solid #e6edf6;
+  background: #f8fafc;
   color: var(--muted);
   font-size: 12px;
   font-weight: 900;
 }
 
-.lesson-option-row,
+.lesson-option-row {
+  display: grid;
+  grid-template-columns: minmax(220px, 1.5fr) minmax(96px, 0.55fr) minmax(96px, 0.55fr) 82px;
+  gap: 12px;
+  align-items: center;
+  padding: 10px 12px;
+  border-bottom: 1px solid #eef3f8;
+}
+
+.lesson-option-row:last-child {
+  border-bottom: 0;
+}
+
+.lesson-option-row input,
+.lesson-option-form input {
+  min-height: 40px;
+  border-color: #dbe5f1;
+  background: #fbfdff;
+}
+
+.lesson-option-row .danger-button {
+  min-height: 40px;
+  padding: 8px 10px;
+}
+
+.lesson-add-card {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px dashed #cbd5e1;
+  border-radius: 8px;
+  background: #fbfdff;
+}
+
+.lesson-add-title {
+  margin: 0;
+  color: #334155;
+  font-size: 13px;
+  font-weight: 900;
+}
+
 .lesson-option-form {
   display: grid;
-  grid-template-columns: minmax(180px, 1.4fr) minmax(90px, 0.6fr) minmax(90px, 0.6fr) auto;
-  gap: 10px;
+  grid-template-columns: minmax(220px, 1.5fr) minmax(96px, 0.55fr) minmax(96px, 0.55fr) 82px;
+  gap: 12px;
   align-items: end;
+}
+
+.lesson-option-form label {
+  display: grid;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.lesson-option-form .ghost-button {
+  min-height: 40px;
+  padding: 8px 10px;
 }
 
 .primary-button.has-unsaved {
   box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.22);
+}
+
+body:has(#coachView.view.active) .workspace {
+  width: min(100%, 1160px);
+  padding: 28px 32px;
+}
+
+body:has(#coachView.view.active) .section-header {
+  align-items: flex-start;
+  margin-bottom: 14px;
+}
+
+body:has(#coachView.view.active) .section-header h2 {
+  font-size: 34px;
+  line-height: 1.08;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.header-actions .ghost-button,
+.header-actions .primary-button {
+  min-height: 38px;
+  border-radius: 8px;
+  padding: 8px 14px;
+  text-decoration: none;
+}
+
+.coach-tabs {
+  gap: 28px;
+  margin-bottom: 20px;
+  padding: 0;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.coach-tab {
+  min-height: 40px;
+  border-radius: 0;
+  padding: 0 0 10px;
+  border-bottom: 2px solid transparent;
+  color: #64748b;
+  font-weight: 800;
+}
+
+.coach-tab.active,
+html[data-active-coach-panel="photoPanel"] .coach-tab[data-coach-panel="photoPanel"],
+html[data-active-coach-panel="bookingsPanel"] .coach-tab[data-coach-panel="bookingsPanel"],
+html[data-active-coach-panel="availabilityPanel"] .coach-tab[data-coach-panel="availabilityPanel"] {
+  background: transparent;
+  color: var(--blue);
+  border-bottom-color: var(--blue);
+}
+
+.profile-panel {
+  gap: 14px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.compact-profile-card {
+  justify-content: start;
+  border-color: rgba(217, 226, 239, 0.82);
+  background: #ffffff;
+}
+
+.compact-profile-card .mini-avatar {
+  width: 52px;
+  height: 52px;
+}
+
+.compact-edit-link {
+  margin-left: auto;
+  min-height: 36px;
+  padding: 8px 12px;
+  text-decoration: none;
+}
+
+.teaching-location-panel,
+.lesson-rate-panel {
+  border-color: rgba(217, 226, 239, 0.82);
+  box-shadow: 0 8px 24px rgba(23, 32, 51, 0.05);
+}
+
+.teaching-location-grid {
+  grid-template-columns: minmax(0, 1.15fr) minmax(280px, 0.85fr);
+  gap: 24px;
+}
+
+.lesson-rate-layout {
+  grid-template-columns: minmax(210px, 0.78fr) minmax(0, 2.22fr);
+}
+
+.rate-summary-card {
+  background: #f8fafc;
+}
+
+.lesson-option-header,
+.lesson-option-row {
+  grid-template-columns: minmax(220px, 1.5fr) minmax(110px, 0.55fr) minmax(110px, 0.55fr) 56px;
+}
+
+.lesson-option-row .danger-button {
+  color: #64748b;
+  border-color: transparent;
+  background: transparent;
+}
+
+.lesson-option-row .danger-button:hover {
+  color: var(--red);
+  border-color: #fecaca;
+  background: #fff1f2;
+}
+
+.profile-save-button {
+  display: none;
 }
 
 .method-switch,
@@ -421,4 +644,3 @@ html[data-active-coach-panel="availabilityPanel"] .coach-tab[data-coach-panel="a
   display: grid;
   gap: 16px;
 }
-

@@ -1,7 +1,390 @@
 .student-controls {
+  position: relative;
+  z-index: 30;
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: minmax(240px, 1.2fr) minmax(240px, 1.2fr) minmax(180px, 0.7fr);
   gap: 14px;
+  align-items: start;
+}
+
+.student-controls:has(.student-filter-panel:not(.is-hidden))::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  background: rgba(15, 23, 42, 0.06);
+  pointer-events: none;
+}
+
+.sidebar-note {
+  margin: 10px 0 0;
+  color: #dbeafe;
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.student-filter-group {
+  position: relative;
+  z-index: 11;
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.student-filter-group legend {
+  padding: 0;
+  color: #334155;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.student-filter-compact {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+}
+
+.student-filter-compact input {
+  min-height: 40px;
+  padding: 0 12px;
+  border: 1px solid #dbe5f1;
+  border-radius: 10px;
+  background: #ffffff;
+  color: #172033;
+  font: inherit;
+  font-size: 13px;
+}
+
+.student-filter-toggle {
+  min-height: 40px;
+  white-space: nowrap;
+}
+
+.student-filter-summary {
+  margin: 0;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.student-filter-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-height: 26px;
+}
+
+.student-filter-chip {
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+  gap: 6px;
+  padding: 4px 8px;
+  border: 1px solid #bfdbfe;
+  border-radius: 999px;
+  background: #eff6ff;
+  color: #1e3a8a;
+  font-size: 12px;
+  font-weight: 900;
+  line-height: 1.2;
+}
+
+button.student-filter-chip {
+  cursor: pointer;
+}
+
+button.student-filter-chip:hover {
+  border-color: #60a5fa;
+  background: #dbeafe;
+}
+
+.student-filter-chip.is-all {
+  border-color: #dbe5f1;
+  background: #f8fafc;
+  color: #475569;
+}
+
+.student-filter-panel {
+  position: absolute;
+  z-index: 40;
+  top: calc(100% + 8px);
+  left: 0;
+  right: 0;
+  display: grid;
+  max-height: 220px;
+  overflow: auto;
+  padding: 6px;
+  border: 1px solid #dbe5f1;
+  border-radius: 12px;
+  background: #ffffff;
+  box-shadow: 0 28px 80px rgba(15, 23, 42, 0.34);
+}
+
+.student-filter-options {
+  display: grid;
+  gap: 0;
+  align-content: start;
+}
+
+.student-filter-options label {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr);
+  align-items: center;
+  min-height: 26px;
+  gap: 8px;
+  margin: 0;
+  padding: 4px 8px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: #334155;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.student-filter-options label:hover {
+  background: #f1f5f9;
+}
+
+.student-filter-options label:first-child {
+  margin: 0 0 4px;
+  border-bottom: 1px solid #e2e8f0;
+  border-radius: 7px 7px 0 0;
+  background: #f8fafc;
+  font-weight: 900;
+}
+
+.student-filter-options input {
+  width: 14px;
+  height: 14px;
+  margin: 0;
+  accent-color: #2563eb;
+}
+
+.student-page-tabs {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 16px;
+  padding: 4px;
+  border: 1px solid #dbe5f1;
+  border-radius: 12px;
+  background: #f8fafc;
+  width: fit-content;
+}
+
+.student-page-tab {
+  min-height: 38px;
+  padding: 8px 14px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: #64748b;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.student-page-tab.active {
+  background: #ffffff;
+  color: #1d4ed8;
+  box-shadow: 0 8px 22px rgba(15, 23, 42, 0.08);
+}
+
+html[data-active-student-panel="studentBookingsPanel"] .student-page-tab.active:not([data-student-panel="studentBookingsPanel"]),
+html[data-active-student-panel="studentAccountPanel"] .student-page-tab.active:not([data-student-panel="studentAccountPanel"]) {
+  background: transparent;
+  color: #64748b;
+  box-shadow: none;
+}
+
+html[data-active-student-panel="studentBookingsPanel"] .student-page-tab[data-student-panel="studentBookingsPanel"],
+html[data-active-student-panel="studentAccountPanel"] .student-page-tab[data-student-panel="studentAccountPanel"] {
+  background: #ffffff;
+  color: #1d4ed8;
+  box-shadow: 0 8px 22px rgba(15, 23, 42, 0.08);
+}
+
+.student-tab-panel {
+  display: none;
+}
+
+.student-tab-panel.active {
+  display: grid;
+  gap: 16px;
+}
+
+html[data-active-student-panel="studentBookingsPanel"] .student-tab-panel.active:not([data-student-content="studentBookingsPanel"]),
+html[data-active-student-panel="studentAccountPanel"] .student-tab-panel.active:not([data-student-content="studentAccountPanel"]) {
+  display: none;
+}
+
+html[data-active-student-panel="studentBookingsPanel"] .student-tab-panel[data-student-content="studentBookingsPanel"],
+html[data-active-student-panel="studentAccountPanel"] .student-tab-panel[data-student-content="studentAccountPanel"] {
+  display: grid;
+  gap: 16px;
+}
+
+.student-simple-panel {
+  display: grid;
+  gap: 16px;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #ffffff;
+}
+
+.student-simple-panel h3 {
+  margin: 0;
+  font-size: 20px;
+}
+
+.student-mini-list {
+  display: grid;
+  gap: 16px;
+}
+
+.student-booking-section {
+  display: grid;
+  gap: 10px;
+}
+
+.student-booking-section-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.student-booking-section-heading h4 {
+  margin: 0;
+  color: #172033;
+  font-size: 15px;
+}
+
+.student-booking-section-heading span {
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.student-mini-list-group {
+  display: grid;
+  gap: 8px;
+}
+
+.student-mini-booking {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #f8fafc;
+}
+
+.student-mini-booking.is-completed {
+  background: #ffffff;
+  color: #64748b;
+}
+
+.student-mini-booking strong,
+.student-mini-booking span {
+  display: block;
+}
+
+.student-mini-booking strong {
+  color: #172033;
+}
+
+.student-mini-booking span,
+.student-mini-booking small {
+  color: var(--muted);
+  font-weight: 800;
+}
+
+.student-mini-booking-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.student-mini-booking-actions .ghost-button,
+.student-mini-booking-actions .danger-button {
+  min-height: 34px;
+  padding: 7px 12px;
+}
+
+.compact-empty {
+  margin: 0;
+  padding: 10px 0;
+}
+
+.student-account-form {
+  display: grid;
+  gap: 16px;
+}
+
+.student-account-section {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #f8fafc;
+}
+
+.student-account-section h4 {
+  margin: 0;
+  color: #172033;
+  font-size: 15px;
+}
+
+.student-account-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.student-account-grid label,
+.student-account-section > label {
+  display: grid;
+  gap: 7px;
+  color: #334155;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.student-account-checks {
+  display: grid;
+  gap: 9px;
+}
+
+.student-account-checks label {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  color: #334155;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.student-account-checks input {
+  width: 16px;
+  min-height: 16px;
+  accent-color: #2563eb;
+}
+
+.student-account-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: flex-end;
 }
 
 .primary-button {
@@ -68,6 +451,257 @@
 .slot-card.booked {
   background: #fff7ed;
   border-color: #fed7aa;
+}
+
+.student-calendar-card {
+  grid-column: 1 / -1;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #ffffff;
+  box-shadow: 0 18px 45px rgba(15, 23, 42, 0.06);
+}
+
+.student-calendar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.student-calendar-header h3 {
+  margin: 0;
+  font-size: 20px;
+}
+
+.student-booking-calendar.drag-calendar {
+  touch-action: auto;
+  user-select: auto;
+}
+
+.student-calendar-cell {
+  display: grid;
+  place-items: stretch;
+  padding: 0;
+}
+
+.student-time-option {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  min-height: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: #172033;
+  cursor: pointer;
+}
+
+.student-time-option:hover {
+  background: rgba(255, 255, 255, 0.18);
+  box-shadow: inset 0 0 0 2px rgba(30, 64, 175, 0.48), 0 8px 20px rgba(30, 64, 175, 0.18);
+}
+
+.student-calendar-legend {
+  width: fit-content;
+}
+
+.student-calendar-cell.availability-low {
+  background: #dbeafe;
+}
+
+.student-calendar-cell.availability-medium {
+  background: #93c5fd;
+}
+
+.student-calendar-cell.availability-high {
+  background: #2563eb;
+}
+
+.student-availability-swatch {
+  width: 24px;
+  height: 14px;
+  border: 1px solid #cbd5e1;
+  border-radius: 4px;
+}
+
+.student-availability-swatch.low {
+  background: #dbeafe;
+}
+
+.student-availability-swatch.medium {
+  background: #93c5fd;
+}
+
+.student-availability-swatch.high {
+  background: #2563eb;
+}
+
+.student-coach-option strong,
+.student-coach-option span,
+.student-coach-option small {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.student-coach-option strong {
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.student-coach-option span {
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.student-coach-option small {
+  color: #475569;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+}
+
+.student-coach-option-list {
+  display: grid;
+  gap: 10px;
+  margin: 12px 0 0;
+}
+
+.student-coach-option {
+  display: grid;
+  gap: 4px;
+  width: 100%;
+  padding: 12px;
+  border: 1px solid #dbe5f1;
+  border-radius: 10px;
+  background: #ffffff;
+  color: #172033;
+  text-align: left;
+  cursor: pointer;
+}
+
+.student-coach-option:hover {
+  border-color: #60a5fa;
+  background: #eff6ff;
+}
+
+.public-calendar-card {
+  display: grid;
+  gap: 14px;
+  grid-column: 1 / -1;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.public-calendar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.public-calendar-header h3 {
+  margin: 0;
+}
+
+.public-calendar-header span {
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: #f1f5f9;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.public-calendar-grid {
+  display: grid;
+  grid-template-columns: minmax(150px, 0.7fr) minmax(0, 1fr);
+  overflow: hidden;
+  border: 1px solid #dbe5f1;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.public-calendar-time,
+.public-calendar-status {
+  min-height: 54px;
+  padding: 12px;
+  border-right: 1px solid #e2e8f0;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.public-calendar-status {
+  border-right: 0;
+}
+
+.public-calendar-grid > :nth-last-child(-n + 2) {
+  border-bottom: 0;
+}
+
+.public-calendar-head {
+  min-height: 40px;
+  background: #f8fafc;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.public-calendar-time strong,
+.public-calendar-time span,
+.public-calendar-status span {
+  display: block;
+}
+
+.public-calendar-time strong {
+  color: #172033;
+}
+
+.public-calendar-time span {
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.public-calendar-status {
+  display: grid;
+  align-items: center;
+  font-weight: 900;
+}
+
+.public-calendar-status.has-public-availability {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.public-calendar-status.no-public-availability {
+  background: #e5e7eb;
+  color: #64748b;
+}
+
+.public-calendar-note {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.public-login-link {
+  justify-content: center;
+  text-decoration: none;
 }
 
 .student-booking-group {
@@ -223,4 +857,3 @@
 .booking-dialog::backdrop {
   background: rgba(15, 23, 42, 0.48);
 }
-

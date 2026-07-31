@@ -22,7 +22,22 @@ function concreteLocationOptionsForCoach(coachId) {
 }
 
 function populateCoachSelects() {
-  elements.studentCoachFilter.innerHTML = coachOptions(true);
+  if (elements.studentCoachFilterGroup) {
+    elements.studentCoachFilterGroup.innerHTML = [
+      `<label><input type="checkbox" name="studentCoachFilter" value="all" checked /> 全部教练</label>`,
+      ...coaches.map((coach) => `<label><input type="checkbox" name="studentCoachFilter" value="${coach.id}" checked /> ${coach.name}</label>`),
+    ].join("");
+  }
+
+  if (elements.studentRinkFilterGroup) {
+    elements.studentRinkFilterGroup.innerHTML = [
+      `<label><input type="checkbox" name="studentRinkFilter" value="all" checked /> 全部冰场</label>`,
+      ...rinks.map((rink) => `<label><input type="checkbox" name="studentRinkFilter" value="${rink}" checked /> ${rink}</label>`),
+      `<label><input type="checkbox" name="studentRinkFilter" value="Zoom" checked /> Zoom</label>`,
+    ].join("");
+  }
+  updateStudentFilterSummaries();
+  renderStudentFilterChips();
 }
 
 function populateTimeSelects() {
@@ -65,6 +80,7 @@ function render() {
   syncLocationOptions();
   renderCoachSlots();
   renderStudentSlots();
+  renderStudentOwnBookings();
   renderStats();
   renderDropdownOpenSlots();
   renderDropdownWeekSlots();
@@ -73,8 +89,23 @@ function render() {
 }
 
 function renderStats() {
-  elements.availableCount.textContent = slots.filter((slot) => !slot.booked).length;
-  elements.bookedCount.textContent = slots.filter((slot) => slot.booked).length;
+  const weekStart = startOfWeekIso(todayIso());
+  const weekEnd = addDaysIso(weekStart, 7);
+  const weeklyCoachSlots = slots.filter((slot) => slot.coachId === currentCoachId && slot.date >= weekStart && slot.date < weekEnd);
+  const availableHours = weeklyCoachSlots
+    .filter((slot) => !slot.booked && !slotOverlapsBlockedException(slot))
+    .reduce((total, slot) => total + (minutesFromTime(slot.end) - minutesFromTime(slot.start)) / 60, 0);
+  const bookedCount = weeklyCoachSlots.filter((slot) => slot.booked).length;
+  const allBookedCount = slots.filter((slot) => slot.booked).length;
+  if (elements.availableCount) {
+    elements.availableCount.textContent = Number.isInteger(availableHours) ? String(availableHours) : availableHours.toFixed(1);
+  }
+  if (elements.bookedCount) {
+    elements.bookedCount.textContent = bookedCount;
+  }
+  if (elements.adminBookedCount) {
+    elements.adminBookedCount.textContent = allBookedCount;
+  }
 }
 
 function syncProfileForm() {
@@ -93,12 +124,16 @@ function renderLessonOptions() {
   const profile = getProfile(currentCoachId);
   const rows = profile.lessonOptions
     .map((lesson) => {
+      const displayName = lesson.name
+        .replace("30 min private lesson", "30 分钟私教")
+        .replace("60 min private lesson", "60 分钟私教")
+        .replace("45 min private lesson", "45 分钟私教");
       return `
         <article class="lesson-option-row" data-lesson-id="${lesson.id}">
-          <input class="lesson-name-input" type="text" value="${lesson.name}" aria-label="Lesson name" />
+          <input class="lesson-name-input" type="text" value="${displayName}" aria-label="课程名称" />
           <input class="lesson-duration-input" type="number" min="15" step="15" value="${lesson.duration}" aria-label="Lesson duration" />
           <input class="lesson-price-input" type="number" min="0" step="5" value="${lesson.price}" aria-label="Lesson price" />
-          <button class="danger-button" type="button" data-action="remove-lesson">删除</button>
+          <button class="danger-button" type="button" data-action="remove-lesson" aria-label="删除课程">•••</button>
         </article>
       `;
     })
@@ -106,8 +141,8 @@ function renderLessonOptions() {
   elements.lessonOptionsList.innerHTML = `
     <div class="lesson-option-header" aria-hidden="true">
       <span>课程名称</span>
-      <span>时长（分钟）</span>
-      <span>价格</span>
+      <span>时长</span>
+      <span>学生支付</span>
       <span>操作</span>
     </div>
     ${rows}
@@ -465,20 +500,315 @@ function renderDropdownWeekSlots() {
 }
 
 function renderStudentSlots() {
-  const coachFilter = elements.studentCoachFilter.value;
-  const dateFilter = elements.studentDateFilter.value;
-  const available = slots.filter((slot) => {
-    const coachMatches = coachFilter === "all" || slot.coachId === coachFilter;
-    const dateMatches = !dateFilter || slot.date === dateFilter;
-    return !slot.booked && !slotOverlapsBlockedException(slot) && coachMatches && dateMatches;
-  });
-
-  if (!available.length) {
-    elements.studentSlots.innerHTML = `<p class="empty-state">当前筛选条件下没有可预约滑冰时间。可以换一个日期或 coach。</p>`;
+  renderStudentAccessState();
+  if (!studentHasFullAccess) {
+    renderPublicStudentCalendar();
     return;
   }
 
-  elements.studentSlots.innerHTML = available.map(renderStudentSlotCard).join("");
+  const selectedCoaches = getSelectedStudentFilterValues("studentCoachFilter", coaches.map((coach) => coach.id));
+  const selectedRinks = getSelectedStudentFilterValues("studentRinkFilter", [...rinks, "Zoom"]);
+  const weekStart = startOfWeekIso(elements.studentDateFilter.value || nextWeekdayIso());
+  const weekEnd = addDaysIso(weekStart, 7);
+  const available = slots.filter((slot) => {
+    const coachMatches = selectedCoaches.has(slot.coachId);
+    const rinkMatches = studentRinkMatches(slot, selectedRinks);
+    const dateMatches = slot.date >= weekStart && slot.date < weekEnd;
+    return !slot.booked && !slotOverlapsBlockedException(slot) && coachMatches && rinkMatches && dateMatches;
+  });
+
+  elements.studentDateFilter.value = weekStart;
+  renderFullStudentCalendar(weekStart, available);
+}
+
+function getSelectedStudentFilterValues(name, fallbackValues) {
+  const checked = [...document.querySelectorAll(`input[name="${name}"]:checked`)].map((input) => input.value);
+  if (!checked.length || checked.includes("all")) return new Set(fallbackValues);
+  return new Set(checked);
+}
+
+function updateStudentFilterSummaries() {
+  updateStudentFilterSummary("studentCoachFilter", elements.studentCoachFilterSummary, "位教练", coaches.length);
+  updateStudentFilterSummary("studentRinkFilter", elements.studentRinkFilterSummary, "个冰场", rinks.length + 1);
+  renderStudentFilterChips();
+}
+
+function updateStudentFilterSummary(name, summaryElement, unit, totalCount) {
+  if (!summaryElement) return;
+  const checked = [...document.querySelectorAll(`input[name="${name}"]:checked`)].map((input) => input.value);
+  const selectedCount = !checked.length || checked.includes("all") ? totalCount : checked.length;
+  summaryElement.textContent = `已选 ${selectedCount} ${unit}`;
+}
+
+function renderStudentFilterChips() {
+  renderStudentFilterChipGroup("studentCoachFilter", elements.studentCoachChips, coaches.length, "全部教练");
+  renderStudentFilterChipGroup("studentRinkFilter", elements.studentRinkChips, rinks.length + 1, "全部冰场");
+}
+
+function renderStudentFilterChipGroup(name, container, totalCount, allLabel) {
+  if (!container) return;
+  const checked = [...document.querySelectorAll(`input[name="${name}"]:checked`)];
+  const isAll = !checked.length || checked.some((input) => input.value === "all") || checked.filter((input) => input.value !== "all").length === totalCount;
+  const selectedInputs = isAll ? [] : checked.filter((input) => input.value !== "all");
+  const chips = isAll
+    ? `<span class="student-filter-chip is-all">${allLabel}</span>`
+    : selectedInputs
+        .map((input) => `<button class="student-filter-chip" type="button" data-action="remove-student-filter" data-filter-name="${name}" data-filter-value="${input.value}">${input.closest("label")?.textContent.trim()} <span aria-hidden="true">×</span></button>`)
+        .join("");
+  container.innerHTML = chips;
+}
+
+function studentRinkMatches(slot, selectedRinks) {
+  if (slot.location === "Any served rink") {
+    const profile = getProfile(slot.coachId);
+    const servedRinks = profile.servedRinks && profile.servedRinks.length ? profile.servedRinks : [profile.homeRink || rinks[0]];
+    return servedRinks.some((rink) => selectedRinks.has(rink));
+  }
+  return selectedRinks.has(slot.location);
+}
+
+function renderStudentAccessState() {
+  if (elements.studentControls) {
+    elements.studentControls.classList.toggle("is-hidden", !studentHasFullAccess);
+  }
+  if (elements.studentLoginPrompt) {
+    elements.studentLoginPrompt.classList.toggle("is-hidden", studentHasFullAccess);
+  }
+  if (elements.studentAccessMessage) {
+    elements.studentAccessMessage.textContent = studentHasFullAccess
+      ? "已登录：可查看完整教练、场馆、价格和预约信息。"
+      : `未登录预览：只显示未来 ${publicStudentPreviewHours} 小时内是否有可预约时间，不显示教练、场馆和价格。`;
+  }
+}
+
+function renderStudentOwnBookings() {
+  if (!elements.studentOwnBookings) return;
+
+  if (!studentHasFullAccess) {
+    elements.studentOwnBookings.innerHTML = `
+      <p class="empty-state">登录 / 注册后可以查看自己的预约记录。</p>
+      <a class="primary-button public-login-link" href="login/index.html">登录 / 注册</a>
+    `;
+    return;
+  }
+
+  const bookings = slots
+    .filter((slot) => slot.booked && slot.student)
+    .slice()
+    .sort(slotSort);
+
+  const upcoming = bookings.filter((slot) => !isPastStudentBooking(slot));
+  const completed = bookings.filter(isPastStudentBooking).sort((a, b) => slotSort(b, a));
+
+  elements.studentOwnBookings.innerHTML = bookings.length
+    ? `
+      ${renderStudentBookingSection("还没有进行的课", upcoming, "暂无未进行的预约。")}
+      ${renderStudentBookingSection("已经上完的课", completed, "暂无已完成课程。")}
+    `
+    : `<p class="empty-state">还没有预约记录。</p>`;
+}
+
+function isPastStudentBooking(slot) {
+  return new Date(`${slot.date}T${slot.end}`) < new Date();
+}
+
+function renderStudentBookingSection(title, bookingSlots, emptyText) {
+  return `
+    <section class="student-booking-section">
+      <div class="student-booking-section-heading">
+        <h4>${title}</h4>
+        <span>${bookingSlots.length} 节</span>
+      </div>
+      <div class="student-mini-list-group">
+        ${
+          bookingSlots.length
+            ? bookingSlots.map(renderStudentMiniBooking).join("")
+            : `<p class="empty-state compact-empty">${emptyText}</p>`
+        }
+      </div>
+    </section>
+  `;
+}
+
+function renderStudentMiniBooking(slot) {
+  const coach = getCoach(slot.coachId);
+  const isCompleted = isPastStudentBooking(slot);
+  return `
+    <article class="student-mini-booking ${isCompleted ? "is-completed" : ""}">
+      <div>
+        <strong>${formatDate(slot.date)} · ${slot.start}-${slot.end}</strong>
+        <span>${coach.name} · ${formatLocationLabel(slot.location)}</span>
+      </div>
+      <div class="student-mini-booking-actions">
+        <small>$${slot.lessonPrice}</small>
+        ${
+          isCompleted
+            ? ""
+            : `
+              <button class="ghost-button" type="button" data-action="modify-student-booking" data-id="${slot.id}">修改</button>
+              <button class="danger-button" type="button" data-action="cancel-student-booking" data-id="${slot.id}">取消</button>
+            `
+        }
+      </div>
+    </article>
+  `;
+}
+
+function localIsoFromDate(date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function timeFromDate(date) {
+  return `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
+}
+
+function renderPublicStudentCalendar() {
+  const windows = getPublicAvailabilityWindows();
+  const rows = windows.map(renderPublicStudentCalendarRow).join("");
+  const emptyText = windows.some((window) => window.hasOpenSlot)
+    ? ""
+    : `<p class="public-calendar-note">未来 ${publicStudentPreviewHours} 小时内暂无公开可预约时间。登录后可以查看完整未来课表。</p>`;
+
+  elements.studentSlots.innerHTML = `
+    <section class="public-calendar-card" aria-label="公开可预约时间预览">
+      <div class="public-calendar-header">
+        <div>
+          <p class="eyebrow">公开预览</p>
+          <h3>未来 ${publicStudentPreviewHours} 小时</h3>
+        </div>
+        <span>弱化数据</span>
+      </div>
+      <div class="public-calendar-grid">
+        <div class="public-calendar-time public-calendar-head">时间</div>
+        <div class="public-calendar-status public-calendar-head">状态</div>
+        ${rows}
+      </div>
+      ${emptyText}
+      <a class="ghost-button public-login-link" href="login/index.html">登录 / 注册查看完整时间表</a>
+    </section>
+  `;
+}
+
+function getPublicAvailabilityWindows() {
+  const now = new Date();
+  const startMinutes = now.getHours() * 60 + now.getMinutes();
+  const roundedStartMinutes = Math.ceil(startMinutes / calendarStep) * calendarStep;
+  const cursorStart = new Date(now);
+  cursorStart.setHours(Math.floor(roundedStartMinutes / 60), roundedStartMinutes % 60, 0, 0);
+  const end = new Date(now.getTime() + publicStudentPreviewHours * 60 * 60 * 1000);
+  const windows = [];
+
+  for (let cursor = cursorStart; cursor < end; cursor = new Date(cursor.getTime() + calendarStep * 60 * 1000)) {
+    const windowEnd = new Date(cursor.getTime() + calendarStep * 60 * 1000);
+    const hasOpenSlot = slots.some((slot) => {
+      const slotStart = new Date(`${slot.date}T${slot.start}`);
+      const slotEnd = new Date(`${slot.date}T${slot.end}`);
+      return !slot.booked && !slotOverlapsBlockedException(slot) && slotStart < windowEnd && slotEnd > cursor;
+    });
+
+    windows.push({
+      date: localIsoFromDate(cursor),
+      start: timeFromDate(cursor),
+      end: timeFromDate(windowEnd),
+      hasOpenSlot,
+    });
+  }
+
+  return windows;
+}
+
+function renderPublicStudentCalendarRow(window) {
+  return `
+    <div class="public-calendar-time">
+      <strong>${window.start} - ${window.end}</strong>
+      <span>${formatDate(window.date)}</span>
+    </div>
+    <div class="public-calendar-status ${window.hasOpenSlot ? "has-public-availability" : "no-public-availability"}">
+      <span>${window.hasOpenSlot ? "有可预约时间" : "暂无可预约时间"}</span>
+    </div>
+  `;
+}
+
+function renderFullStudentCalendar(weekStart, availableSlots) {
+  const slotsByCell = availableSlots.reduce((groups, slot) => {
+    const key = `${slot.date}|${minutesFromTime(slot.start)}`;
+    groups[key] = groups[key] || [];
+    groups[key].push(slot);
+    return groups;
+  }, {});
+  const weekEnd = addDaysIso(weekStart, 6);
+  const rows = [];
+
+  for (let minutes = minutesFromTime(coreDayStart); minutes < minutesFromTime(coreDayEnd); minutes += calendarStep) {
+    rows.push(`<div class="calendar-time">${timeFromMinutes(minutes)}</div>`);
+    for (let dayIndex = 0; dayIndex < 7; dayIndex += 1) {
+      const date = addDaysIso(weekStart, dayIndex);
+      const cellSlots = slotsByCell[`${date}|${minutes}`] || [];
+      rows.push(renderStudentCalendarCell(date, minutes, cellSlots));
+    }
+  }
+
+  const hasOpenSlots = availableSlots.length > 0;
+  elements.studentSlots.innerHTML = `
+    <section class="student-calendar-card calendar-panel" aria-label="学生可预约周历">
+      <div class="panel-heading compact-heading student-calendar-header">
+        <div>
+          <p class="eyebrow">预约日历</p>
+          <h3>${formatDate(weekStart)} - ${formatDate(weekEnd)}</h3>
+        </div>
+      </div>
+      <div class="calendar-legend student-calendar-legend" aria-label="学生预约日历图例">
+        <span><i class="student-availability-swatch low"></i>空档少</span>
+        <span><i class="student-availability-swatch medium"></i>空档中等</span>
+        <span><i class="student-availability-swatch high"></i>空档多</span>
+        <span><i class="legend-dot blocked"></i>未开放</span>
+      </div>
+      <div class="calendar-week-frame">
+        <button class="calendar-side-arrow" type="button" data-action="student-week" data-offset="-7" aria-label="上一周">‹</button>
+        <div class="student-booking-calendar drag-calendar">
+          <div class="calendar-corner"></div>
+          ${dayLabels
+            .map((label, index) => {
+              const date = addDaysIso(weekStart, index);
+              return `<div class="calendar-day">${label}<span>${formatDate(date)}</span></div>`;
+            })
+            .join("")}
+          ${rows.join("")}
+        </div>
+        <button class="calendar-side-arrow" type="button" data-action="student-week" data-offset="7" aria-label="下一周">›</button>
+      </div>
+      ${
+        hasOpenSlots
+          ? ""
+          : `<p class="empty-state">当前筛选条件下没有可预约滑冰时间。可以换一周或选择全部教练。</p>`
+      }
+    </section>
+  `;
+}
+
+function renderStudentCalendarCell(date, minutes, cellSlots) {
+  if (!cellSlots.length) {
+    return `<div class="calendar-cell student-calendar-cell has-blocked" aria-label="${formatDate(date)} ${timeFromMinutes(minutes)} 未开放"></div>`;
+  }
+
+  const slotIds = cellSlots.map((slot) => slot.id).join(",");
+  const availabilityLevel = getStudentAvailabilityLevel(cellSlots.length);
+  return `
+    <div class="calendar-cell student-calendar-cell has-slot availability-${availabilityLevel}">
+      <button class="student-time-option" type="button" data-action="choose-time" data-ids="${slotIds}" title="${cellSlots.length} 位教练可预约">
+        <span class="visually-hidden">${cellSlots.length} 位教练可预约</span>
+      </button>
+    </div>
+  `;
+}
+
+function getStudentAvailabilityLevel(count) {
+  if (count >= 3) return "high";
+  if (count === 2) return "medium";
+  return "low";
 }
 
 function renderStudentSlotCard(slot) {

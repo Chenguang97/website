@@ -479,14 +479,128 @@ function openBookingDialog(slotId) {
   const profile = getProfile(slot.coachId);
   const defaultConcreteLocation = (profile.servedRinks && profile.servedRinks[0]) || profile.homeRink || rinks[0];
   elements.bookingSlotId.value = slot.id;
+  elements.bookingDialogMode.value = "create";
   elements.dialogTitle.textContent = `${coach.name} · ${slot.lessonName || "Private lesson"} · $${slot.lessonPrice} · ${formatDate(slot.date)} ${slot.start}`;
-  elements.bookingLocation.innerHTML = concreteLocationOptionsForCoach(slot.coachId);
-  elements.bookingLocationLabel.classList.toggle("is-hidden", slot.location !== "Any served rink");
+  elements.bookingSubmitButton.textContent = "确认预约";
+  elements.bookingNewSlotLabel.classList.add("is-hidden");
+  elements.bookingNewSlot.innerHTML = "";
+  elements.bookingLocation.innerHTML = bookingLocationOptionsForSlot(slot);
+  elements.bookingLocationLabel.classList.remove("is-hidden");
+  elements.bookingLocation.disabled = false;
   elements.bookingLocation.value = slot.location === "Any served rink" ? defaultConcreteLocation : slot.location;
+  elements.bookingForSelf.checked = true;
   elements.studentName.value = "";
+  syncBookingForSelf();
+  elements.studentEmailLabel.classList.remove("is-hidden");
+  elements.studentEmail.disabled = false;
+  elements.studentEmail.required = true;
   elements.studentEmail.value = "";
   elements.studentNote.value = "";
+  if (elements.studentSlotOptionsDialog?.open) {
+    elements.studentSlotOptionsDialog.close();
+  }
   elements.bookingDialog.showModal();
+}
+
+function openModifyBookingDialog(slotId) {
+  const slot = slots.find((item) => item.id === slotId);
+  if (!slot || !slot.booked || !slot.student || isPastStudentBooking(slot)) return;
+
+  const coach = getCoach(slot.coachId);
+  elements.bookingSlotId.value = slot.id;
+  elements.bookingDialogMode.value = "modify";
+  elements.dialogTitle.textContent = `修改预约 · ${coach.name} · ${formatDate(slot.date)} ${slot.start}`;
+  elements.bookingSubmitButton.textContent = "保存修改";
+  elements.bookingNewSlotLabel.classList.add("is-hidden");
+  elements.bookingNewSlot.innerHTML = "";
+  elements.bookingNewSlot.value = slot.id;
+  elements.bookingLocationLabel.classList.add("is-hidden");
+  elements.bookingLocation.disabled = true;
+  elements.studentEmailLabel.classList.add("is-hidden");
+  elements.studentEmail.disabled = true;
+  elements.studentEmail.required = false;
+  elements.bookingForSelf.checked = !slot.student.name || slot.student.name === "本人";
+  elements.studentName.value = elements.bookingForSelf.checked ? "" : slot.student.name;
+  syncBookingForSelf();
+  elements.studentEmail.value = slot.student.email || "";
+  elements.studentNote.value = slot.student.note || "";
+  elements.bookingDialog.showModal();
+}
+
+function populateRescheduleOptions(currentSlotId) {
+  const currentSlot = slots.find((slot) => slot.id === currentSlotId);
+  if (!currentSlot || elements.bookingDialogMode.value !== "modify" || elements.bookingSlotId.value !== currentSlotId || !elements.bookingDialog.open) return;
+
+  const availableSlots = getRescheduleOptions(currentSlot);
+  const optionHtml = [currentSlot, ...availableSlots].map((option) => renderRescheduleOption(currentSlot, option)).join("");
+  const moreText = availableSlots.length >= rescheduleOptionLimit ? `<option disabled>更多时间请到预约课程日历选择</option>` : "";
+  elements.bookingNewSlot.innerHTML = `${optionHtml}${moreText}`;
+  elements.bookingNewSlot.value = currentSlot.id;
+}
+
+function getRescheduleOptions(currentSlot) {
+  const today = todayIso();
+  const windowEnd = addDaysIso(today, rescheduleWindowWeeks * 7);
+  return slots
+    .filter((slot) => slot.id !== currentSlot.id)
+    .filter((slot) => !slot.booked && slot.date >= today && slot.date <= windowEnd)
+    .filter((slot) => !isPastStudentBooking(slot) && !slotOverlapsBlockedException(slot))
+    .sort(slotSort)
+    .slice(0, rescheduleOptionLimit);
+}
+
+function renderRescheduleOption(currentSlot, slot) {
+  const coach = getCoach(slot.coachId);
+  const currentText = slot.id === currentSlot.id ? "当前时间 · " : "";
+  return `<option value="${slot.id}">${currentText}${formatDate(slot.date)} ${slot.start}-${slot.end} · ${coach.name} · ${slot.lessonName || "私教课"} · $${slot.lessonPrice} · ${formatLocationLabel(slot.location)}</option>`;
+}
+
+function bookingLocationOptionsForSlot(slot) {
+  if (slot.location === "Any served rink") {
+    return concreteLocationOptionsForCoach(slot.coachId);
+  }
+  return `<option value="${slot.location}">${formatLocationLabel(slot.location)}</option>`;
+}
+
+function syncModifyBookingLocation(currentSlot) {
+  const selectedSlot = slots.find((slot) => slot.id === elements.bookingNewSlot.value) || currentSlot;
+  const profile = getProfile(selectedSlot.coachId);
+  const defaultConcreteLocation = (profile.servedRinks && profile.servedRinks[0]) || profile.homeRink || rinks[0];
+  elements.bookingLocation.innerHTML = bookingLocationOptionsForSlot(selectedSlot);
+  elements.bookingLocationLabel.classList.remove("is-hidden");
+  elements.bookingLocation.value = selectedSlot.id === currentSlot.id
+    ? currentSlot.location
+    : selectedSlot.location === "Any served rink"
+      ? defaultConcreteLocation
+      : selectedSlot.location;
+}
+
+function openStudentSlotOptions(slotIds) {
+  if (!elements.studentSlotOptionsDialog || !elements.studentSlotOptionsList) return;
+
+  const options = slotIds
+    .map((id) => slots.find((slot) => slot.id === id))
+    .filter(Boolean)
+    .filter((slot) => !slot.booked && !slotOverlapsBlockedException(slot))
+    .sort((a, b) => `${getCoach(a.coachId).name}${a.location}${a.lessonPrice}`.localeCompare(`${getCoach(b.coachId).name}${b.location}${b.lessonPrice}`));
+
+  if (!options.length) return;
+
+  const first = options[0];
+  elements.studentSlotOptionsTitle.textContent = `${formatDate(first.date)} ${first.start} - ${first.end}`;
+  elements.studentSlotOptionsList.innerHTML = options
+    .map((slot) => {
+      const coach = getCoach(slot.coachId);
+      return `
+        <button class="student-coach-option" type="button" data-action="book" data-id="${slot.id}">
+          <strong>${coach.name}</strong>
+          <span>${coach.subject}</span>
+          <small>${formatLocationLabel(slot.location)} · ${slot.lessonName || "私教课"} · $${slot.lessonPrice}</small>
+        </button>
+      `;
+    })
+    .join("");
+  elements.studentSlotOptionsDialog.showModal();
 }
 
 function openBookingDetails(slotId) {
@@ -522,6 +636,20 @@ function removeBookingFromDetails() {
   render();
 }
 
+function cancelStudentBooking(slotId) {
+  const slot = slots.find((item) => item.id === slotId);
+  if (!slot || !slot.booked || isPastStudentBooking(slot)) return;
+
+  const confirmed = window.confirm(`确定要取消 ${formatDate(slot.date)} ${slot.start}-${slot.end} 的预约吗？`);
+  if (!confirmed) return;
+
+  pushUndoState();
+  slot.booked = false;
+  slot.student = null;
+  setAvailabilityDirty(true, "有未保存的预约修改");
+  render();
+}
+
 function handleScheduleCalendarClick(event) {
   const cell = event.target.closest(".calendar-cell.has-booking");
   if (!cell || !cell.dataset.slotId) return;
@@ -531,30 +659,65 @@ function handleScheduleCalendarClick(event) {
 function confirmBooking(event) {
   event.preventDefault();
   const slot = slots.find((item) => item.id === elements.bookingSlotId.value);
-  if (!slot || slot.booked) return;
+  const isModify = elements.bookingDialogMode.value === "modify";
+  if (!slot || (slot.booked && !isModify) || (!slot.booked && isModify)) return;
 
-  pushUndoState();
-  slot.booked = true;
-  if (slot.location === "Any served rink") {
-    slot.location = elements.bookingLocation.value;
-  }
-  slot.student = {
-    name: elements.studentName.value.trim(),
-    email: elements.studentEmail.value.trim(),
+  const bookingForSelf = elements.bookingForSelf.checked;
+  const student = {
+    name: bookingForSelf ? "本人" : elements.studentName.value.trim(),
+    email: isModify ? slot.student?.email || "" : elements.studentEmail.value.trim(),
     note: elements.studentNote.value.trim(),
   };
+
+  pushUndoState();
+  if (isModify) {
+    slot.student = student;
+  } else {
+    slot.booked = true;
+    slot.student = student;
+    if (slot.location === "Any served rink") {
+      slot.location = elements.bookingLocation.value;
+    }
+  }
 
   elements.bookingDialog.close();
   setAvailabilityDirty(true, "有未保存的预约修改");
   render();
 }
 
+function syncBookingForSelf() {
+  const bookingForSelf = elements.bookingForSelf.checked;
+  elements.studentNameLabel.classList.toggle("is-hidden", bookingForSelf);
+  elements.studentName.disabled = bookingForSelf;
+  elements.studentName.required = !bookingForSelf;
+  if (bookingForSelf) {
+    elements.studentName.value = "";
+  }
+}
+
 function handleSlotAction(event) {
   const button = event.target.closest("button[data-action]");
   if (!button) return;
 
-  const { action, id } = button.dataset;
-  if (action === "book") openBookingDialog(id);
+  const { action, id, ids } = button.dataset;
+  if (action === "student-week") {
+    const offset = Number(button.dataset.offset || 0);
+    elements.studentDateFilter.value = addDaysIso(elements.studentDateFilter.value || nextWeekdayIso(), offset);
+    renderStudentSlots();
+    return;
+  }
+  if (action === "remove-student-filter") {
+    removeStudentFilterChip(button.dataset.filterName, button.dataset.filterValue);
+    return;
+  }
+  if (action === "choose-time") {
+    openStudentSlotOptions((ids || "").split(",").filter(Boolean));
+    return;
+  }
+  if (action === "book") {
+    openBookingDialog(id);
+    return;
+  }
   if (action === "delete") {
     const deleted = slots.find((slot) => slot.id === id);
     if (deleted) pushUndoState();
@@ -595,6 +758,125 @@ function handleSlotAction(event) {
       setAvailabilityDirty(true);
       render();
     }
+  }
+  if (action === "modify-student-booking") {
+    openModifyBookingDialog(id);
+    return;
+  }
+  if (action === "cancel-student-booking") {
+    cancelStudentBooking(id);
+    return;
+  }
+}
+
+function handleBookingNewSlotChange() {
+  if (elements.bookingDialogMode.value !== "modify") return;
+  const currentSlot = slots.find((slot) => slot.id === elements.bookingSlotId.value);
+  if (!currentSlot) return;
+  syncModifyBookingLocation(currentSlot);
+}
+
+function removeStudentFilterChip(name, value) {
+  const input = document.querySelector(`input[name="${name}"][value="${value}"]`);
+  const allInput = document.querySelector(`input[name="${name}"][value="all"]`);
+  if (!input) return;
+
+  input.checked = false;
+  if (![...document.querySelectorAll(`input[name="${name}"]:checked`)].some((item) => item.value !== "all")) {
+    if (allInput) allInput.checked = true;
+    syncStudentFilterCheckboxes(allInput);
+  } else if (allInput) {
+    allInput.checked = false;
+  }
+  updateStudentFilterSummaries();
+  renderStudentSlots();
+}
+
+function handleStudentFilterChange(event) {
+  const input = event.target.closest("input[type='checkbox']");
+  if (!input) return;
+
+  syncStudentFilterCheckboxes(input);
+  updateStudentFilterSummaries();
+}
+
+function applyStudentFilterPanel(event) {
+  const panelType = event.currentTarget.dataset.studentFilterPanel;
+  const panel = panelType === "coach" ? elements.studentCoachFilterPanel : elements.studentRinkFilterPanel;
+  if (!panel) return;
+
+  panel.classList.add("is-hidden");
+  if (panelType === "coach" && elements.studentCoachSearch) elements.studentCoachSearch.value = "";
+  if (panelType === "rink" && elements.studentRinkSearch) elements.studentRinkSearch.value = "";
+  renderStudentSlots();
+}
+
+function openStudentFilterPanel(event) {
+  const search = event.currentTarget;
+  const panel = search === elements.studentCoachSearch ? elements.studentCoachFilterPanel : elements.studentRinkFilterPanel;
+  const optionGroup = search === elements.studentCoachSearch ? elements.studentCoachFilterGroup : elements.studentRinkFilterGroup;
+  if (!panel) return;
+
+  if (panel.classList.contains("is-hidden")) {
+    search.value = "";
+    optionGroup?.querySelectorAll("label").forEach((label) => {
+      label.classList.remove("is-hidden");
+    });
+  }
+  panel.classList.remove("is-hidden");
+}
+
+function handleStudentFilterSearch(event) {
+  const search = event.currentTarget;
+  const panel = search === elements.studentCoachSearch ? elements.studentCoachFilterGroup : elements.studentRinkFilterGroup;
+  const query = search.value.trim().toLowerCase();
+  if (!panel) return;
+
+  openStudentFilterPanel(event);
+  panel.querySelectorAll("label").forEach((label) => {
+    const isAllOption = label.querySelector("input")?.value === "all";
+    const matches = !query || label.textContent.toLowerCase().includes(query);
+    label.classList.toggle("is-hidden", !isAllOption && !matches);
+  });
+}
+
+function handleStudentFilterOutsideClick(event) {
+  if (!elements.studentControls || elements.studentControls.contains(event.target)) return;
+
+  elements.studentCoachFilterPanel?.classList.add("is-hidden");
+  elements.studentRinkFilterPanel?.classList.add("is-hidden");
+  if (elements.studentCoachSearch) elements.studentCoachSearch.value = "";
+  if (elements.studentRinkSearch) elements.studentRinkSearch.value = "";
+}
+
+function syncStudentFilterCheckboxes(changedInput) {
+  const { name, value, checked } = changedInput;
+  const inputs = [...document.querySelectorAll(`input[name="${name}"]`)];
+  const allInput = inputs.find((input) => input.value === "all");
+  const itemInputs = inputs.filter((input) => input.value !== "all");
+  if (!allInput) return;
+
+  if (value === "all") {
+    allInput.checked = checked || !itemInputs.some((input) => input.checked);
+    itemInputs.forEach((input) => {
+      input.checked = allInput.checked;
+    });
+    return;
+  }
+
+  if (allInput.checked && !checked) {
+    itemInputs.forEach((input) => {
+      input.checked = input === changedInput;
+    });
+    changedInput.checked = true;
+  }
+  if (!itemInputs.some((input) => input.checked)) {
+    allInput.checked = true;
+    itemInputs.forEach((input) => {
+      input.checked = true;
+    });
+  } else {
+    allInput.checked = itemInputs.every((input) => input.checked);
   }
 }
 

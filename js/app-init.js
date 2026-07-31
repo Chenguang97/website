@@ -4,6 +4,7 @@ function bindEvents() {
   elements.methodButtons.forEach((button) => button.addEventListener("click", switchMethod));
   elements.availabilitySubtabs.forEach((button) => button.addEventListener("click", switchAvailabilitySection));
   elements.bookingSubtabs.forEach((button) => button.addEventListener("click", switchBookingSection));
+  elements.studentTabs.forEach((button) => button.addEventListener("click", switchStudentPanel));
   elements.coachProfileForm.addEventListener("submit", saveCoachProfile);
   elements.coachPhotoForm.addEventListener("submit", saveCoachPhoto);
   elements.coachPhotoFile.addEventListener("change", handlePhotoFileChange);
@@ -43,7 +44,16 @@ function bindEvents() {
     renderWeeklyAvailabilityViews();
     renderDropdownOpenSlots();
   });
-  elements.studentCoachFilter.addEventListener("change", renderStudentSlots);
+  elements.studentCoachFilterGroup?.addEventListener("change", handleStudentFilterChange);
+  elements.studentRinkFilterGroup?.addEventListener("change", handleStudentFilterChange);
+  elements.studentControls?.addEventListener("click", handleSlotAction);
+  elements.studentFilterToggles.forEach((button) => button.addEventListener("click", applyStudentFilterPanel));
+  elements.studentCoachSearch?.addEventListener("focus", openStudentFilterPanel);
+  elements.studentCoachSearch?.addEventListener("click", openStudentFilterPanel);
+  elements.studentCoachSearch?.addEventListener("input", handleStudentFilterSearch);
+  elements.studentRinkSearch?.addEventListener("focus", openStudentFilterPanel);
+  elements.studentRinkSearch?.addEventListener("click", openStudentFilterPanel);
+  elements.studentRinkSearch?.addEventListener("input", handleStudentFilterSearch);
   elements.studentDateFilter.addEventListener("change", renderStudentSlots);
   elements.calendarWeekStart.addEventListener("change", () => {
     renderWeeklyAvailabilityViews();
@@ -52,6 +62,8 @@ function bindEvents() {
   elements.coachSlots.addEventListener("click", handleSlotAction);
   elements.dropdownOpenSlots.addEventListener("click", handleSlotAction);
   elements.studentSlots.addEventListener("click", handleSlotAction);
+  elements.studentSlotOptionsList?.addEventListener("click", handleSlotAction);
+  elements.studentOwnBookings?.addEventListener("click", handleSlotAction);
   elements.saveAvailability.addEventListener("click", saveAvailabilityChanges);
   elements.exceptionDragCalendar.addEventListener("click", handleScheduleCalendarClick);
   elements.dragCalendar.addEventListener("pointerdown", startCalendarDrag);
@@ -62,11 +74,15 @@ function bindEvents() {
     clearDragSelection();
   });
   elements.bookingForm.addEventListener("submit", confirmBooking);
+  elements.bookingNewSlot?.addEventListener("change", handleBookingNewSlotChange);
+  elements.bookingForSelf?.addEventListener("change", syncBookingForSelf);
   elements.closeDialog.addEventListener("click", () => elements.bookingDialog.close());
+  elements.closeStudentSlotOptions?.addEventListener("click", () => elements.studentSlotOptionsDialog.close());
   elements.closeBookingDetails.addEventListener("click", () => elements.bookingDetailsDialog.close());
   elements.removeBookingDetails.addEventListener("click", removeBookingFromDetails);
   elements.resetDemo.addEventListener("click", resetDemoData);
   document.addEventListener("keydown", handleGlobalKeydown);
+  document.addEventListener("click", handleStudentFilterOutsideClick);
   window.addEventListener("beforeunload", (event) => {
     if (!hasUnsavedProfileChanges) return;
     event.preventDefault();
@@ -85,6 +101,7 @@ function init() {
   elements.exceptionCalendarWeekStart.value = startOfWeekIso(initialDate);
   bindEvents();
   activateCoachPanel(localStorage.getItem(activeCoachPanelStorageKey) || "profilePanel", false);
+  activateStudentPanel(storageGetItem(activeStudentPanelStorageKey) || "studentBookPanel", false);
   renderDragCalendar();
   renderExceptionDragCalendar();
   render();

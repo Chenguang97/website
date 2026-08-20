@@ -442,11 +442,30 @@
                 </div>
               </fieldset>
               <label>
-                选择周
+                选择日期
                 <input id="studentDateFilter" type="date" />
+                <span id="studentPendingDateMessage" class="student-pending-date-message is-hidden">日期已暂选，点击确定后切换。</span>
+                <span id="studentDateActions" class="student-date-actions is-hidden">
+                  <button class="primary-button" type="button" data-action="apply-student-date">确定</button>
+                </span>
               </label>
+              <label>
+                课程时长
+                <select id="studentLessonDurationFilter">
+                  <option value="all">全部时长</option>
+                </select>
+              </label>
+              <div class="student-view-mode-control" aria-label="查看方式">
+                <span>查看方式</span>
+                <div class="student-view-mode-buttons" role="group" aria-label="选择日视图或周视图">
+                  <button class="student-view-mode-button" type="button" data-action="set-student-view-mode" data-view-mode="day" aria-pressed="false">日视图</button>
+                  <button class="student-view-mode-button active" type="button" data-action="set-student-view-mode" data-view-mode="week" aria-pressed="true">周视图</button>
+                </div>
+              </div>
+              <p id="studentViewDateRange" class="student-view-date-range" aria-live="polite"></p>
             </div>
 
+            <div id="studentDayAvailability" class="student-day-availability is-hidden" aria-live="polite"></div>
             <div id="studentSlots" class="booking-grid" aria-live="polite"></div>
           </section>
 
@@ -626,6 +645,7 @@
         </div>
         <input id="bookingSlotId" type="hidden" />
         <input id="bookingDialogMode" type="hidden" value="create" />
+        <input id="bookingLessonId" type="hidden" />
         <label id="bookingNewSlotLabel" class="is-hidden">
           新的预约时间
           <select id="bookingNewSlot"></select>

@@ -2,9 +2,75 @@
   position: relative;
   z-index: 30;
   display: grid;
-  grid-template-columns: minmax(240px, 1.2fr) minmax(240px, 1.2fr) minmax(180px, 0.7fr);
+  grid-template-columns: minmax(220px, 1.2fr) minmax(220px, 1.2fr) minmax(150px, 0.65fr) minmax(140px, 0.6fr) auto;
   gap: 14px;
   align-items: start;
+}
+
+.student-view-mode-control {
+  display: grid;
+  gap: 7px;
+  align-self: end;
+}
+
+.student-view-mode-control > span {
+  color: #334155;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.student-view-mode-buttons {
+  display: inline-flex;
+  width: fit-content;
+  padding: 4px;
+  border: 1px solid #dbe5f1;
+  border-radius: 12px;
+  background: #f8fafc;
+}
+
+.student-view-mode-button {
+  min-height: 38px;
+  padding: 8px 14px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: #64748b;
+  font-size: 14px;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.student-view-mode-button.active {
+  background: #ffffff;
+  color: #1d4ed8;
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.08);
+}
+
+.student-view-date-range {
+  grid-column: 3 / -1;
+  margin: -4px 0 0;
+  color: #1e3a8a;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.student-pending-date-message {
+  display: block;
+  margin-top: 6px;
+  color: #92400e;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.student-date-actions {
+  display: block;
+  margin-top: 8px;
+}
+
+.student-date-actions .primary-button {
+  min-height: 32px;
+  padding: 6px 10px;
+  font-size: 12px;
 }
 
 .student-controls:has(.student-filter-panel:not(.is-hidden))::before {
@@ -215,6 +281,110 @@ html[data-active-student-panel="studentAccountPanel"] .student-page-tab[data-stu
 .student-tab-panel.active {
   display: grid;
   gap: 16px;
+}
+
+.student-day-availability-card {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid #dbe5f1;
+  border-radius: 14px;
+  background: #ffffff;
+  box-shadow: 0 16px 45px rgba(15, 23, 42, 0.08);
+}
+
+.student-day-availability-heading,
+.student-day-calendar-summary {
+  display: flex;
+}
+
+.student-day-availability-heading {
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.student-day-availability-heading h3 {
+  margin: 0;
+  font-size: 20px;
+}
+
+.student-day-availability-heading > span {
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.student-day-calendar {
+  display: grid;
+  grid-template-columns: 72px minmax(220px, 1fr);
+  max-height: 560px;
+  overflow: auto;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #ffffff;
+}
+
+.student-day-calendar .calendar-day {
+  color: #64748b;
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  text-align: left;
+}
+
+.student-day-calendar .calendar-cell,
+.student-day-calendar .calendar-time {
+  min-height: 38px;
+}
+
+.student-day-calendar .student-time-option {
+  justify-content: stretch;
+  text-align: left;
+  overflow: hidden;
+}
+
+.student-day-calendar-summary {
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  gap: 5px;
+  padding: 5px 8px;
+  color: #172033;
+  font-size: 11.5px;
+  font-weight: 900;
+  overflow: hidden;
+}
+
+.student-day-calendar-summary strong,
+.student-day-calendar-summary small {
+  display: inline-block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.student-day-calendar-summary strong {
+  flex: 0 0 auto;
+  font-weight: 950;
+}
+
+.student-day-calendar-summary > small {
+  flex: 1 1 auto;
+  min-width: 0;
+  color: #334155;
+  font-size: 10.5px;
+  font-weight: 600;
+}
+
+.student-day-calendar .student-calendar-cell.availability-high .student-day-calendar-summary,
+.student-day-calendar .student-calendar-cell.availability-high .student-day-calendar-summary > small {
+  color: #172033;
+}
+
+.student-day-calendar .student-calendar-cell.availability-medium .student-day-calendar-summary > small {
+  color: #1e3a8a;
 }
 
 html[data-active-student-panel="studentBookingsPanel"] .student-tab-panel.active:not([data-student-content="studentBookingsPanel"]),
@@ -507,15 +677,15 @@ html[data-active-student-panel="studentAccountPanel"] .student-tab-panel[data-st
 }
 
 .student-calendar-cell.availability-low {
-  background: #dbeafe;
+  background: #e0f2fe;
 }
 
 .student-calendar-cell.availability-medium {
-  background: #93c5fd;
+  background: #a5d8ff;
 }
 
 .student-calendar-cell.availability-high {
-  background: #2563eb;
+  background: #60bdf2;
 }
 
 .student-availability-swatch {
@@ -526,15 +696,15 @@ html[data-active-student-panel="studentAccountPanel"] .student-tab-panel[data-st
 }
 
 .student-availability-swatch.low {
-  background: #dbeafe;
+  background: #e0f2fe;
 }
 
 .student-availability-swatch.medium {
-  background: #93c5fd;
+  background: #a5d8ff;
 }
 
 .student-availability-swatch.high {
-  background: #2563eb;
+  background: #60bdf2;
 }
 
 .student-coach-option strong,

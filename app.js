@@ -54,7 +54,8 @@ function bindEvents() {
   elements.studentRinkSearch?.addEventListener("focus", openStudentFilterPanel);
   elements.studentRinkSearch?.addEventListener("click", openStudentFilterPanel);
   elements.studentRinkSearch?.addEventListener("input", handleStudentFilterSearch);
-  elements.studentDateFilter.addEventListener("change", renderStudentSlots);
+  elements.studentDateFilter.addEventListener("change", handleStudentDateDraftChange);
+  elements.studentLessonDurationFilter?.addEventListener("change", renderStudentSlots);
   elements.calendarWeekStart.addEventListener("change", () => {
     renderWeeklyAvailabilityViews();
   });
@@ -62,6 +63,7 @@ function bindEvents() {
   elements.coachSlots.addEventListener("click", handleSlotAction);
   elements.dropdownOpenSlots.addEventListener("click", handleSlotAction);
   elements.studentSlots.addEventListener("click", handleSlotAction);
+  elements.studentDayAvailability?.addEventListener("click", handleSlotAction);
   elements.studentSlotOptionsList?.addEventListener("click", handleSlotAction);
   elements.studentOwnBookings?.addEventListener("click", handleSlotAction);
   elements.saveAvailability.addEventListener("click", saveAvailabilityChanges);
@@ -83,6 +85,7 @@ function bindEvents() {
   elements.resetDemo.addEventListener("click", resetDemoData);
   document.addEventListener("keydown", handleGlobalKeydown);
   document.addEventListener("click", handleStudentFilterOutsideClick);
+  document.addEventListener("click", handleStudentDateOutsideClick);
   window.addEventListener("beforeunload", (event) => {
     if (!hasUnsavedProfileChanges) return;
     event.preventDefault();
@@ -97,6 +100,7 @@ function init() {
   elements.slotDate.value = initialDate;
   elements.blockDialogDate.value = initialDate;
   elements.studentDateFilter.value = initialDate;
+  studentSelectedDate = initialDate;
   elements.calendarWeekStart.value = startOfWeekIso(initialDate);
   elements.exceptionCalendarWeekStart.value = startOfWeekIso(initialDate);
   bindEvents();

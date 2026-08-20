@@ -1,10 +1,31 @@
 function addAvailability(event) {
   event.preventDefault();
+  const date = elements.slotDate.value;
+  const location = elements.locationType.value;
+  const startTime = elements.startTime.value;
+  const endTime = elements.endTime.value;
+  const timePattern = /^\d{2}:\d{2}$/;
+
+  if (date && location && startTime && !endTime) {
+    showFormMessage("请选择有效的结束时间，结束时间需要晚于开始时间。", true);
+    return;
+  }
+
+  if (!date || !location || !startTime || !endTime) {
+    showFormMessage("请填写日期、地点、开始时间和结束时间。", true);
+    return;
+  }
+
+  if (!timePattern.test(startTime) || !timePattern.test(endTime)) {
+    showFormMessage("时间格式无效，请选择有效的开始和结束时间。", true);
+    return;
+  }
+
   const startMinutes = minutesFromTime(elements.startTime.value);
   const endMinutes = minutesFromTime(elements.endTime.value);
   const lesson = getAvailabilityLesson();
 
-  if (endMinutes <= startMinutes) {
+  if (!Number.isFinite(startMinutes) || !Number.isFinite(endMinutes) || endMinutes <= startMinutes) {
     showFormMessage("结束时间需要晚于开始时间。", true);
     return;
   }
@@ -14,18 +35,42 @@ function addAvailability(event) {
     return;
   }
 
-  const undoSnapshot = captureUndoState();
-  const { newSlots, overwritten, bookedTemplateUpdates } = replaceRecurringAvailabilityRange(
-    currentCoachId,
-    elements.slotDate.value,
+  requestAvailabilityChange({
+    date,
     startMinutes,
     endMinutes,
     lesson,
-    elements.locationType.value,
-    elements.coachNote.value.trim()
+    location,
+    note: elements.coachNote.value.trim(),
+    source: "manual",
+  });
+}
+
+function requestAvailabilityChange(change, allowOverride = false) {
+  const conflicts = findRecurringAvailabilityConflicts(change.date, change.startMinutes, change.endMinutes, change.location);
+  if (conflicts.length && !allowOverride) {
+    pendingAvailabilityConflict = change;
+    showAvailabilityConflictDialog(change, conflicts);
+    return;
+  }
+
+  applyAvailabilityChange(change, allowOverride);
+}
+
+function applyAvailabilityChange(change, trimCrossRinkConflicts = false) {
+  const undoSnapshot = captureUndoState();
+  const { newSlots, overwritten, bookedTemplateUpdates, trimmed } = replaceRecurringAvailabilityRange(
+    currentCoachId,
+    change.date,
+    change.startMinutes,
+    change.endMinutes,
+    change.lesson,
+    change.location,
+    change.note,
+    trimCrossRinkConflicts
   );
 
-  if (!newSlots.length && !overwritten.length && !bookedTemplateUpdates.length) {
+  if (!newSlots.length && !overwritten.length && !bookedTemplateUpdates.length && !trimmed.length) {
     showFormMessage("这段时间没有可覆盖的开放时间，可能已经被预约。");
     return;
   }
@@ -33,8 +78,65 @@ function addAvailability(event) {
   pushUndoState(undoSnapshot);
   elements.coachNote.value = "";
   refreshAvailabilityDirty();
-  showFormMessage(`已同步每周可预约时间：${newSlots.length} 个新时间，${overwritten.length} 个开放时间，${bookedTemplateUpdates.length} 个已预约时间底色。`);
+  showFormMessage(`已同步每周可预约时间：${newSlots.length} 个新时间，${overwritten.length} 个开放时间，${trimmed.length} 个裁剪时段，${bookedTemplateUpdates.length} 个已预约时间底色。`);
   render();
+}
+
+function findAvailabilityConflicts(date, startMinutes, endMinutes, location) {
+  const conflicts = slots.filter((slot) => {
+    return (
+      slot.coachId === currentCoachId &&
+      slot.date === date &&
+      !slot.booked &&
+      slot.location !== location &&
+      rangesOverlap(minutesFromTime(slot.start), minutesFromTime(slot.end), startMinutes, endMinutes)
+    );
+  });
+  if (!conflicts.length) return conflicts;
+
+  const conflictStart = Math.min(...conflicts.map((slot) => minutesFromTime(slot.start)));
+  const conflictEnd = Math.max(...conflicts.map((slot) => minutesFromTime(slot.end)));
+  const isExactRangeReplacement = conflictStart === startMinutes && conflictEnd === endMinutes;
+  return isExactRangeReplacement ? [] : conflicts;
+}
+
+function findRecurringAvailabilityConflicts(date, startMinutes, endMinutes, location) {
+  return getRecurringDatesForDate(currentCoachId, date).flatMap((recurringDate) => {
+    return findAvailabilityConflicts(recurringDate, startMinutes, endMinutes, location);
+  });
+}
+
+function showAvailabilityConflictDialog(change, conflicts) {
+  const sample = conflicts.slice(0, 4).map((slot) => `${formatDate(slot.date)} ${slot.start}-${slot.end} · ${formatLocationLabel(slot.location)}`);
+  const extra = conflicts.length > sample.length ? `，另有 ${conflicts.length - sample.length} 个重叠时段` : "";
+  elements.conflictDetails.textContent = `新时段 ${formatDate(change.date)} ${timeFromMinutes(change.startMinutes)}-${timeFromMinutes(change.endMinutes)} · ${formatLocationLabel(change.location)} 与其他冰场开放时间重叠：${sample.join("；")}${extra}。请选择 Override 裁剪旧时段，或 Cancel 保留原状。`;
+  if (typeof elements.conflictDialog.showModal === "function") {
+    elements.conflictDialog.showModal();
+  } else {
+    elements.conflictDialog.open = true;
+  }
+}
+
+function cancelAvailabilityConflict() {
+  pendingAvailabilityConflict = null;
+  if (typeof elements.conflictDialog.close === "function") {
+    elements.conflictDialog.close();
+  }
+  elements.conflictDialog.open = false;
+  elements.conflictDialog.removeAttribute("open");
+  showFormMessage("已取消覆盖，原有可用时间未修改。");
+}
+
+function confirmAvailabilityConflictOverride() {
+  if (!pendingAvailabilityConflict) return;
+  const change = pendingAvailabilityConflict;
+  pendingAvailabilityConflict = null;
+  if (typeof elements.conflictDialog.close === "function") {
+    elements.conflictDialog.close();
+  }
+  elements.conflictDialog.open = false;
+  elements.conflictDialog.removeAttribute("open");
+  requestAvailabilityChange(change, true);
 }
 
 function toggleCalendarHours() {
@@ -128,7 +230,16 @@ function addBlockExceptionRange(date, start, end, reason = "不可预约时间")
   refreshAvailabilityDirty("有未保存的不可预约时间");
 }
 
-function replaceAvailabilityRange(coachId, date, startMinutes, endMinutes, lesson, location, note) {
+function cloneSlotSegment(slot, startMinutes, endMinutes) {
+  return {
+    ...slot,
+    id: createId(),
+    start: timeFromMinutes(startMinutes),
+    end: timeFromMinutes(endMinutes),
+  };
+}
+
+function replaceAvailabilityRange(coachId, date, startMinutes, endMinutes, lesson, location, note, trimCrossRinkConflicts = false) {
   const bookedTemplateUpdates = slots.filter((slot) => {
     return (
       slot.coachId === coachId &&
@@ -145,10 +256,35 @@ function replaceAvailabilityRange(coachId, date, startMinutes, endMinutes, lesso
       rangesOverlap(minutesFromTime(slot.start), minutesFromTime(slot.end), startMinutes, endMinutes)
     );
   });
-  const overwrittenIds = new Set(overwritten.map((slot) => slot.id));
+  const trimmed = [];
+  const overwrittenIds = new Set();
 
-  overwritten.forEach(markDeletedSlot);
+  overwritten.forEach((slot) => {
+    const slotStart = minutesFromTime(slot.start);
+    const slotEnd = minutesFromTime(slot.end);
+    const shouldTrim = trimCrossRinkConflicts && slot.location !== location;
+
+    overwrittenIds.add(slot.id);
+    markDeletedSlot(slot);
+
+    if (!shouldTrim) return;
+
+    const leftStart = slotStart;
+    const leftEnd = Math.min(startMinutes, slotEnd);
+    const rightStart = Math.max(endMinutes, slotStart);
+    const rightEnd = slotEnd;
+
+    if (leftStart < leftEnd) {
+      trimmed.push(cloneSlotSegment(slot, leftStart, leftEnd));
+    }
+    if (rightStart < rightEnd) {
+      trimmed.push(cloneSlotSegment(slot, rightStart, rightEnd));
+    }
+  });
+
   slots = slots.filter((slot) => !overwrittenIds.has(slot.id));
+  slots = [...slots, ...trimmed];
+  trimmed.forEach(markAddedSlot);
 
   const newSlots = createSlotsFromRange(coachId, date, startMinutes, endMinutes, lesson, location, note);
   slots = [...slots, ...newSlots];
@@ -158,7 +294,7 @@ function replaceAvailabilityRange(coachId, date, startMinutes, endMinutes, lesso
     markRangeCells(slot.date, Math.max(minutesFromTime(slot.start), startMinutes), Math.min(minutesFromTime(slot.end), endMinutes), unsavedRecurringCellKeys);
   });
 
-  return { newSlots, overwritten, bookedTemplateUpdates };
+  return { newSlots, overwritten, bookedTemplateUpdates, trimmed };
 }
 
 function getRecurringDatesForDate(coachId, date) {
@@ -194,17 +330,18 @@ function getRecurringDatesForDate(coachId, date) {
   return [...dates].sort();
 }
 
-function replaceRecurringAvailabilityRange(coachId, date, startMinutes, endMinutes, lesson, location, note) {
+function replaceRecurringAvailabilityRange(coachId, date, startMinutes, endMinutes, lesson, location, note, trimCrossRinkConflicts = false) {
   return getRecurringDatesForDate(coachId, date).reduce(
     (summary, recurringDate) => {
       markRangeCells(recurringDate, startMinutes, endMinutes, unsavedRecurringCellKeys);
-      const result = replaceAvailabilityRange(coachId, recurringDate, startMinutes, endMinutes, lesson, location, note);
+      const result = replaceAvailabilityRange(coachId, recurringDate, startMinutes, endMinutes, lesson, location, note, trimCrossRinkConflicts);
       summary.newSlots.push(...result.newSlots);
       summary.overwritten.push(...result.overwritten);
       summary.bookedTemplateUpdates.push(...result.bookedTemplateUpdates);
+      summary.trimmed.push(...result.trimmed);
       return summary;
     },
-    { newSlots: [], overwritten: [], bookedTemplateUpdates: [] }
+    { newSlots: [], overwritten: [], bookedTemplateUpdates: [], trimmed: [] }
   );
 }
 
@@ -471,16 +608,18 @@ function handleLessonOptionClick(event) {
   render();
 }
 
-function openBookingDialog(slotId) {
+function openBookingDialog(slotId, lessonId = "") {
   const slot = slots.find((item) => item.id === slotId);
   if (!slot) return;
 
   const coach = getCoach(slot.coachId);
   const profile = getProfile(slot.coachId);
+  const lesson = getStudentLessonOptionsForCoach(slot.coachId).find((option) => option.id === lessonId) || getFittingLessonOptionsForStart(slot, getSelectedStudentLessonDuration())[0] || getStudentLessonOptionsForCoach(slot.coachId)[0];
   const defaultConcreteLocation = (profile.servedRinks && profile.servedRinks[0]) || profile.homeRink || rinks[0];
   elements.bookingSlotId.value = slot.id;
+  elements.bookingLessonId.value = lesson.id;
   elements.bookingDialogMode.value = "create";
-  elements.dialogTitle.textContent = `${coach.name} · ${slot.lessonName || "Private lesson"} · $${slot.lessonPrice} · ${formatDate(slot.date)} ${slot.start}`;
+  elements.dialogTitle.textContent = `${coach.name} · ${lesson.name || "Private lesson"} · $${lesson.price} · ${formatDate(slot.date)} ${slot.start}`;
   elements.bookingSubmitButton.textContent = "确认预约";
   elements.bookingNewSlotLabel.classList.add("is-hidden");
   elements.bookingNewSlot.innerHTML = "";
@@ -578,24 +717,29 @@ function syncModifyBookingLocation(currentSlot) {
 function openStudentSlotOptions(slotIds) {
   if (!elements.studentSlotOptionsDialog || !elements.studentSlotOptionsList) return;
 
-  const options = slotIds
+  const selectedDuration = getSelectedStudentLessonDuration();
+  const startSlots = slotIds
     .map((id) => slots.find((slot) => slot.id === id))
     .filter(Boolean)
     .filter((slot) => !slot.booked && !slotOverlapsBlockedException(slot))
     .sort((a, b) => `${getCoach(a.coachId).name}${a.location}${a.lessonPrice}`.localeCompare(`${getCoach(b.coachId).name}${b.location}${b.lessonPrice}`));
+  const options = startSlots.flatMap((slot) => {
+    return getFittingLessonOptionsForStart(slot, selectedDuration).map((lesson) => ({ slot, lesson }));
+  });
 
   if (!options.length) return;
 
-  const first = options[0];
-  elements.studentSlotOptionsTitle.textContent = `${formatDate(first.date)} ${first.start} - ${first.end}`;
+  const first = options[0].slot;
+  elements.studentSlotOptionsTitle.textContent = `${formatDate(first.date)} ${first.start}`;
   elements.studentSlotOptionsList.innerHTML = options
-    .map((slot) => {
+    .map(({ slot, lesson }) => {
       const coach = getCoach(slot.coachId);
+      const endTime = timeFromMinutes(minutesFromTime(slot.start) + Number(lesson.duration));
       return `
-        <button class="student-coach-option" type="button" data-action="book" data-id="${slot.id}">
+        <button class="student-coach-option" type="button" data-action="book" data-id="${slot.id}" data-lesson-id="${lesson.id}">
           <strong>${coach.name}</strong>
           <span>${coach.subject}</span>
-          <small>${formatLocationLabel(slot.location)} · ${slot.lessonName || "私教课"} · $${slot.lessonPrice}</small>
+          <small>${slot.start}-${endTime} · ${formatLocationLabel(slot.location)} · ${lesson.name || `${lesson.duration} min private lesson`} · $${lesson.price}</small>
         </button>
       `;
     })
@@ -629,6 +773,7 @@ function removeBookingFromDetails() {
   if (!confirmed) return;
 
   pushUndoState();
+  restoreConsumedAvailabilitySlots(slot);
   slot.booked = false;
   slot.student = null;
   elements.bookingDetailsDialog.close();
@@ -644,6 +789,7 @@ function cancelStudentBooking(slotId) {
   if (!confirmed) return;
 
   pushUndoState();
+  restoreConsumedAvailabilitySlots(slot);
   slot.booked = false;
   slot.student = null;
   setAvailabilityDirty(true, "有未保存的预约修改");
@@ -661,6 +807,14 @@ function confirmBooking(event) {
   const slot = slots.find((item) => item.id === elements.bookingSlotId.value);
   const isModify = elements.bookingDialogMode.value === "modify";
   if (!slot || (slot.booked && !isModify) || (!slot.booked && isModify)) return;
+  const lesson = isModify
+    ? null
+    : getStudentLessonOptionsForCoach(slot.coachId).find((option) => option.id === elements.bookingLessonId?.value) || getFittingLessonOptionsForStart(slot, getSelectedStudentLessonDuration())[0];
+
+  if (!isModify && (!lesson || !canFitLessonFromSlot(slot, Number(lesson.duration)))) {
+    showFormMessage("这个时间已经无法完整容纳所选课程时长，请重新选择。", true);
+    return;
+  }
 
   const bookingForSelf = elements.bookingForSelf.checked;
   const student = {
@@ -673,6 +827,7 @@ function confirmBooking(event) {
   if (isModify) {
     slot.student = student;
   } else {
+    applyLessonToBookingSlot(slot, lesson);
     slot.booked = true;
     slot.student = student;
     if (slot.location === "Any served rink") {
@@ -683,6 +838,44 @@ function confirmBooking(event) {
   elements.bookingDialog.close();
   setAvailabilityDirty(true, "有未保存的预约修改");
   render();
+}
+
+function applyLessonToBookingSlot(slot, lesson) {
+  const duration = Number(lesson.duration);
+  const coveredSlots = getAvailabilitySlotsCoveredByLesson(slot, duration).filter((coveredSlot) => coveredSlot.id !== slot.id);
+  slot.consumedAvailabilitySlots = coveredSlots.map((coveredSlot) => ({ ...coveredSlot }));
+  slots = slots.filter((item) => !coveredSlots.some((coveredSlot) => coveredSlot.id === item.id));
+  slot.end = timeFromMinutes(minutesFromTime(slot.start) + duration);
+  slot.lessonId = lesson.id;
+  slot.lessonName = lesson.name;
+  slot.lessonDuration = duration;
+  slot.lessonPrice = lesson.price;
+}
+
+function getAvailabilitySlotsCoveredByLesson(startSlot, duration) {
+  const startMinutes = minutesFromTime(startSlot.start);
+  const endMinutes = startMinutes + Number(duration);
+  const availabilityLocation = getAvailabilityLocation(startSlot);
+  return slots.filter((slot) => {
+    return (
+      slot.coachId === startSlot.coachId &&
+      slot.date === startSlot.date &&
+      !slot.booked &&
+      !slotOverlapsBlockedException(slot) &&
+      getAvailabilityLocation(slot) === availabilityLocation &&
+      rangesOverlap(minutesFromTime(slot.start), minutesFromTime(slot.end), startMinutes, endMinutes)
+    );
+  });
+}
+
+function restoreConsumedAvailabilitySlots(slot) {
+  if (!Array.isArray(slot.consumedAvailabilitySlots) || !slot.consumedAvailabilitySlots.length) return;
+  const existingIds = new Set(slots.map((item) => item.id));
+  const restoredSlots = slot.consumedAvailabilitySlots
+    .filter((item) => !existingIds.has(item.id))
+    .map((item) => ({ ...item, booked: false, student: null, consumedAvailabilitySlots: undefined }));
+  slots = [...slots, ...restoredSlots];
+  slot.consumedAvailabilitySlots = [];
 }
 
 function syncBookingForSelf() {
@@ -702,8 +895,18 @@ function handleSlotAction(event) {
   const { action, id, ids } = button.dataset;
   if (action === "student-week") {
     const offset = Number(button.dataset.offset || 0);
-    elements.studentDateFilter.value = addDaysIso(elements.studentDateFilter.value || nextWeekdayIso(), offset);
+    studentSelectedDate = addDaysIso(studentSelectedDate || elements.studentDateFilter.value || nextWeekdayIso(), offset);
+    elements.studentDateFilter.value = studentSelectedDate;
     renderStudentSlots();
+    return;
+  }
+  if (action === "set-student-view-mode") {
+    studentViewMode = button.dataset.viewMode === "week" ? "week" : "day";
+    renderStudentSlots();
+    return;
+  }
+  if (action === "apply-student-date") {
+    applyStudentDateSelection();
     return;
   }
   if (action === "remove-student-filter") {
@@ -715,7 +918,7 @@ function handleSlotAction(event) {
     return;
   }
   if (action === "book") {
-    openBookingDialog(id);
+    openBookingDialog(id, button.dataset.lessonId);
     return;
   }
   if (action === "delete") {
@@ -753,6 +956,7 @@ function handleSlotAction(event) {
     const slot = slots.find((item) => item.id === id);
     if (slot) {
       pushUndoState();
+      restoreConsumedAvailabilitySlots(slot);
       slot.booked = false;
       slot.student = null;
       setAvailabilityDirty(true);
@@ -767,6 +971,27 @@ function handleSlotAction(event) {
     cancelStudentBooking(id);
     return;
   }
+}
+
+function handleStudentDateDraftChange() {
+  renderStudentDatePendingState();
+}
+
+function applyStudentDateSelection() {
+  studentSelectedDate = elements.studentDateFilter.value || studentSelectedDate || nextWeekdayIso();
+  elements.studentDateFilter.value = studentSelectedDate;
+  renderStudentSlots();
+}
+
+function cancelStudentDateSelection() {
+  elements.studentDateFilter.value = studentSelectedDate || nextWeekdayIso();
+  renderStudentDatePendingState();
+}
+
+function handleStudentDateOutsideClick(event) {
+  if (!elements.studentDateActions || elements.studentDateActions.classList.contains("is-hidden")) return;
+  if (event.target.closest("#studentDateFilter") || event.target.closest("#studentDateActions")) return;
+  cancelStudentDateSelection();
 }
 
 function handleBookingNewSlotChange() {
@@ -1048,24 +1273,15 @@ function finishCalendarDrag() {
       return;
     }
 
-    const { newSlots, overwritten, bookedTemplateUpdates } = replaceRecurringAvailabilityRange(
-      currentCoachId,
+    requestAvailabilityChange({
       date,
-      start,
-      end,
+      startMinutes: start,
+      endMinutes: end,
       lesson,
-      elements.calendarLocationType.value,
-      `从日历添加：${formatLocationLabel(elements.calendarLocationType.value)}。`
-    );
-    if (newSlots.length || overwritten.length || bookedTemplateUpdates.length) {
-      pushUndoState(undoSnapshot);
-      refreshAvailabilityDirty();
-    }
-    if (newSlots.length || overwritten.length || bookedTemplateUpdates.length) {
-      showFormMessage(`日历已同步每周可预约时间：${newSlots.length} 个新时间，${overwritten.length} 个开放时间，${bookedTemplateUpdates.length} 个已预约时间底色。`);
-    } else {
-      showFormMessage("这段时间已被预约或无法覆盖。");
-    }
+      location: elements.calendarLocationType.value,
+      note: `从日历添加：${formatLocationLabel(elements.calendarLocationType.value)}。`,
+      source: "calendar",
+    });
   }
 
   dragState = null;

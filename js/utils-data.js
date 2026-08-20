@@ -110,6 +110,11 @@ function createId() {
 function createDefaultProfile(coachId) {
   const index = Math.max(0, coaches.findIndex((coach) => coach.id === coachId));
   const rate = [120, 95, 110][index];
+  const lessonDurationsByCoach = {
+    maya: [30, 45, 60],
+    alex: [30, 60],
+    sam: [45, 60],
+  };
   return {
     coachId,
     rate,
@@ -118,27 +123,18 @@ function createDefaultProfile(coachId) {
     travelsToOtherRinks: false,
     travelFee: 0,
     photoUrl: "",
-    lessonOptions: createDefaultLessonOptions(rate),
+    lessonOptions: createDefaultLessonOptions(rate, lessonDurationsByCoach[coachId]),
   };
 }
 
-function createDefaultLessonOptions(rate) {
-  return [
-    {
-      id: "lesson-30",
-      name: "30 min private lesson",
-      duration: 30,
-      price: Math.round(rate / 2),
-      custom: false,
-    },
-    {
-      id: "lesson-60",
-      name: "60 min private lesson",
-      duration: 60,
-      price: rate,
-      custom: false,
-    },
-  ];
+function createDefaultLessonOptions(rate, durations = [30, 60]) {
+  return durations.map((duration) => ({
+    id: `lesson-${duration}`,
+    name: `${duration} min private lesson`,
+    duration,
+    price: Math.round((rate * duration) / 60),
+    custom: false,
+  }));
 }
 
 function normalizeProfile(profile) {
@@ -148,6 +144,10 @@ function normalizeProfile(profile) {
   }
   if (!Array.isArray(normalized.lessonOptions) || !normalized.lessonOptions.length) {
     normalized.lessonOptions = createDefaultLessonOptions(Number(normalized.rate || 0));
+  } else {
+    const existingLessonIds = new Set(normalized.lessonOptions.map((lesson) => lesson.id));
+    const missingDefaults = createDefaultProfile(normalized.coachId).lessonOptions.filter((lesson) => !existingLessonIds.has(lesson.id));
+    normalized.lessonOptions = [...normalized.lessonOptions, ...missingDefaults].sort((a, b) => Number(a.duration) - Number(b.duration));
   }
   return normalized;
 }

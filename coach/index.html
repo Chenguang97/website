@@ -438,6 +438,7 @@
           <button class="icon-button" type="button" id="closeDialog" aria-label="关闭">×</button>
         </div>
         <input id="bookingSlotId" type="hidden" />
+        <input id="bookingLessonId" type="hidden" />
         <label id="bookingLocationLabel" class="is-hidden">
           Lesson location
           <select id="bookingLocation"></select>
@@ -505,6 +506,22 @@
         <div class="dialog-actions">
           <button class="ghost-button" type="button" id="cancelBlockDialog">Cancel</button>
           <button class="danger-button" type="submit">Confirm block</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="conflictDialog" class="booking-dialog" data-conflict-dialog>
+      <form method="dialog">
+        <div class="dialog-heading">
+          <div>
+            <p class="eyebrow">可用时间冲突</p>
+            <h3>确认覆盖重叠时段</h3>
+          </div>
+        </div>
+        <p id="conflictDetails" class="dialog-note">新时段与其他冰场已有开放时间重叠。</p>
+        <div class="dialog-actions">
+          <button class="ghost-button" type="button" id="cancelConflictOverride">Cancel</button>
+          <button class="danger-button" type="button" id="confirmConflictOverride">Override</button>
         </div>
       </form>
     </dialog>

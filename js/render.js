@@ -501,24 +501,211 @@ function renderDropdownWeekSlots() {
 
 function renderStudentSlots() {
   renderStudentAccessState();
+  renderStudentViewModeButtons();
   if (!studentHasFullAccess) {
+    renderStudentDayAvailability([]);
     renderPublicStudentCalendar();
     return;
   }
 
   const selectedCoaches = getSelectedStudentFilterValues("studentCoachFilter", coaches.map((coach) => coach.id));
   const selectedRinks = getSelectedStudentFilterValues("studentRinkFilter", [...rinks, "Zoom"]);
-  const weekStart = startOfWeekIso(elements.studentDateFilter.value || nextWeekdayIso());
+  renderStudentLessonDurationFilter(selectedCoaches);
+  const selectedDuration = getSelectedStudentLessonDuration();
+  const selectedDate = studentSelectedDate || elements.studentDateFilter.value || nextWeekdayIso();
+  const weekStart = startOfWeekIso(selectedDate);
   const weekEnd = addDaysIso(weekStart, 7);
   const available = slots.filter((slot) => {
     const coachMatches = selectedCoaches.has(slot.coachId);
     const rinkMatches = studentRinkMatches(slot, selectedRinks);
     const dateMatches = slot.date >= weekStart && slot.date < weekEnd;
-    return !slot.booked && !slotOverlapsBlockedException(slot) && coachMatches && rinkMatches && dateMatches;
+    return !slot.booked && !slotOverlapsBlockedException(slot) && coachMatches && rinkMatches && dateMatches && getFittingLessonOptionsForStart(slot, selectedDuration).length > 0;
   });
 
-  elements.studentDateFilter.value = weekStart;
+  elements.studentDateFilter.value = selectedDate;
+  renderStudentDatePendingState();
+  renderStudentViewDateRange(selectedDate, weekStart);
+  renderStudentDayAvailability(getStudentAvailableSlotsForDate(selectedDate, selectedCoaches, selectedRinks, selectedDuration));
+  if (studentViewMode === "day") {
+    elements.studentSlots.innerHTML = "";
+    return;
+  }
+  if (elements.studentDayAvailability) {
+    elements.studentDayAvailability.innerHTML = "";
+    elements.studentDayAvailability.classList.add("is-hidden");
+  }
   renderFullStudentCalendar(weekStart, available);
+}
+
+function getStudentAvailableSlotsForDate(date, selectedCoaches, selectedRinks, selectedDuration = getSelectedStudentLessonDuration()) {
+  return slots
+    .filter((slot) => {
+      const coachMatches = selectedCoaches.has(slot.coachId);
+      const rinkMatches = studentRinkMatches(slot, selectedRinks);
+      return slot.date === date && !slot.booked && !slotOverlapsBlockedException(slot) && coachMatches && rinkMatches && getFittingLessonOptionsForStart(slot, selectedDuration).length > 0;
+    })
+    .sort(slotSort);
+}
+
+function renderStudentLessonDurationFilter(selectedCoaches) {
+  if (!elements.studentLessonDurationFilter) return;
+  const previousValue = elements.studentLessonDurationFilter.value || "all";
+  const durations = [...selectedCoaches]
+    .flatMap((coachId) => getStudentLessonOptionsForCoach(coachId).map((lesson) => Number(lesson.duration)))
+    .filter((duration) => Number.isFinite(duration) && duration > 0);
+  const uniqueDurations = [...new Set(durations)].sort((a, b) => a - b);
+  elements.studentLessonDurationFilter.innerHTML = [
+    `<option value="all">全部时长</option>`,
+    ...uniqueDurations.map((duration) => `<option value="${duration}">${duration} 分钟</option>`),
+  ].join("");
+  elements.studentLessonDurationFilter.value = uniqueDurations.includes(Number(previousValue)) ? previousValue : "all";
+}
+
+function getSelectedStudentLessonDuration() {
+  const value = elements.studentLessonDurationFilter?.value || "all";
+  return value === "all" ? null : Number(value);
+}
+
+function getStudentLessonOptionsForCoach(coachId) {
+  const profile = getProfile(coachId);
+  return (Array.isArray(profile.lessonOptions) && profile.lessonOptions.length ? profile.lessonOptions : createDefaultLessonOptions(Number(profile.rate || 0)))
+    .filter((lesson) => Number(lesson.duration) > 0)
+    .sort((a, b) => Number(a.duration) - Number(b.duration));
+}
+
+function getFittingLessonOptionsForStart(slot, selectedDuration = null) {
+  return getStudentLessonOptionsForCoach(slot.coachId).filter((lesson) => {
+    const duration = Number(lesson.duration);
+    return (!selectedDuration || duration === selectedDuration) && canFitLessonFromSlot(slot, duration);
+  });
+}
+
+function canFitLessonFromSlot(startSlot, duration) {
+  const startMinutes = minutesFromTime(startSlot.start);
+  const endMinutes = startMinutes + Number(duration);
+  const availabilityLocation = getAvailabilityLocation(startSlot);
+  if (!Number.isFinite(endMinutes) || endMinutes > minutesFromTime(fullDayEnd)) return false;
+
+  for (let minutes = startMinutes; minutes < endMinutes; minutes += calendarStep) {
+    const coveringSlot = slots.find((slot) => {
+      return (
+        slot.coachId === startSlot.coachId &&
+        slot.date === startSlot.date &&
+        !slot.booked &&
+        !slotOverlapsBlockedException(slot) &&
+        getAvailabilityLocation(slot) === availabilityLocation &&
+        minutesFromTime(slot.start) <= minutes &&
+        minutesFromTime(slot.end) >= Math.min(minutes + calendarStep, endMinutes)
+      );
+    });
+    if (!coveringSlot) return false;
+  }
+
+  return true;
+}
+
+function renderStudentDayAvailability(daySlots) {
+  if (!elements.studentDayAvailability) return;
+
+  renderStudentViewModeButtons();
+  elements.studentDayAvailability.classList.toggle("is-hidden", !studentHasFullAccess || studentViewMode !== "day");
+
+  if (!studentHasFullAccess || studentViewMode !== "day") {
+    elements.studentDayAvailability.innerHTML = "";
+    return;
+  }
+
+  const selectedDate = elements.studentDateFilter.value || nextWeekdayIso();
+  const slotsByCell = daySlots.reduce((groups, slot) => {
+    const key = minutesFromTime(slot.start);
+    groups[key] = groups[key] || [];
+    groups[key].push(slot);
+    return groups;
+  }, {});
+  const rows = [];
+
+  for (let minutes = minutesFromTime(coreDayStart); minutes < minutesFromTime(coreDayEnd); minutes += calendarStep) {
+    const cellSlots = slotsByCell[minutes] || [];
+    rows.push(`<div class="calendar-time">${timeFromMinutes(minutes)}</div>`);
+    rows.push(renderStudentDayAvailabilityCell(selectedDate, minutes, cellSlots));
+  }
+
+  elements.studentDayAvailability.innerHTML = `
+    <section class="student-day-availability-card calendar-panel">
+      <div class="student-day-availability-heading">
+        <div>
+          <p class="eyebrow">所选日期 availability</p>
+          <h3>${formatDate(selectedDate)}</h3>
+        </div>
+        <span>${daySlots.length} 个可预约时段</span>
+      </div>
+      <div class="calendar-legend student-calendar-legend" aria-label="所选日期预约日历图例">
+        <span><i class="student-availability-swatch low"></i>可约教练少</span>
+        <span><i class="student-availability-swatch medium"></i>可约教练中等</span>
+        <span><i class="student-availability-swatch high"></i>可约教练多</span>
+        <span><i class="legend-dot blocked"></i>未开放</span>
+      </div>
+      <div class="student-day-calendar drag-calendar" aria-label="${formatDate(selectedDate)} 可预约时间">
+        <div class="calendar-corner"></div>
+        <div class="calendar-day">Availability</div>
+        ${rows.join("")}
+      </div>
+      ${
+        daySlots.length
+          ? ""
+          : `<p class="empty-state compact-empty">当前选择的教练和冰场在这一天没有可预约时段。</p>`
+      }
+    </section>
+  `;
+}
+
+function renderStudentViewModeButtons() {
+  elements.studentViewModeButtons?.forEach((button) => {
+    const isActive = button.dataset.viewMode === studentViewMode;
+    button.classList.toggle("active", isActive);
+    button.setAttribute("aria-pressed", String(isActive));
+  });
+}
+
+function renderStudentViewDateRange(selectedDate, weekStart = startOfWeekIso(selectedDate)) {
+  if (!elements.studentViewDateRange) return;
+  const text = studentViewMode === "week"
+    ? `${formatDate(weekStart)} - ${formatDate(addDaysIso(weekStart, 6))}`
+    : formatDate(selectedDate);
+  elements.studentViewDateRange.textContent = text;
+}
+
+function renderStudentDatePendingState() {
+  if (!elements.studentDateFilter) return;
+  const hasPendingDate = Boolean(studentSelectedDate && elements.studentDateFilter.value && elements.studentDateFilter.value !== studentSelectedDate);
+  elements.studentPendingDateMessage?.classList.toggle("is-hidden", !hasPendingDate);
+  elements.studentDateActions?.classList.toggle("is-hidden", !hasPendingDate);
+}
+
+function renderStudentDayAvailabilityCell(date, minutes, cellSlots) {
+  if (!cellSlots.length) {
+    return `<div class="calendar-cell student-calendar-cell has-blocked" aria-label="${formatDate(date)} ${timeFromMinutes(minutes)} 未开放"></div>`;
+  }
+
+  const slotIds = cellSlots.map((slot) => slot.id).join(",");
+  const availabilityLevel = getStudentAvailabilityLevel(cellSlots.length);
+  const visibleCoachNames = getStudentDayAvailabilityCoachNames(cellSlots);
+  const extraCount = cellSlots.length - visibleCoachNames.length;
+  const coachCountLabel = `${cellSlots.length} coach${cellSlots.length === 1 ? "" : "es"} available`;
+  return `
+    <div class="calendar-cell student-calendar-cell has-slot availability-${availabilityLevel}">
+      <button class="student-time-option" type="button" data-action="choose-time" data-ids="${slotIds}" title="${cellSlots.length} 位教练可预约">
+        <span class="student-day-calendar-summary">
+          <strong>${coachCountLabel}</strong>
+          <small>· ${visibleCoachNames.join(" · ")}${extraCount > 0 ? ` · +${extraCount} more` : ""}</small>
+        </span>
+      </button>
+    </div>
+  `;
+}
+
+function getStudentDayAvailabilityCoachNames(cellSlots) {
+  return cellSlots.slice(0, 3).map((slot) => getCoach(slot.coachId).name);
 }
 
 function getSelectedStudentFilterValues(name, fallbackValues) {
@@ -938,7 +1125,7 @@ function renderCalendarAvailability() {
     cell.classList.toggle("is-editing", isUnsavedOpen || isUnsavedBlock || isRecurringEdit);
     cell.classList.toggle("is-past", isPast);
     cell.title = slot
-      ? `${slot.start}-${slot.end} ${formatLocationLabel(getAvailabilityLocation(slot))}${slot.booked ? ` · 已预约${slot.student?.name ? `：${slot.student.name}` : ""} · ${formatLocationLabel(slot.location)}` : " · 可预约"}${isPast ? " · 已过去" : ""}`
+      ? `${slot.start}-${slot.end} ${formatLocationLabel(getAvailabilityLocation(slot))}${slot.booked ? ` · 已预约 · ${formatLocationLabel(slot.location)}` : " · 可预约"}${isPast ? " · 已过去" : ""}`
       : `不可预约${isPast ? " · 已过去" : ""}`;
     cell.setAttribute("aria-label", cell.title);
   });

@@ -1,4 +1,22 @@
-function selectCalendarRink(event) {
+import { setAvailabilityDirty, showFormMessage } from "./availability-status.js";
+import { getCoachBookingStudents, renderCoachBookingStudentFilter, renderCoachSlots } from "./coach-bookings-render.js";
+import { confirmDiscardProfileChanges, setProfileDirty } from "./coach-profile-actions.js";
+import { activeCoachPanelStorageKey, activeStudentPanelStorageKey } from "./config.js";
+import { createDefaultProfiles, createDefaultSlots } from "./demo-data.js";
+import { elements } from "./elements.js";
+import { render, renderCalendarRinkOptions, renderExceptionCalendarAvailability } from "./render.js";
+import {
+  clearCoachProfileDraft,
+  replaceCoachProfiles,
+  replaceSlots,
+  saveProfiles,
+  saveSlots,
+  state,
+} from "./state.js";
+import { storageSetItem } from "./storage-adapter.js";
+import { clearUndoHistory } from "./undo.js";
+
+export function selectCalendarRink(event) {
   const button = event.target.closest("button[data-rink]");
   if (!button) return;
 
@@ -21,7 +39,7 @@ function switchView(event) {
   });
 }
 
-function switchMethod(event) {
+export function switchMethod(event) {
   const button = event.currentTarget;
   const method = button.dataset.method;
 
@@ -36,7 +54,7 @@ function switchMethod(event) {
   });
 }
 
-function switchAvailabilitySection(event) {
+export function switchAvailabilitySection(event) {
   const button = event.currentTarget;
   const sectionId = button.dataset.availabilitySection;
 
@@ -51,7 +69,7 @@ function switchAvailabilitySection(event) {
   });
 }
 
-function switchBookingSection(event) {
+export function switchBookingSection(event) {
   const button = event.currentTarget;
   const sectionId = button.dataset.bookingSection;
 
@@ -66,11 +84,41 @@ function switchBookingSection(event) {
   });
 }
 
-function switchStudentPanel(event) {
+export function switchStudentPanel(event) {
   activateStudentPanel(event.currentTarget.dataset.studentPanel);
 }
 
-function activateStudentPanel(panelId, shouldPersist = true) {
+export function searchCoachBookingStudents(event) {
+  state.coachBookingStudentSearch = event.currentTarget.value;
+  renderCoachBookingStudentFilter();
+}
+
+export function selectCoachBookingStudent(event) {
+  state.coachBookingStudentKey = event.currentTarget.value;
+  state.coachBookingSelectedStudent = getCoachBookingStudents().find((student) => student.key === state.coachBookingStudentKey) || null;
+  renderCoachSlots();
+  renderExceptionCalendarAvailability();
+}
+
+function clearCoachBookingStudentFilter() {
+  state.coachBookingStudentKey = "";
+  state.coachBookingStudentSearch = "";
+  state.coachBookingSelectedStudent = null;
+  if (elements.coachBookingStudentSearch) elements.coachBookingStudentSearch.value = "";
+  renderCoachSlots();
+  renderExceptionCalendarAvailability();
+}
+
+export function handleCoachBookingFilterAction(event) {
+  if (event.target.closest('[data-action="clear-coach-booking-student"]')) clearCoachBookingStudentFilter();
+}
+
+export function switchCoachBookingPeriod(event) {
+  state.coachBookingListPeriod = event.currentTarget.dataset.coachBookingPeriod === "past" ? "past" : "upcoming";
+  renderCoachSlots();
+}
+
+export function activateStudentPanel(panelId, shouldPersist = true) {
   const targetPanelId = [...elements.studentTabs].some((button) => button.dataset.studentPanel === panelId) ? panelId : "studentBookPanel";
   document.documentElement.dataset.activeStudentPanel = targetPanelId;
 
@@ -89,7 +137,7 @@ function activateStudentPanel(panelId, shouldPersist = true) {
   }
 }
 
-function activateCoachPanel(panelId, shouldPersist = true) {
+export function activateCoachPanel(panelId, shouldPersist = true) {
   const targetPanelId = [...elements.coachTabs].some((button) => button.dataset.coachPanel === panelId) ? panelId : "profilePanel";
   document.documentElement.dataset.activeCoachPanel = targetPanelId;
 
@@ -108,23 +156,28 @@ function activateCoachPanel(panelId, shouldPersist = true) {
   }
 }
 
-function switchCoachPanel(event) {
+export function switchCoachPanel(event) {
   if (!confirmDiscardProfileChanges()) return;
   activateCoachPanel(event.currentTarget.dataset.coachPanel);
 }
 
-function resetDemoData() {
-  coachProfiles = createDefaultProfiles();
-  slots = createDefaultSlots();
-  hasUnsavedProfileChanges = false;
-  unsavedAddedSlotIds.clear();
-  unsavedBlockedCellKeys.clear();
-  unsavedRecurringCellKeys.clear();
-  unsavedBlockExceptionIds.clear();
-  pendingDeletedSlots.clear();
+export function resetDemoData() {
+  replaceCoachProfiles(createDefaultProfiles());
+  clearCoachProfileDraft();
+  replaceSlots(createDefaultSlots());
+  state.hasUnsavedProfileChanges = false;
+  state.unsavedAddedSlotIds.clear();
+  state.unsavedBlockedCellKeys.clear();
+  state.unsavedRecurringCellKeys.clear();
+  state.unsavedBlockExceptionIds.clear();
+  state.pendingDeletedSlots.clear();
   clearUndoHistory();
   if (!saveProfiles() || !saveSlots()) {
-    showFormMessage("重置失败。浏览器存储空间不足。", true);
+    if (document.body.dataset.page !== "admin") showFormMessage("重置失败。浏览器存储空间不足。", true);
+    return;
+  }
+  if (document.body.dataset.page === "admin") {
+    render();
     return;
   }
   setProfileDirty(false);

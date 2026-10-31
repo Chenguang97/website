@@ -1,3 +1,62 @@
+import {
+  calendarStep,
+  coaches,
+  coreDayEnd,
+  coreDayStart,
+  currentCoachId,
+  dayLabels,
+  defaultStart,
+  fullDayEnd,
+  fullDayStart,
+  publicStudentPreviewHours,
+  rinkColors,
+  rinks,
+  studentHasFullAccess,
+  unavailableSelection,
+} from "./config.js";
+import { elements } from "./elements.js";
+import {
+  canFitLessonFromSlot as canFitLessonFrom,
+  findSlotAt as findSlotAtIn,
+  getAvailabilityLocation,
+  isPastBooking,
+  slotOverlapsBlockedException as overlapsBlocked,
+  slotSort,
+} from "./domain/scheduling.mjs";
+import { coachBookingMatchesStudent, renderCoachCalendarFilterSummary, renderCoachSlots } from "./coach-bookings-render.js";
+import { ensureCoachProfileDraft, getProfile, state } from "./state.js";
+import { escapeAttribute, escapeHtml } from "./ui/safe-html.mjs";
+import { formatLocationLabel } from "./ui/display.js";
+import {
+  addDaysIso,
+  cellKey,
+  formatDate,
+  formatWeekday,
+  getCoach,
+  isPastCalendarCell,
+  minutesFromTime,
+  nextWeekdayIso,
+  startOfWeekIso,
+  timeFromMinutes,
+  todayIso,
+} from "./utils-data.js";
+
+function canFitLessonFromSlot(slot, duration) {
+  return canFitLessonFrom(slot, duration, state.slots, state.blockedExceptions, calendarStep, fullDayEnd);
+}
+
+function findSlotAt(coachId, date, minutes) {
+  return findSlotAtIn(state.slots, coachId, date, minutes);
+}
+
+function isPastStudentBooking(slot) {
+  return isPastBooking(slot);
+}
+
+function slotOverlapsBlockedException(slot) {
+  return overlapsBlocked(slot, state.blockedExceptions);
+}
+
 function coachOptions(includeAll = false) {
   const options = coaches
     .map((coach) => `<option value="${coach.id}">${coach.name} · ${coach.subject}</option>`)
@@ -15,13 +74,13 @@ function rinkOptionsForCoach(coachId) {
   ].join("");
 }
 
-function concreteLocationOptionsForCoach(coachId) {
+export function concreteLocationOptionsForCoach(coachId) {
   const profile = getProfile(coachId);
   const servedRinks = profile.servedRinks && profile.servedRinks.length ? profile.servedRinks : [profile.homeRink || rinks[0]];
   return [...servedRinks, "Zoom"].map((location) => `<option value="${location}">${formatLocationLabel(location)}</option>`).join("");
 }
 
-function populateCoachSelects() {
+export function populateCoachSelects() {
   if (elements.studentCoachFilterGroup) {
     elements.studentCoachFilterGroup.innerHTML = [
       `<label><input type="checkbox" name="studentCoachFilter" value="all" checked /> 全部教练</label>`,
@@ -36,11 +95,16 @@ function populateCoachSelects() {
       `<label><input type="checkbox" name="studentRinkFilter" value="Zoom" checked /> Zoom</label>`,
     ].join("");
   }
+  if (elements.multiCoachRequestTargets) {
+    elements.multiCoachRequestTargets.innerHTML = coaches
+      .map((coach) => `<option value="${escapeAttribute(coach.id)}">${escapeHtml(coach.name)}</option>`)
+      .join("");
+  }
   updateStudentFilterSummaries();
   renderStudentFilterChips();
 }
 
-function populateTimeSelects() {
+export function populateTimeSelects() {
   const startMinutes = minutesFromTime(fullDayStart);
   const endMinutes = minutesFromTime(fullDayEnd);
   const startOptions = [];
@@ -57,7 +121,7 @@ function populateTimeSelects() {
   syncEndTimeOptions(elements.blockDialogStart, elements.blockDialogEnd, "12:00");
 }
 
-function syncEndTimeOptions(startSelect, endSelect, preferredEnd = endSelect.value) {
+export function syncEndTimeOptions(startSelect, endSelect, preferredEnd = endSelect.value) {
   const minimumEnd = minutesFromTime(startSelect.value) + calendarStep;
   const options = [];
 
@@ -69,34 +133,36 @@ function syncEndTimeOptions(startSelect, endSelect, preferredEnd = endSelect.val
   endSelect.value = minutesFromTime(preferredEnd) >= minimumEnd ? preferredEnd : timeFromMinutes(minimumEnd);
 }
 
-function slotSort(a, b) {
-  return `${a.date}${a.start}`.localeCompare(`${b.date}${b.start}`);
-}
-
-function render() {
-  slots.sort(slotSort);
-  syncProfileForm();
-  syncPhotoForm();
-  syncLocationOptions();
-  renderCoachSlots();
-  renderStudentSlots();
-  renderStudentOwnBookings();
-  renderStats();
-  renderDropdownOpenSlots();
-  renderDropdownWeekSlots();
-  renderCalendarAvailability();
-  renderExceptionCalendarAvailability();
+export function render() {
+  state.slots.sort(slotSort);
+  const page = document.body.dataset.page;
+  if (page === "coach") {
+    syncProfileForm();
+    syncPhotoForm();
+    syncLocationOptions();
+    renderCoachSlots();
+    renderStats();
+    renderDropdownOpenSlots();
+    renderDropdownWeekSlots();
+    renderCalendarAvailability();
+    renderExceptionCalendarAvailability();
+  } else if (page === "student") {
+    renderStudentSlots();
+    renderStudentOwnBookings();
+  } else if (page === "admin") {
+    renderStats();
+  }
 }
 
 function renderStats() {
   const weekStart = startOfWeekIso(todayIso());
   const weekEnd = addDaysIso(weekStart, 7);
-  const weeklyCoachSlots = slots.filter((slot) => slot.coachId === currentCoachId && slot.date >= weekStart && slot.date < weekEnd);
+  const weeklyCoachSlots = state.slots.filter((slot) => slot.coachId === currentCoachId && slot.date >= weekStart && slot.date < weekEnd);
   const availableHours = weeklyCoachSlots
     .filter((slot) => !slot.booked && !slotOverlapsBlockedException(slot))
     .reduce((total, slot) => total + (minutesFromTime(slot.end) - minutesFromTime(slot.start)) / 60, 0);
   const bookedCount = weeklyCoachSlots.filter((slot) => slot.booked).length;
-  const allBookedCount = slots.filter((slot) => slot.booked).length;
+  const allBookedCount = state.slots.filter((slot) => slot.booked).length;
   if (elements.availableCount) {
     elements.availableCount.textContent = Number.isInteger(availableHours) ? String(availableHours) : availableHours.toFixed(1);
   }
@@ -109,6 +175,7 @@ function renderStats() {
 }
 
 function syncProfileForm() {
+  ensureCoachProfileDraft();
   const profile = getProfile(currentCoachId);
   elements.coachRate.value = profile.rate;
   elements.servedRinkInputs.forEach((input) => {
@@ -130,7 +197,7 @@ function renderLessonOptions() {
         .replace("45 min private lesson", "45 分钟私教");
       return `
         <article class="lesson-option-row" data-lesson-id="${lesson.id}">
-          <input class="lesson-name-input" type="text" value="${displayName}" aria-label="课程名称" />
+          <input class="lesson-name-input" type="text" value="${escapeAttribute(displayName)}" aria-label="课程名称" />
           <input class="lesson-duration-input" type="number" min="15" step="15" value="${lesson.duration}" aria-label="Lesson duration" />
           <input class="lesson-price-input" type="number" min="0" step="5" value="${lesson.price}" aria-label="Lesson price" />
           <button class="danger-button" type="button" data-action="remove-lesson" aria-label="删除课程">•••</button>
@@ -149,7 +216,7 @@ function renderLessonOptions() {
   `;
 }
 
-function setCoachPhotoPreview(photoUrl) {
+export function setCoachPhotoPreview(photoUrl) {
   const coach = getCoach(currentCoachId);
   if (photoUrl) {
     elements.coachPhotoPreview.textContent = "";
@@ -165,18 +232,18 @@ function setCoachPhotoPreview(photoUrl) {
     .slice(0, 2);
 }
 
-function syncPhotoForm() {
+export function syncPhotoForm() {
   const profile = getProfile(currentCoachId);
   elements.coachPhotoUrl.value = profile.photoUrl || "";
   elements.coachPhotoFile.value = "";
-  pendingPhotoDataUrl = "";
+  state.pendingPhotoDataUrl = "";
   setCoachPhotoPreview(profile.photoUrl);
 }
 
-function handlePhotoFileChange() {
+export function handlePhotoFileChange() {
   const file = elements.coachPhotoFile.files && elements.coachPhotoFile.files[0];
   if (!file) {
-    pendingPhotoDataUrl = "";
+    state.pendingPhotoDataUrl = "";
     setCoachPhotoPreview(elements.coachPhotoUrl.value.trim() || getProfile(currentCoachId).photoUrl);
     return;
   }
@@ -189,9 +256,9 @@ function handlePhotoFileChange() {
 
   readResizedImage(file)
     .then((dataUrl) => {
-      pendingPhotoDataUrl = dataUrl;
+      state.pendingPhotoDataUrl = dataUrl;
       elements.coachPhotoUrl.value = "";
-      setCoachPhotoPreview(pendingPhotoDataUrl);
+      setCoachPhotoPreview(state.pendingPhotoDataUrl);
       elements.photoMessage.textContent = "已选择本地照片，记得保存。";
       elements.photoMessage.style.color = "var(--green)";
     })
@@ -225,7 +292,7 @@ function readResizedImage(file) {
   });
 }
 
-function syncLocationOptions() {
+export function syncLocationOptions() {
   const dropdownLocation = elements.locationType.value || "Any served rink";
   const calendarLocation = elements.calendarLocationType.value || "Any served rink";
   elements.locationType.innerHTML = rinkOptionsForCoach(currentCoachId);
@@ -238,7 +305,7 @@ function syncLocationOptions() {
   renderScheduleLegend();
 }
 
-function renderCalendarRinkOptions() {
+export function renderCalendarRinkOptions() {
   const profile = getProfile(currentCoachId);
   const servedRinks = profile.servedRinks && profile.servedRinks.length ? profile.servedRinks : [profile.homeRink || rinks[0]];
   const options = [
@@ -261,18 +328,8 @@ function renderCalendarRinkOptions() {
     .join("");
 }
 
-function getRinkColor(location) {
+export function getRinkColor(location) {
   return rinkColors[location] || "#bbf7d0";
-}
-
-function formatLocationLabel(location) {
-  if (location === "Any served rink") return "不限冰场";
-  if (location === unavailableSelection) return "不可预约";
-  return location;
-}
-
-function getAvailabilityLocation(slot) {
-  return slot?.availabilityLocation || slot?.location || unavailableSelection;
 }
 
 function getBookedRinkColor(location) {
@@ -313,89 +370,8 @@ function renderScheduleLegend() {
   ].join("");
 }
 
-function renderCoachSlots() {
-  const visible = slots.filter((slot) => slot.booked && slot.coachId === currentCoachId);
-
-  if (!visible.length) {
-    elements.coachSlots.innerHTML = `<p class="empty-state">目前还没有学生预约。学生 book 之后会显示在这里。</p>`;
-    return;
-  }
-
-  const groupedByStudent = visible.reduce((groups, slot) => {
-    const studentName = slot.student?.name || "Student";
-    const studentEmail = slot.student?.email || "";
-    const key = `${studentName.toLowerCase()}|${studentEmail.toLowerCase()}`;
-    if (!groups.has(key)) {
-      groups.set(key, {
-        name: studentName,
-        email: studentEmail,
-        slots: [],
-      });
-    }
-    groups.get(key).slots.push(slot);
-    return groups;
-  }, new Map());
-
-  const studentGroups = Array.from(groupedByStudent.values()).sort((a, b) => {
-    return `${a.name}${a.email}`.localeCompare(`${b.name}${b.email}`);
-  });
-
-  elements.coachSlots.innerHTML = studentGroups.map(renderStudentBookingGroup).join("");
-}
-
-function renderStudentBookingGroup(group) {
-  const slotsByLocation = group.slots.reduce((locations, slot) => {
-    if (!locations.has(slot.location)) locations.set(slot.location, []);
-    locations.get(slot.location).push(slot);
-    return locations;
-  }, new Map());
-
-  const locationGroups = Array.from(slotsByLocation.entries()).sort(([locationA], [locationB]) => locationA.localeCompare(locationB));
-  const totalLessons = group.slots.length;
-
-  return `
-    <details class="student-booking-group" open>
-      <summary>
-        <div>
-          <strong>${group.name}</strong>
-          <span>${group.email || "No email"}</span>
-        </div>
-        <span class="pill">${totalLessons} lesson${totalLessons === 1 ? "" : "s"}</span>
-      </summary>
-      <div class="student-booking-locations">
-        ${locationGroups
-          .map(([location, locationSlots]) => {
-            const sortedSlots = [...locationSlots].sort(slotSort);
-            return `
-              <section class="student-booking-location" style="--booking-location-color:${getRinkColor(location)}; --booking-location-booked-color:${getBookedRinkColor(location)}">
-                <h4><i class="booking-location-dot" aria-hidden="true"></i>${location}</h4>
-                <div class="booking-row-list">
-                  ${sortedSlots.map(renderStudentBookingRow).join("")}
-                </div>
-              </section>
-            `;
-          })
-          .join("")}
-      </div>
-    </details>
-  `;
-}
-
-function renderStudentBookingRow(slot) {
-  return `
-    <article class="student-booking-row" style="--booking-location-color:${getRinkColor(slot.location)}; --booking-location-booked-color:${getBookedRinkColor(slot.location)}">
-      <i class="booking-location-mark" aria-hidden="true"></i>
-      <div>
-        <strong>${formatDate(slot.date)} · ${slot.start} - ${slot.end}</strong>
-        <span>${slot.lessonName || "Private lesson"} · ${slot.lessonDuration || ""} min · $${slot.lessonPrice}</span>
-        ${slot.student?.note ? `<span>${slot.student.note}</span>` : ""}
-      </div>
-    </article>
-  `;
-}
-
 function getSlotsForDate(date) {
-  return slots.filter((slot) => slot.coachId === currentCoachId && slot.date === date).sort(slotSort);
+  return state.slots.filter((slot) => slot.coachId === currentCoachId && slot.date === date).sort(slotSort);
 }
 
 function groupSlotsForDisplay(daySlots, options = {}) {
@@ -442,7 +418,7 @@ function groupSlotsForDisplay(daySlots, options = {}) {
   }, []);
 }
 
-function renderDropdownOpenSlots() {
+export function renderDropdownOpenSlots() {
   const selectedDate = elements.slotDate.value || todayIso();
   const visible = groupSlotsForDisplay(getSlotsForDate(selectedDate), { ignoreBooked: true });
 
@@ -476,7 +452,7 @@ function renderDropdownOpenSlots() {
     .join("");
 }
 
-function renderDropdownWeekSlots() {
+export function renderDropdownWeekSlots() {
   const weekStart = startOfWeekIso(elements.slotDate.value || todayIso());
   const cards = dayLabels.map((label, index) => {
     const date = addDaysIso(weekStart, index);
@@ -499,7 +475,7 @@ function renderDropdownWeekSlots() {
   elements.dropdownWeekSlots.innerHTML = cards.join("");
 }
 
-function renderStudentSlots() {
+export function renderStudentSlots() {
   renderStudentAccessState();
   renderStudentViewModeButtons();
   if (!studentHasFullAccess) {
@@ -512,10 +488,10 @@ function renderStudentSlots() {
   const selectedRinks = getSelectedStudentFilterValues("studentRinkFilter", [...rinks, "Zoom"]);
   renderStudentLessonDurationFilter(selectedCoaches);
   const selectedDuration = getSelectedStudentLessonDuration();
-  const selectedDate = studentSelectedDate || elements.studentDateFilter.value || nextWeekdayIso();
+  const selectedDate = state.studentSelectedDate || elements.studentDateFilter.value || nextWeekdayIso();
   const weekStart = startOfWeekIso(selectedDate);
   const weekEnd = addDaysIso(weekStart, 7);
-  const available = slots.filter((slot) => {
+  const available = state.slots.filter((slot) => {
     const coachMatches = selectedCoaches.has(slot.coachId);
     const rinkMatches = studentRinkMatches(slot, selectedRinks);
     const dateMatches = slot.date >= weekStart && slot.date < weekEnd;
@@ -526,7 +502,7 @@ function renderStudentSlots() {
   renderStudentDatePendingState();
   renderStudentViewDateRange(selectedDate, weekStart);
   renderStudentDayAvailability(getStudentAvailableSlotsForDate(selectedDate, selectedCoaches, selectedRinks, selectedDuration));
-  if (studentViewMode === "day") {
+  if (state.studentViewMode === "day") {
     elements.studentSlots.innerHTML = "";
     return;
   }
@@ -538,7 +514,7 @@ function renderStudentSlots() {
 }
 
 function getStudentAvailableSlotsForDate(date, selectedCoaches, selectedRinks, selectedDuration = getSelectedStudentLessonDuration()) {
-  return slots
+  return state.slots
     .filter((slot) => {
       const coachMatches = selectedCoaches.has(slot.coachId);
       const rinkMatches = studentRinkMatches(slot, selectedRinks);
@@ -561,56 +537,32 @@ function renderStudentLessonDurationFilter(selectedCoaches) {
   elements.studentLessonDurationFilter.value = uniqueDurations.includes(Number(previousValue)) ? previousValue : "all";
 }
 
-function getSelectedStudentLessonDuration() {
+export function getSelectedStudentLessonDuration() {
   const value = elements.studentLessonDurationFilter?.value || "all";
   return value === "all" ? null : Number(value);
 }
 
-function getStudentLessonOptionsForCoach(coachId) {
+export function getStudentLessonOptionsForCoach(coachId) {
   const profile = getProfile(coachId);
   return (Array.isArray(profile.lessonOptions) && profile.lessonOptions.length ? profile.lessonOptions : createDefaultLessonOptions(Number(profile.rate || 0)))
     .filter((lesson) => Number(lesson.duration) > 0)
     .sort((a, b) => Number(a.duration) - Number(b.duration));
 }
 
-function getFittingLessonOptionsForStart(slot, selectedDuration = null) {
+export function getFittingLessonOptionsForStart(slot, selectedDuration = null) {
   return getStudentLessonOptionsForCoach(slot.coachId).filter((lesson) => {
     const duration = Number(lesson.duration);
     return (!selectedDuration || duration === selectedDuration) && canFitLessonFromSlot(slot, duration);
   });
 }
 
-function canFitLessonFromSlot(startSlot, duration) {
-  const startMinutes = minutesFromTime(startSlot.start);
-  const endMinutes = startMinutes + Number(duration);
-  const availabilityLocation = getAvailabilityLocation(startSlot);
-  if (!Number.isFinite(endMinutes) || endMinutes > minutesFromTime(fullDayEnd)) return false;
-
-  for (let minutes = startMinutes; minutes < endMinutes; minutes += calendarStep) {
-    const coveringSlot = slots.find((slot) => {
-      return (
-        slot.coachId === startSlot.coachId &&
-        slot.date === startSlot.date &&
-        !slot.booked &&
-        !slotOverlapsBlockedException(slot) &&
-        getAvailabilityLocation(slot) === availabilityLocation &&
-        minutesFromTime(slot.start) <= minutes &&
-        minutesFromTime(slot.end) >= Math.min(minutes + calendarStep, endMinutes)
-      );
-    });
-    if (!coveringSlot) return false;
-  }
-
-  return true;
-}
-
 function renderStudentDayAvailability(daySlots) {
   if (!elements.studentDayAvailability) return;
 
   renderStudentViewModeButtons();
-  elements.studentDayAvailability.classList.toggle("is-hidden", !studentHasFullAccess || studentViewMode !== "day");
+  elements.studentDayAvailability.classList.toggle("is-hidden", !studentHasFullAccess || state.studentViewMode !== "day");
 
-  if (!studentHasFullAccess || studentViewMode !== "day") {
+  if (!studentHasFullAccess || state.studentViewMode !== "day") {
     elements.studentDayAvailability.innerHTML = "";
     return;
   }
@@ -661,7 +613,7 @@ function renderStudentDayAvailability(daySlots) {
 
 function renderStudentViewModeButtons() {
   elements.studentViewModeButtons?.forEach((button) => {
-    const isActive = button.dataset.viewMode === studentViewMode;
+    const isActive = button.dataset.viewMode === state.studentViewMode;
     button.classList.toggle("active", isActive);
     button.setAttribute("aria-pressed", String(isActive));
   });
@@ -669,15 +621,15 @@ function renderStudentViewModeButtons() {
 
 function renderStudentViewDateRange(selectedDate, weekStart = startOfWeekIso(selectedDate)) {
   if (!elements.studentViewDateRange) return;
-  const text = studentViewMode === "week"
+  const text = state.studentViewMode === "week"
     ? `${formatDate(weekStart)} - ${formatDate(addDaysIso(weekStart, 6))}`
     : formatDate(selectedDate);
   elements.studentViewDateRange.textContent = text;
 }
 
-function renderStudentDatePendingState() {
+export function renderStudentDatePendingState() {
   if (!elements.studentDateFilter) return;
-  const hasPendingDate = Boolean(studentSelectedDate && elements.studentDateFilter.value && elements.studentDateFilter.value !== studentSelectedDate);
+  const hasPendingDate = Boolean(state.studentSelectedDate && elements.studentDateFilter.value && elements.studentDateFilter.value !== state.studentSelectedDate);
   elements.studentPendingDateMessage?.classList.toggle("is-hidden", !hasPendingDate);
   elements.studentDateActions?.classList.toggle("is-hidden", !hasPendingDate);
 }
@@ -714,7 +666,7 @@ function getSelectedStudentFilterValues(name, fallbackValues) {
   return new Set(checked);
 }
 
-function updateStudentFilterSummaries() {
+export function updateStudentFilterSummaries() {
   updateStudentFilterSummary("studentCoachFilter", elements.studentCoachFilterSummary, "位教练", coaches.length);
   updateStudentFilterSummary("studentRinkFilter", elements.studentRinkFilterSummary, "个冰场", rinks.length + 1);
   renderStudentFilterChips();
@@ -727,7 +679,7 @@ function updateStudentFilterSummary(name, summaryElement, unit, totalCount) {
   summaryElement.textContent = `已选 ${selectedCount} ${unit}`;
 }
 
-function renderStudentFilterChips() {
+export function renderStudentFilterChips() {
   renderStudentFilterChipGroup("studentCoachFilter", elements.studentCoachChips, coaches.length, "全部教练");
   renderStudentFilterChipGroup("studentRinkFilter", elements.studentRinkChips, rinks.length + 1, "全部冰场");
 }
@@ -740,7 +692,7 @@ function renderStudentFilterChipGroup(name, container, totalCount, allLabel) {
   const chips = isAll
     ? `<span class="student-filter-chip is-all">${allLabel}</span>`
     : selectedInputs
-        .map((input) => `<button class="student-filter-chip" type="button" data-action="remove-student-filter" data-filter-name="${name}" data-filter-value="${input.value}">${input.closest("label")?.textContent.trim()} <span aria-hidden="true">×</span></button>`)
+        .map((input) => `<button class="student-filter-chip" type="button" data-action="remove-student-filter" data-filter-name="${escapeAttribute(name)}" data-filter-value="${escapeAttribute(input.value)}">${escapeHtml(input.closest("label")?.textContent.trim())} <span aria-hidden="true">×</span></button>`)
         .join("");
   container.innerHTML = chips;
 }
@@ -768,7 +720,7 @@ function renderStudentAccessState() {
   }
 }
 
-function renderStudentOwnBookings() {
+export function renderStudentOwnBookings() {
   if (!elements.studentOwnBookings) return;
 
   if (!studentHasFullAccess) {
@@ -779,7 +731,7 @@ function renderStudentOwnBookings() {
     return;
   }
 
-  const bookings = slots
+  const bookings = state.slots
     .filter((slot) => slot.booked && slot.student)
     .slice()
     .sort(slotSort);
@@ -793,10 +745,6 @@ function renderStudentOwnBookings() {
       ${renderStudentBookingSection("已经上完的课", completed, "暂无已完成课程。")}
     `
     : `<p class="empty-state">还没有预约记录。</p>`;
-}
-
-function isPastStudentBooking(slot) {
-  return new Date(`${slot.date}T${slot.end}`) < new Date();
 }
 
 function renderStudentBookingSection(title, bookingSlots, emptyText) {
@@ -823,8 +771,8 @@ function renderStudentMiniBooking(slot) {
   return `
     <article class="student-mini-booking ${isCompleted ? "is-completed" : ""}">
       <div>
-        <strong>${formatDate(slot.date)} · ${slot.start}-${slot.end}</strong>
-        <span>${coach.name} · ${formatLocationLabel(slot.location)}</span>
+        <strong>${escapeHtml(formatDate(slot.date))} · ${escapeHtml(slot.start)}-${escapeHtml(slot.end)}</strong>
+        <span>${escapeHtml(slot.student?.name || "本人")} · ${escapeHtml(coach.name)} · ${escapeHtml(formatLocationLabel(slot.location))} · ${escapeHtml(slot.status || "Confirmed")}</span>
       </div>
       <div class="student-mini-booking-actions">
         <small>$${slot.lessonPrice}</small>
@@ -832,8 +780,8 @@ function renderStudentMiniBooking(slot) {
           isCompleted
             ? ""
             : `
-              <button class="ghost-button" type="button" data-action="modify-student-booking" data-id="${slot.id}">修改</button>
-              <button class="danger-button" type="button" data-action="cancel-student-booking" data-id="${slot.id}">取消</button>
+              <button class="ghost-button" type="button" data-action="modify-student-booking" data-id="${escapeAttribute(slot.id)}">修改</button>
+              <button class="danger-button" type="button" data-action="cancel-student-booking" data-id="${escapeAttribute(slot.id)}">取消</button>
             `
         }
       </div>
@@ -890,7 +838,7 @@ function getPublicAvailabilityWindows() {
 
   for (let cursor = cursorStart; cursor < end; cursor = new Date(cursor.getTime() + calendarStep * 60 * 1000)) {
     const windowEnd = new Date(cursor.getTime() + calendarStep * 60 * 1000);
-    const hasOpenSlot = slots.some((slot) => {
+    const hasOpenSlot = state.slots.some((slot) => {
       const slotStart = new Date(`${slot.date}T${slot.start}`);
       const slotEnd = new Date(`${slot.date}T${slot.end}`);
       return !slot.booked && !slotOverlapsBlockedException(slot) && slotStart < windowEnd && slotEnd > cursor;
@@ -1009,22 +957,22 @@ function renderStudentSlotCard(slot) {
     <article class="slot-card">
       <div class="slot-top">
         <div>
-          <div class="slot-time">${slot.start} - ${slot.end}</div>
-          <div class="slot-meta">${formatDate(slot.date)} · ${slot.location}</div>
+          <div class="slot-time">${escapeHtml(slot.start)} - ${escapeHtml(slot.end)}</div>
+          <div class="slot-meta">${escapeHtml(formatDate(slot.date))} · ${escapeHtml(slot.location)}</div>
         </div>
         <span class="pill">$${slot.lessonPrice}</span>
       </div>
-      <p class="slot-note"><strong>${coach.name}</strong> · ${coach.subject}<br>${slot.lessonName || "私教课"} · ${slot.lessonDuration || ""} 分钟<br>${travelText}<br>${slot.note || "可预约一节滑冰私教课。"}</p>
-      <button class="primary-button" type="button" data-action="book" data-id="${slot.id}">Book this time</button>
+      <p class="slot-note"><strong>${escapeHtml(coach.name)}</strong> · ${escapeHtml(coach.subject)}<br>${escapeHtml(slot.lessonName || "私教课")} · ${escapeHtml(slot.lessonDuration || "")} 分钟<br>${escapeHtml(travelText)}<br>${escapeHtml(slot.note || "可预约一节滑冰私教课。")}</p>
+      <button class="primary-button" type="button" data-action="book" data-id="${escapeAttribute(slot.id)}">Book this time</button>
     </article>
   `;
 }
 
-function renderDragCalendar() {
+export function renderDragCalendar() {
   const weekStart = startOfWeekIso(elements.calendarWeekStart.value || todayIso());
   elements.calendarWeekStart.value = weekStart;
-  const displayStart = calendarShowsFullDay ? fullDayStart : coreDayStart;
-  const displayEnd = calendarShowsFullDay ? fullDayEnd : coreDayEnd;
+  const displayStart = state.calendarShowsFullDay ? fullDayStart : coreDayStart;
+  const displayEnd = state.calendarShowsFullDay ? fullDayEnd : coreDayEnd;
 
   const header = [
     `<div class="calendar-corner"></div>`,
@@ -1054,17 +1002,24 @@ function renderDragCalendar() {
   renderCalendarAvailability();
 }
 
-function renderExceptionDragCalendar() {
+export function renderExceptionDragCalendar() {
   const weekStart = startOfWeekIso(elements.exceptionCalendarWeekStart.value || elements.calendarWeekStart.value || todayIso());
   elements.exceptionCalendarWeekStart.value = weekStart;
-  const displayStart = exceptionCalendarShowsFullDay ? fullDayStart : coreDayStart;
-  const displayEnd = exceptionCalendarShowsFullDay ? fullDayEnd : coreDayEnd;
+  const weekEnd = addDaysIso(weekStart, 6);
+  const [startYear, startMonth, startDay] = weekStart.split("-").map(Number);
+  const [endYear, endMonth, endDay] = weekEnd.split("-").map(Number);
+  if (elements.coachScheduleWeekRange) {
+    elements.coachScheduleWeekRange.innerHTML = `<span>${startYear}年${startMonth}月${startDay}日</span><wbr>—<wbr><span>${endYear !== startYear ? `${endYear}年` : ""}${endMonth}月${endDay}日</span>`;
+  }
+  const currentDate = todayIso();
+  const displayStart = state.exceptionCalendarShowsFullDay ? fullDayStart : coreDayStart;
+  const displayEnd = state.exceptionCalendarShowsFullDay ? fullDayEnd : coreDayEnd;
 
   const header = [
     `<div class="calendar-corner"></div>`,
     ...dayLabels.map((label, index) => {
       const date = addDaysIso(weekStart, index);
-      return `<div class="calendar-day">${label}<span>${formatDate(date)}</span></div>`;
+      return `<div class="calendar-day${date === currentDate ? " is-today" : ""}" data-date="${date}"${date === currentDate ? ' aria-current="date"' : ""}>${label}<span>${formatDate(date)}${date === currentDate ? " · 今天" : ""}</span></div>`;
     }),
   ].join("");
 
@@ -1088,14 +1043,8 @@ function renderExceptionDragCalendar() {
   renderExceptionCalendarAvailability();
 }
 
-function findSlotAt(coachId, date, minutes) {
-  return slots.find((item) => {
-    return item.coachId === coachId && item.date === date && minutes >= minutesFromTime(item.start) && minutes < minutesFromTime(item.end);
-  });
-}
-
 function findBlockAt(date, minutes) {
-  return blockedExceptions.find((block) => {
+  return state.blockedExceptions.find((block) => {
     return block.coachId === currentCoachId && block.date === date && minutes >= minutesFromTime(block.start) && minutes < minutesFromTime(block.end);
   });
 }
@@ -1110,9 +1059,9 @@ function renderCalendarAvailability() {
     const date = addDaysIso(weekStart, Number(cell.dataset.dayIndex));
     const minutes = Number(cell.dataset.minutes);
     const slot = findSlotAt(selectedCoach, date, minutes);
-    const isUnsavedOpen = Boolean(slot && unsavedAddedSlotIds.has(slot.id));
-    const isUnsavedBlock = !slot && unsavedBlockedCellKeys.has(cellKey(date, minutes));
-    const isRecurringEdit = unsavedRecurringCellKeys.has(cellKey(date, minutes));
+    const isUnsavedOpen = Boolean(slot && state.unsavedAddedSlotIds.has(slot.id));
+    const isUnsavedBlock = !slot && state.unsavedBlockedCellKeys.has(cellKey(date, minutes));
+    const isRecurringEdit = state.unsavedRecurringCellKeys.has(cellKey(date, minutes));
     const isPast = isPastCalendarCell(date, minutes);
 
     cell.style.removeProperty("--rink-color");
@@ -1131,7 +1080,7 @@ function renderCalendarAvailability() {
   });
 }
 
-function renderExceptionCalendarAvailability() {
+export function renderExceptionCalendarAvailability() {
   if (!elements.exceptionDragCalendar || !elements.exceptionDragCalendar.children.length) return;
 
   const weekStart = elements.exceptionCalendarWeekStart.value;
@@ -1141,9 +1090,10 @@ function renderExceptionCalendarAvailability() {
     const minutes = Number(cell.dataset.minutes);
     const slot = findSlotAt(currentCoachId, date, minutes);
     const block = findBlockAt(date, minutes);
-    const isUnsavedBlock = Boolean(block && unsavedBlockExceptionIds.has(block.id));
+    const isUnsavedBlock = Boolean(block && state.unsavedBlockExceptionIds.has(block.id));
     const studentName = slot && slot.booked && slot.student ? slot.student.name : "";
-    const isBookingStart = Boolean(studentName && minutes === minutesFromTime(slot.start));
+    const isFilteredBooking = Boolean(slot && slot.booked && !coachBookingMatchesStudent(slot));
+    const isBookingStart = Boolean(slot && slot.booked && minutes === minutesFromTime(slot.start));
 
     cell.textContent = "";
     delete cell.dataset.slotId;
@@ -1155,16 +1105,21 @@ function renderExceptionCalendarAvailability() {
     }
     cell.classList.toggle("has-slot", Boolean(slot && !block));
     cell.classList.toggle("has-booking", Boolean(slot && slot.booked));
-    if (slot && slot.booked && !block) {
+    cell.classList.toggle("is-filtered-booking", isFilteredBooking);
+    if (slot && slot.booked && !block && !isFilteredBooking) {
       cell.dataset.slotId = slot.id;
     }
     cell.classList.toggle("has-blocked", !slot || Boolean(block));
     cell.classList.toggle("is-editing", isUnsavedBlock);
     cell.classList.toggle("booking-start", isBookingStart);
     if (isBookingStart) {
-      cell.innerHTML = `<span class="calendar-cell-label">${studentName}</span>`;
+      const label = document.createElement("span");
+      label.className = "calendar-cell-label";
+      label.textContent = isFilteredBooking ? "已占用" : studentName || "学生";
+      cell.append(label);
     }
-    cell.title = block ? `${block.start}-${block.end} 不可预约` : slot ? `${slot.start}-${slot.end} ${formatLocationLabel(slot.location)}${studentName ? ` · ${studentName}` : ""}` : "不可预约";
+    cell.title = block ? `${block.start}-${block.end} 不可预约` : isFilteredBooking ? `${slot.start}-${slot.end} 已占用（其他学生预约）` : slot ? `${slot.start}-${slot.end} ${formatLocationLabel(slot.location)}${studentName ? ` · ${studentName}` : ""}` : "不可预约";
     cell.setAttribute("aria-label", cell.title);
   });
+  renderCoachCalendarFilterSummary();
 }

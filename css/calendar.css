@@ -1,3 +1,4 @@
+@layer legacy {
 .calendar-panel {
   display: grid;
   gap: 16px;
@@ -508,3 +509,5 @@ label {
   font-weight: 800;
 }
 
+
+}

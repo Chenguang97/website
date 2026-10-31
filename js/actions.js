@@ -1,4 +1,69 @@
-function addAvailability(event) {
+import { refreshAvailabilityDirty, setAvailabilityDirty, showFormMessage } from "./availability-status.js";
+import {
+  cancelStudentBooking,
+  openBookingDetails,
+  openBookingDialog,
+  openModifyBookingDialog,
+  openStudentSlotOptions,
+  removeBookingFromDetails,
+  restoreConsumedAvailabilitySlots,
+  syncModifyBookingLocation,
+} from "./booking-actions.js";
+import {
+  calendarStep,
+  currentCoachId,
+  fullDayEnd,
+  recurringFutureWeeks,
+  recurringPastWeeks,
+  unavailableSelection,
+} from "./config.js";
+import { findSlotAt as findSlotAtIn, rangesOverlap } from "./domain/scheduling.mjs";
+import { elements } from "./elements.js";
+import {
+  addBlockedException as appendBlockedException,
+  getAvailabilityLesson,
+  getLastStorageRecoveryMessage,
+  replaceBlockedExceptions,
+  replaceSlots,
+  saveSlots,
+  state,
+} from "./state.js";
+import { formatLocationLabel } from "./ui/display.js";
+import {
+  getRinkColor,
+  render,
+  renderDragCalendar,
+  renderDropdownOpenSlots,
+  renderDropdownWeekSlots,
+  renderExceptionDragCalendar,
+  renderStudentDatePendingState,
+  renderStudentSlots,
+  syncEndTimeOptions,
+  updateStudentFilterSummaries,
+} from "./render.js";
+import { captureUndoState, clearUndoHistory, pushUndoState } from "./undo.js";
+import {
+  addDaysIso,
+  cellKey,
+  createId,
+  createSlotsFromRange,
+  formatDate,
+  isPastCalendarCell,
+  markRangeCells,
+  markSlotCells,
+  minutesFromTime,
+  nextWeekdayIso,
+  startOfWeekIso,
+  timeFromMinutes,
+  todayIso,
+  weekdayIndex,
+} from "./utils-data.js";
+
+function findSlotAt(coachId, date, minutes) {
+  return findSlotAtIn(state.slots, coachId, date, minutes);
+}
+
+export function addAvailability(event) {
   event.preventDefault();
   const date = elements.slotDate.value;
   const location = elements.locationType.value;
@@ -49,7 +114,7 @@ function addAvailability(event) {
 function requestAvailabilityChange(change, allowOverride = false) {
   const conflicts = findRecurringAvailabilityConflicts(change.date, change.startMinutes, change.endMinutes, change.location);
   if (conflicts.length && !allowOverride) {
-    pendingAvailabilityConflict = change;
+    state.pendingAvailabilityConflict = change;
     showAvailabilityConflictDialog(change, conflicts);
     return;
   }
@@ -83,7 +148,7 @@ function applyAvailabilityChange(change, trimCrossRinkConflicts = false) {
 }
 
 function findAvailabilityConflicts(date, startMinutes, endMinutes, location) {
-  const conflicts = slots.filter((slot) => {
+  const conflicts = state.slots.filter((slot) => {
     return (
       slot.coachId === currentCoachId &&
       slot.date === date &&
@@ -117,8 +182,8 @@ function showAvailabilityConflictDialog(change, conflicts) {
   }
 }
 
-function cancelAvailabilityConflict() {
-  pendingAvailabilityConflict = null;
+export function cancelAvailabilityConflict() {
+  state.pendingAvailabilityConflict = null;
   if (typeof elements.conflictDialog.close === "function") {
     elements.conflictDialog.close();
   }
@@ -127,10 +192,10 @@ function cancelAvailabilityConflict() {
   showFormMessage("已取消覆盖，原有可用时间未修改。");
 }
 
-function confirmAvailabilityConflictOverride() {
-  if (!pendingAvailabilityConflict) return;
-  const change = pendingAvailabilityConflict;
-  pendingAvailabilityConflict = null;
+export function confirmAvailabilityConflictOverride() {
+  if (!state.pendingAvailabilityConflict) return;
+  const change = state.pendingAvailabilityConflict;
+  state.pendingAvailabilityConflict = null;
   if (typeof elements.conflictDialog.close === "function") {
     elements.conflictDialog.close();
   }
@@ -139,46 +204,46 @@ function confirmAvailabilityConflictOverride() {
   requestAvailabilityChange(change, true);
 }
 
-function toggleCalendarHours() {
-  calendarShowsFullDay = !calendarShowsFullDay;
-  elements.toggleCalendarHours.textContent = calendarShowsFullDay ? "收起全天" : "显示全天";
+export function toggleCalendarHours() {
+  state.calendarShowsFullDay = !state.calendarShowsFullDay;
+  elements.toggleCalendarHours.textContent = state.calendarShowsFullDay ? "收起全天" : "显示全天";
   renderDragCalendar();
 }
 
-function toggleExceptionCalendarHours() {
-  exceptionCalendarShowsFullDay = !exceptionCalendarShowsFullDay;
-  elements.toggleExceptionCalendarHours.textContent = exceptionCalendarShowsFullDay ? "收起全天" : "显示全天";
+export function toggleExceptionCalendarHours() {
+  state.exceptionCalendarShowsFullDay = !state.exceptionCalendarShowsFullDay;
+  elements.toggleExceptionCalendarHours.textContent = state.exceptionCalendarShowsFullDay ? "收起全天" : "显示全天";
   renderExceptionDragCalendar();
 }
 
-function renderWeeklyAvailabilityViews() {
+export function renderWeeklyAvailabilityViews() {
   renderDragCalendar();
   renderDropdownWeekSlots();
 }
 
-function shiftCalendarWeek(direction) {
+export function shiftCalendarWeek(direction) {
   const currentWeek = startOfWeekIso(elements.calendarWeekStart.value || nextWeekdayIso());
   elements.calendarWeekStart.value = addDaysIso(currentWeek, direction * 7);
   renderWeeklyAvailabilityViews();
 }
 
-function goToCurrentCalendarWeek() {
+export function goToCurrentCalendarWeek() {
   elements.calendarWeekStart.value = startOfWeekIso(todayIso());
   renderWeeklyAvailabilityViews();
 }
 
-function shiftScheduleWeek(direction) {
+export function shiftScheduleWeek(direction) {
   const currentWeek = startOfWeekIso(elements.exceptionCalendarWeekStart.value || todayIso());
   elements.exceptionCalendarWeekStart.value = addDaysIso(currentWeek, direction * 7);
   renderExceptionDragCalendar();
 }
 
-function goToCurrentScheduleWeek() {
+export function goToCurrentScheduleWeek() {
   elements.exceptionCalendarWeekStart.value = startOfWeekIso(todayIso());
   renderExceptionDragCalendar();
 }
 
-function openBlockTimeDialog() {
+export function openBlockTimeDialog() {
   elements.blockDialogDate.value = elements.exceptionCalendarWeekStart.value || elements.slotDate.value || nextWeekdayIso();
   elements.blockDialogStart.value = defaultStart;
   syncEndTimeOptions(elements.blockDialogStart, elements.blockDialogEnd, "12:00");
@@ -186,11 +251,11 @@ function openBlockTimeDialog() {
   elements.blockDialog.showModal();
 }
 
-function closeBlockTimeDialog() {
+export function closeBlockTimeDialog() {
   elements.blockDialog.close();
 }
 
-function addBlockException(event) {
+export function addBlockException(event) {
   event.preventDefault();
   const start = elements.blockDialogStart.value;
   const end = elements.blockDialogEnd.value;
@@ -222,10 +287,10 @@ function addBlockExceptionRange(date, start, end, reason = "不可预约时间")
     end: timeFromMinutes(end),
     reason,
   };
-  blockedExceptions.push(block);
-  unsavedBlockExceptionIds.add(block.id);
+  appendBlockedException(block);
+  state.unsavedBlockExceptionIds.add(block.id);
   for (let minutes = start; minutes < end; minutes += calendarStep) {
-    unsavedBlockedCellKeys.add(cellKey(date, minutes));
+    state.unsavedBlockedCellKeys.add(cellKey(date, minutes));
   }
   refreshAvailabilityDirty("有未保存的不可预约时间");
 }
@@ -240,7 +305,7 @@ function cloneSlotSegment(slot, startMinutes, endMinutes) {
 }
 
 function replaceAvailabilityRange(coachId, date, startMinutes, endMinutes, lesson, location, note, trimCrossRinkConflicts = false) {
-  const bookedTemplateUpdates = slots.filter((slot) => {
+  const bookedTemplateUpdates = state.slots.filter((slot) => {
     return (
       slot.coachId === coachId &&
       slot.date === date &&
@@ -248,7 +313,7 @@ function replaceAvailabilityRange(coachId, date, startMinutes, endMinutes, lesso
       rangesOverlap(minutesFromTime(slot.start), minutesFromTime(slot.end), startMinutes, endMinutes)
     );
   });
-  const overwritten = slots.filter((slot) => {
+  const overwritten = state.slots.filter((slot) => {
     return (
       slot.coachId === coachId &&
       slot.date === date &&
@@ -282,16 +347,16 @@ function replaceAvailabilityRange(coachId, date, startMinutes, endMinutes, lesso
     }
   });
 
-  slots = slots.filter((slot) => !overwrittenIds.has(slot.id));
-  slots = [...slots, ...trimmed];
+  replaceSlots(state.slots.filter((slot) => !overwrittenIds.has(slot.id)));
+  replaceSlots([...state.slots, ...trimmed]);
   trimmed.forEach(markAddedSlot);
 
-  const newSlots = createSlotsFromRange(coachId, date, startMinutes, endMinutes, lesson, location, note);
-  slots = [...slots, ...newSlots];
+  const newSlots = createSlotsFromRange(coachId, date, startMinutes, endMinutes, lesson, location, note, true, state.slots);
+  replaceSlots([...state.slots, ...newSlots]);
   newSlots.forEach(markAddedSlot);
   bookedTemplateUpdates.forEach((slot) => {
     slot.availabilityLocation = location;
-    markRangeCells(slot.date, Math.max(minutesFromTime(slot.start), startMinutes), Math.min(minutesFromTime(slot.end), endMinutes), unsavedRecurringCellKeys);
+    markRangeCells(slot.date, Math.max(minutesFromTime(slot.start), startMinutes), Math.min(minutesFromTime(slot.end), endMinutes), state.unsavedRecurringCellKeys);
   });
 
   return { newSlots, overwritten, bookedTemplateUpdates, trimmed };
@@ -315,13 +380,13 @@ function getRecurringDatesForDate(coachId, date) {
     }
   }
 
-  slots.forEach((slot) => {
+  state.slots.forEach((slot) => {
     if (slot.coachId === coachId && slot.date >= today && weekdayIndex(slot.date) === targetWeekday) {
       dates.add(slot.date);
     }
   });
 
-  pendingDeletedSlots.forEach((slot) => {
+  state.pendingDeletedSlots.forEach((slot) => {
     if (slot.coachId === coachId && slot.date >= today && weekdayIndex(slot.date) === targetWeekday) {
       dates.add(slot.date);
     }
@@ -333,7 +398,7 @@ function getRecurringDatesForDate(coachId, date) {
 function replaceRecurringAvailabilityRange(coachId, date, startMinutes, endMinutes, lesson, location, note, trimCrossRinkConflicts = false) {
   return getRecurringDatesForDate(coachId, date).reduce(
     (summary, recurringDate) => {
-      markRangeCells(recurringDate, startMinutes, endMinutes, unsavedRecurringCellKeys);
+      markRangeCells(recurringDate, startMinutes, endMinutes, state.unsavedRecurringCellKeys);
       const result = replaceAvailabilityRange(coachId, recurringDate, startMinutes, endMinutes, lesson, location, note, trimCrossRinkConflicts);
       summary.newSlots.push(...result.newSlots);
       summary.overwritten.push(...result.overwritten);
@@ -346,7 +411,7 @@ function replaceRecurringAvailabilityRange(coachId, date, startMinutes, endMinut
 }
 
 function removeAvailabilityRange(coachId, date, startMinutes, endMinutes) {
-  const bookedTemplateUpdates = slots.filter((slot) => {
+  const bookedTemplateUpdates = state.slots.filter((slot) => {
     return (
       slot.coachId === coachId &&
       slot.date === date &&
@@ -354,7 +419,7 @@ function removeAvailabilityRange(coachId, date, startMinutes, endMinutes) {
       rangesOverlap(minutesFromTime(slot.start), minutesFromTime(slot.end), startMinutes, endMinutes)
     );
   });
-  const removed = slots.filter((slot) => {
+  const removed = state.slots.filter((slot) => {
     return (
       slot.coachId === coachId &&
       slot.date === date &&
@@ -365,10 +430,10 @@ function removeAvailabilityRange(coachId, date, startMinutes, endMinutes) {
   const removedIds = new Set(removed.map((slot) => slot.id));
 
   removed.forEach(markDeletedSlot);
-  slots = slots.filter((slot) => !removedIds.has(slot.id));
+  replaceSlots(state.slots.filter((slot) => !removedIds.has(slot.id)));
   bookedTemplateUpdates.forEach((slot) => {
     slot.availabilityLocation = unavailableSelection;
-    markRangeCells(slot.date, Math.max(minutesFromTime(slot.start), startMinutes), Math.min(minutesFromTime(slot.end), endMinutes), unsavedRecurringCellKeys);
+    markRangeCells(slot.date, Math.max(minutesFromTime(slot.start), startMinutes), Math.min(minutesFromTime(slot.end), endMinutes), state.unsavedRecurringCellKeys);
   });
 
   return removed;
@@ -376,532 +441,51 @@ function removeAvailabilityRange(coachId, date, startMinutes, endMinutes) {
 
 function removeRecurringAvailabilityRange(coachId, date, startMinutes, endMinutes) {
   return getRecurringDatesForDate(coachId, date).flatMap((recurringDate) => {
-    markRangeCells(recurringDate, startMinutes, endMinutes, unsavedRecurringCellKeys);
+    markRangeCells(recurringDate, startMinutes, endMinutes, state.unsavedRecurringCellKeys);
     return removeAvailabilityRange(coachId, recurringDate, startMinutes, endMinutes);
   });
 }
 
-function showFormMessage(message, isError = false) {
-  elements.formMessage.textContent = message;
-  elements.formMessage.style.color = isError ? "var(--red)" : "var(--green)";
-}
-
-function showProfileMessage(message, isError = false) {
-  elements.profileMessage.textContent = message;
-  elements.profileMessage.style.color = isError ? "var(--red)" : "var(--green)";
-}
-
-function setProfileDirty(isDirty, message) {
-  hasUnsavedProfileChanges = isDirty;
-  if (elements.saveProfileChanges) {
-    elements.saveProfileChanges.classList.toggle("has-unsaved", isDirty);
-  }
-  if (message) {
-    showProfileMessage(message, isDirty);
-  }
-}
-
-function discardProfileChanges() {
-  coachProfiles = loadProfiles();
-  setProfileDirty(false);
-  render();
-}
-
-function confirmDiscardProfileChanges() {
-  if (!hasUnsavedProfileChanges) return true;
-  const confirmed = window.confirm("你有尚未保存的更改，确定要放弃这些更改并离开吗？");
-  if (confirmed) {
-    discardProfileChanges();
-  }
-  return confirmed;
-}
-
-function setAvailabilityDirty(isDirty, message) {
-  hasUnsavedAvailabilityChanges = isDirty;
-  elements.availabilitySaveMessage.textContent = message || (isDirty ? "有未保存修改" : "没有未保存修改");
-  elements.availabilitySaveMessage.style.color = isDirty ? "var(--red)" : "var(--muted)";
-}
-
-function refreshAvailabilityDirty(message) {
-  const isDirty = unsavedAddedSlotIds.size > 0 || pendingDeletedSlots.size > 0 || unsavedBlockExceptionIds.size > 0 || unsavedRecurringCellKeys.size > 0;
-  setAvailabilityDirty(isDirty, message || (isDirty ? "有未保存修改" : "没有未保存修改"));
-}
-
-function saveAvailabilityChanges() {
+export function saveAvailabilityChanges() {
   if (!saveSlots()) {
     showFormMessage("保存失败。请先删除过大的本地照片或清理浏览器存储后再试。", true);
     return;
   }
-  unsavedAddedSlotIds.clear();
-  unsavedBlockedCellKeys.clear();
-  unsavedRecurringCellKeys.clear();
-  unsavedBlockExceptionIds.clear();
-  pendingDeletedSlots.clear();
+  state.unsavedAddedSlotIds.clear();
+  state.unsavedBlockedCellKeys.clear();
+  state.unsavedRecurringCellKeys.clear();
+  state.unsavedBlockExceptionIds.clear();
+  state.pendingDeletedSlots.clear();
   clearUndoHistory();
   setAvailabilityDirty(false, "已保存");
-  showFormMessage(lastStorageRecoveryMessage || "可预约时间已保存。");
+  showFormMessage(getLastStorageRecoveryMessage() || "可预约时间已保存。");
   render();
 }
 
-function saveCoachProfile(event) {
-  event.preventDefault();
-  const coachId = currentCoachId;
-  const travels = elements.travelsToOtherRinks.value === "yes";
-  const rate = Number(elements.coachRate.value || 0);
-  const lessonOptions = getLessonOptionsFromForm();
-  const servedRinks = Array.from(elements.servedRinkInputs)
-    .filter((input) => input.checked)
-    .map((input) => input.value);
-
-  if (!servedRinks.length) {
-    showProfileMessage("请至少选择一个可授课冰场。", true);
-    return;
-  }
-
-  coachProfiles[coachId] = {
-    ...getProfile(coachId),
-    coachId,
-    rate,
-    homeRink: servedRinks[0],
-    servedRinks,
-    travelsToOtherRinks: travels,
-    travelFee: travels ? Number(elements.travelFee.value || 0) : 0,
-    lessonOptions,
-  };
-
-  if (!saveProfiles()) {
-    showProfileMessage("保存失败。请删除过大的本地照片或清理浏览器存储后再试。", true);
-    return;
-  }
-  setProfileDirty(false);
-  showProfileMessage("更改已保存。");
-  render();
-}
-
-function getLessonOptionsFromForm() {
-  const existingProfile = getProfile(currentCoachId);
-  return [...elements.lessonOptionsList.querySelectorAll(".lesson-option-row")].map((row) => {
-    const existingLesson = existingProfile.lessonOptions.find((lesson) => lesson.id === row.dataset.lessonId) || {};
-    const duration = Number(row.querySelector(".lesson-duration-input").value || existingLesson.duration || 0);
-    const price = Number(row.querySelector(".lesson-price-input").value || existingLesson.price || 0);
-    return {
-      ...existingLesson,
-      id: row.dataset.lessonId,
-      name: row.querySelector(".lesson-name-input").value.trim() || `${duration}-minute private lesson`,
-      duration,
-      price,
-      custom: true,
-    };
-  });
-}
-
-function previewServedRinksChange() {
-  const servedRinks = Array.from(elements.servedRinkInputs)
-    .filter((input) => input.checked)
-    .map((input) => input.value);
-  if (!servedRinks.length) return;
-
-  coachProfiles[currentCoachId] = {
-    ...getProfile(currentCoachId),
-    homeRink: servedRinks[0],
-    servedRinks,
-  };
-  setProfileDirty(true, "有未保存的更改。");
-  syncLocationOptions();
-}
-
-function saveCoachPhoto(event) {
-  event.preventDefault();
-  const coachId = currentCoachId;
-  const photoUrl = pendingPhotoDataUrl || elements.coachPhotoUrl.value.trim();
-  coachProfiles[coachId] = {
-    ...getProfile(coachId),
-    photoUrl,
-  };
-
-  elements.photoMessage.textContent = "照片已保存。";
-  if (!saveProfiles()) {
-    elements.photoMessage.textContent = "保存失败。图片可能太大，请换一张较小的照片。";
-    elements.photoMessage.style.color = "var(--red)";
-    return;
-  }
-  syncPhotoForm();
-  render();
-}
-
-function addLessonOption() {
-  const profile = getProfile(currentCoachId);
-  const duration = Number(elements.lessonDuration.value || 0);
-  const price = Number(elements.lessonPrice.value || 0);
-  const name = elements.lessonName.value.trim() || `${duration}-minute private lesson`;
-
-  if (!duration || !price) {
-    showProfileMessage("请填写课程时长和价格。", true);
-    return;
-  }
-
-  profile.lessonOptions.push({
-    id: `lesson-${Date.now()}`,
-    name,
-    duration,
-    price,
-    custom: true,
-  });
-  coachProfiles[currentCoachId] = profile;
-  elements.lessonName.value = "";
-  elements.lessonDuration.value = "";
-  elements.lessonPrice.value = "";
-  setProfileDirty(true, "已添加课程选项，记得保存更改。");
-  render();
-}
-
-function handleLessonOptionChange(event) {
-  const row = event.target.closest(".lesson-option-row");
-  if (!row) return;
-
-  const profile = getProfile(currentCoachId);
-  const lesson = profile.lessonOptions.find((item) => item.id === row.dataset.lessonId);
-  if (!lesson) return;
-
-  lesson.name = row.querySelector(".lesson-name-input").value.trim() || `${lesson.duration}-minute private lesson`;
-  lesson.duration = Number(row.querySelector(".lesson-duration-input").value || lesson.duration);
-  lesson.price = Number(row.querySelector(".lesson-price-input").value || lesson.price);
-  lesson.custom = true;
-  coachProfiles[currentCoachId] = profile;
-  setProfileDirty(true, "有未保存的课程价格更改。");
-}
-
-function hasFutureBookingsForLesson(lesson) {
-  return slots.some((slot) => {
-    return (
-      slot.coachId === currentCoachId &&
-      slot.booked &&
-      slot.date >= todayIso() &&
-      slot.lessonName === lesson.name &&
-      Number(slot.lessonDuration) === Number(lesson.duration)
-    );
-  });
-}
-
-function handleLessonOptionClick(event) {
-  const button = event.target.closest("button[data-action='remove-lesson']");
-  if (!button) return;
-
-  const row = button.closest(".lesson-option-row");
-  const profile = getProfile(currentCoachId);
-  const lesson = profile.lessonOptions.find((item) => item.id === row.dataset.lessonId);
-  if (profile.lessonOptions.length <= 1) {
-    showProfileMessage("至少保留一个课程选项。", true);
-    return;
-  }
-  if (!lesson) return;
-  if (hasFutureBookingsForLesson(lesson)) {
-    showProfileMessage("这个课程已有未来预约，不能直接删除。", true);
-    return;
-  }
-  const confirmed = window.confirm("确定要删除这个课程选项吗？删除后，学生将无法再预约该课程。");
-  if (!confirmed) return;
-
-  profile.lessonOptions = profile.lessonOptions.filter((lesson) => lesson.id !== row.dataset.lessonId);
-  coachProfiles[currentCoachId] = profile;
-  setProfileDirty(true, "已删除课程选项，记得保存更改。");
-  render();
-}
-
-function openBookingDialog(slotId, lessonId = "") {
-  const slot = slots.find((item) => item.id === slotId);
-  if (!slot) return;
-
-  const coach = getCoach(slot.coachId);
-  const profile = getProfile(slot.coachId);
-  const lesson = getStudentLessonOptionsForCoach(slot.coachId).find((option) => option.id === lessonId) || getFittingLessonOptionsForStart(slot, getSelectedStudentLessonDuration())[0] || getStudentLessonOptionsForCoach(slot.coachId)[0];
-  const defaultConcreteLocation = (profile.servedRinks && profile.servedRinks[0]) || profile.homeRink || rinks[0];
-  elements.bookingSlotId.value = slot.id;
-  elements.bookingLessonId.value = lesson.id;
-  elements.bookingDialogMode.value = "create";
-  elements.dialogTitle.textContent = `${coach.name} · ${lesson.name || "Private lesson"} · $${lesson.price} · ${formatDate(slot.date)} ${slot.start}`;
-  elements.bookingSubmitButton.textContent = "确认预约";
-  elements.bookingNewSlotLabel.classList.add("is-hidden");
-  elements.bookingNewSlot.innerHTML = "";
-  elements.bookingLocation.innerHTML = bookingLocationOptionsForSlot(slot);
-  elements.bookingLocationLabel.classList.remove("is-hidden");
-  elements.bookingLocation.disabled = false;
-  elements.bookingLocation.value = slot.location === "Any served rink" ? defaultConcreteLocation : slot.location;
-  elements.bookingForSelf.checked = true;
-  elements.studentName.value = "";
-  syncBookingForSelf();
-  elements.studentEmailLabel.classList.remove("is-hidden");
-  elements.studentEmail.disabled = false;
-  elements.studentEmail.required = true;
-  elements.studentEmail.value = "";
-  elements.studentNote.value = "";
-  if (elements.studentSlotOptionsDialog?.open) {
-    elements.studentSlotOptionsDialog.close();
-  }
-  elements.bookingDialog.showModal();
-}
-
-function openModifyBookingDialog(slotId) {
-  const slot = slots.find((item) => item.id === slotId);
-  if (!slot || !slot.booked || !slot.student || isPastStudentBooking(slot)) return;
-
-  const coach = getCoach(slot.coachId);
-  elements.bookingSlotId.value = slot.id;
-  elements.bookingDialogMode.value = "modify";
-  elements.dialogTitle.textContent = `修改预约 · ${coach.name} · ${formatDate(slot.date)} ${slot.start}`;
-  elements.bookingSubmitButton.textContent = "保存修改";
-  elements.bookingNewSlotLabel.classList.add("is-hidden");
-  elements.bookingNewSlot.innerHTML = "";
-  elements.bookingNewSlot.value = slot.id;
-  elements.bookingLocationLabel.classList.add("is-hidden");
-  elements.bookingLocation.disabled = true;
-  elements.studentEmailLabel.classList.add("is-hidden");
-  elements.studentEmail.disabled = true;
-  elements.studentEmail.required = false;
-  elements.bookingForSelf.checked = !slot.student.name || slot.student.name === "本人";
-  elements.studentName.value = elements.bookingForSelf.checked ? "" : slot.student.name;
-  syncBookingForSelf();
-  elements.studentEmail.value = slot.student.email || "";
-  elements.studentNote.value = slot.student.note || "";
-  elements.bookingDialog.showModal();
-}
-
-function populateRescheduleOptions(currentSlotId) {
-  const currentSlot = slots.find((slot) => slot.id === currentSlotId);
-  if (!currentSlot || elements.bookingDialogMode.value !== "modify" || elements.bookingSlotId.value !== currentSlotId || !elements.bookingDialog.open) return;
-
-  const availableSlots = getRescheduleOptions(currentSlot);
-  const optionHtml = [currentSlot, ...availableSlots].map((option) => renderRescheduleOption(currentSlot, option)).join("");
-  const moreText = availableSlots.length >= rescheduleOptionLimit ? `<option disabled>更多时间请到预约课程日历选择</option>` : "";
-  elements.bookingNewSlot.innerHTML = `${optionHtml}${moreText}`;
-  elements.bookingNewSlot.value = currentSlot.id;
-}
-
-function getRescheduleOptions(currentSlot) {
-  const today = todayIso();
-  const windowEnd = addDaysIso(today, rescheduleWindowWeeks * 7);
-  return slots
-    .filter((slot) => slot.id !== currentSlot.id)
-    .filter((slot) => !slot.booked && slot.date >= today && slot.date <= windowEnd)
-    .filter((slot) => !isPastStudentBooking(slot) && !slotOverlapsBlockedException(slot))
-    .sort(slotSort)
-    .slice(0, rescheduleOptionLimit);
-}
-
-function renderRescheduleOption(currentSlot, slot) {
-  const coach = getCoach(slot.coachId);
-  const currentText = slot.id === currentSlot.id ? "当前时间 · " : "";
-  return `<option value="${slot.id}">${currentText}${formatDate(slot.date)} ${slot.start}-${slot.end} · ${coach.name} · ${slot.lessonName || "私教课"} · $${slot.lessonPrice} · ${formatLocationLabel(slot.location)}</option>`;
-}
-
-function bookingLocationOptionsForSlot(slot) {
-  if (slot.location === "Any served rink") {
-    return concreteLocationOptionsForCoach(slot.coachId);
-  }
-  return `<option value="${slot.location}">${formatLocationLabel(slot.location)}</option>`;
-}
-
-function syncModifyBookingLocation(currentSlot) {
-  const selectedSlot = slots.find((slot) => slot.id === elements.bookingNewSlot.value) || currentSlot;
-  const profile = getProfile(selectedSlot.coachId);
-  const defaultConcreteLocation = (profile.servedRinks && profile.servedRinks[0]) || profile.homeRink || rinks[0];
-  elements.bookingLocation.innerHTML = bookingLocationOptionsForSlot(selectedSlot);
-  elements.bookingLocationLabel.classList.remove("is-hidden");
-  elements.bookingLocation.value = selectedSlot.id === currentSlot.id
-    ? currentSlot.location
-    : selectedSlot.location === "Any served rink"
-      ? defaultConcreteLocation
-      : selectedSlot.location;
-}
-
-function openStudentSlotOptions(slotIds) {
-  if (!elements.studentSlotOptionsDialog || !elements.studentSlotOptionsList) return;
-
-  const selectedDuration = getSelectedStudentLessonDuration();
-  const startSlots = slotIds
-    .map((id) => slots.find((slot) => slot.id === id))
-    .filter(Boolean)
-    .filter((slot) => !slot.booked && !slotOverlapsBlockedException(slot))
-    .sort((a, b) => `${getCoach(a.coachId).name}${a.location}${a.lessonPrice}`.localeCompare(`${getCoach(b.coachId).name}${b.location}${b.lessonPrice}`));
-  const options = startSlots.flatMap((slot) => {
-    return getFittingLessonOptionsForStart(slot, selectedDuration).map((lesson) => ({ slot, lesson }));
-  });
-
-  if (!options.length) return;
-
-  const first = options[0].slot;
-  elements.studentSlotOptionsTitle.textContent = `${formatDate(first.date)} ${first.start}`;
-  elements.studentSlotOptionsList.innerHTML = options
-    .map(({ slot, lesson }) => {
-      const coach = getCoach(slot.coachId);
-      const endTime = timeFromMinutes(minutesFromTime(slot.start) + Number(lesson.duration));
-      return `
-        <button class="student-coach-option" type="button" data-action="book" data-id="${slot.id}" data-lesson-id="${lesson.id}">
-          <strong>${coach.name}</strong>
-          <span>${coach.subject}</span>
-          <small>${slot.start}-${endTime} · ${formatLocationLabel(slot.location)} · ${lesson.name || `${lesson.duration} min private lesson`} · $${lesson.price}</small>
-        </button>
-      `;
-    })
-    .join("");
-  elements.studentSlotOptionsDialog.showModal();
-}
-
-function openBookingDetails(slotId) {
-  const slot = slots.find((item) => item.id === slotId);
-  if (!slot || !slot.booked) return;
-
-  const student = slot.student || {};
-  elements.bookingDetailsTitle.textContent = `${formatDate(slot.date)} ${slot.start} - ${slot.end}`;
-  elements.removeBookingDetails.dataset.id = slot.id;
-  elements.bookingDetailsBody.innerHTML = `
-    <div><span>学生</span><strong>${student.name || "学生"}</strong></div>
-    <div><span>Email</span><strong>${student.email || "暂无 email"}</strong></div>
-    <div><span>场馆</span><strong>${formatLocationLabel(slot.location)}</strong></div>
-    <div><span>课程</span><strong>${slot.lessonName || "私教课"} · ${slot.lessonDuration || ""} 分钟 · $${slot.lessonPrice}</strong></div>
-    <div><span>备注</span><strong>${student.note || "暂无备注"}</strong></div>
-  `;
-  elements.bookingDetailsDialog.showModal();
-}
-
-function removeBookingFromDetails() {
-  const slot = slots.find((item) => item.id === elements.removeBookingDetails.dataset.id);
-  if (!slot || !slot.booked) return;
-
-  const studentName = slot.student?.name || "这位学生";
-  const confirmed = window.confirm(`确定要取消 ${studentName} 在 ${formatDate(slot.date)} ${slot.start}-${slot.end} 的预约吗？`);
-  if (!confirmed) return;
-
-  pushUndoState();
-  restoreConsumedAvailabilitySlots(slot);
-  slot.booked = false;
-  slot.student = null;
-  elements.bookingDetailsDialog.close();
-  setAvailabilityDirty(true, "有未保存的预约修改");
-  render();
-}
-
-function cancelStudentBooking(slotId) {
-  const slot = slots.find((item) => item.id === slotId);
-  if (!slot || !slot.booked || isPastStudentBooking(slot)) return;
-
-  const confirmed = window.confirm(`确定要取消 ${formatDate(slot.date)} ${slot.start}-${slot.end} 的预约吗？`);
-  if (!confirmed) return;
-
-  pushUndoState();
-  restoreConsumedAvailabilitySlots(slot);
-  slot.booked = false;
-  slot.student = null;
-  setAvailabilityDirty(true, "有未保存的预约修改");
-  render();
-}
-
-function handleScheduleCalendarClick(event) {
-  const cell = event.target.closest(".calendar-cell.has-booking");
-  if (!cell || !cell.dataset.slotId) return;
-  openBookingDetails(cell.dataset.slotId);
-}
-
-function confirmBooking(event) {
-  event.preventDefault();
-  const slot = slots.find((item) => item.id === elements.bookingSlotId.value);
-  const isModify = elements.bookingDialogMode.value === "modify";
-  if (!slot || (slot.booked && !isModify) || (!slot.booked && isModify)) return;
-  const lesson = isModify
-    ? null
-    : getStudentLessonOptionsForCoach(slot.coachId).find((option) => option.id === elements.bookingLessonId?.value) || getFittingLessonOptionsForStart(slot, getSelectedStudentLessonDuration())[0];
-
-  if (!isModify && (!lesson || !canFitLessonFromSlot(slot, Number(lesson.duration)))) {
-    showFormMessage("这个时间已经无法完整容纳所选课程时长，请重新选择。", true);
-    return;
-  }
-
-  const bookingForSelf = elements.bookingForSelf.checked;
-  const student = {
-    name: bookingForSelf ? "本人" : elements.studentName.value.trim(),
-    email: isModify ? slot.student?.email || "" : elements.studentEmail.value.trim(),
-    note: elements.studentNote.value.trim(),
-  };
-
-  pushUndoState();
-  if (isModify) {
-    slot.student = student;
-  } else {
-    applyLessonToBookingSlot(slot, lesson);
-    slot.booked = true;
-    slot.student = student;
-    if (slot.location === "Any served rink") {
-      slot.location = elements.bookingLocation.value;
-    }
-  }
-
-  elements.bookingDialog.close();
-  setAvailabilityDirty(true, "有未保存的预约修改");
-  render();
-}
-
-function applyLessonToBookingSlot(slot, lesson) {
-  const duration = Number(lesson.duration);
-  const coveredSlots = getAvailabilitySlotsCoveredByLesson(slot, duration).filter((coveredSlot) => coveredSlot.id !== slot.id);
-  slot.consumedAvailabilitySlots = coveredSlots.map((coveredSlot) => ({ ...coveredSlot }));
-  slots = slots.filter((item) => !coveredSlots.some((coveredSlot) => coveredSlot.id === item.id));
-  slot.end = timeFromMinutes(minutesFromTime(slot.start) + duration);
-  slot.lessonId = lesson.id;
-  slot.lessonName = lesson.name;
-  slot.lessonDuration = duration;
-  slot.lessonPrice = lesson.price;
-}
-
-function getAvailabilitySlotsCoveredByLesson(startSlot, duration) {
-  const startMinutes = minutesFromTime(startSlot.start);
-  const endMinutes = startMinutes + Number(duration);
-  const availabilityLocation = getAvailabilityLocation(startSlot);
-  return slots.filter((slot) => {
-    return (
-      slot.coachId === startSlot.coachId &&
-      slot.date === startSlot.date &&
-      !slot.booked &&
-      !slotOverlapsBlockedException(slot) &&
-      getAvailabilityLocation(slot) === availabilityLocation &&
-      rangesOverlap(minutesFromTime(slot.start), minutesFromTime(slot.end), startMinutes, endMinutes)
-    );
-  });
-}
-
-function restoreConsumedAvailabilitySlots(slot) {
-  if (!Array.isArray(slot.consumedAvailabilitySlots) || !slot.consumedAvailabilitySlots.length) return;
-  const existingIds = new Set(slots.map((item) => item.id));
-  const restoredSlots = slot.consumedAvailabilitySlots
-    .filter((item) => !existingIds.has(item.id))
-    .map((item) => ({ ...item, booked: false, student: null, consumedAvailabilitySlots: undefined }));
-  slots = [...slots, ...restoredSlots];
-  slot.consumedAvailabilitySlots = [];
-}
-
-function syncBookingForSelf() {
-  const bookingForSelf = elements.bookingForSelf.checked;
-  elements.studentNameLabel.classList.toggle("is-hidden", bookingForSelf);
-  elements.studentName.disabled = bookingForSelf;
-  elements.studentName.required = !bookingForSelf;
-  if (bookingForSelf) {
-    elements.studentName.value = "";
-  }
-}
-
-function handleSlotAction(event) {
+export function handleSlotAction(event) {
   const button = event.target.closest("button[data-action]");
   if (!button) return;
 
   const { action, id, ids } = button.dataset;
+  if (action === "coach-booking-details" || action === "coach-cancel-booking") {
+    const slot = state.slots.find((item) => item.id === id && item.coachId === currentCoachId && item.booked);
+    if (!slot) return;
+    if (action === "coach-booking-details") openBookingDetails(id);
+    else {
+      elements.removeBookingDetails.dataset.id = id;
+      removeBookingFromDetails();
+    }
+    return;
+  }
   if (action === "student-week") {
     const offset = Number(button.dataset.offset || 0);
-    studentSelectedDate = addDaysIso(studentSelectedDate || elements.studentDateFilter.value || nextWeekdayIso(), offset);
-    elements.studentDateFilter.value = studentSelectedDate;
+    state.studentSelectedDate = addDaysIso(state.studentSelectedDate || elements.studentDateFilter.value || nextWeekdayIso(), offset);
+    elements.studentDateFilter.value = state.studentSelectedDate;
     renderStudentSlots();
     return;
   }
   if (action === "set-student-view-mode") {
-    studentViewMode = button.dataset.viewMode === "week" ? "week" : "day";
+    state.studentViewMode = button.dataset.viewMode === "week" ? "week" : "day";
     renderStudentSlots();
     return;
   }
@@ -913,6 +497,16 @@ function handleSlotAction(event) {
     removeStudentFilterChip(button.dataset.filterName, button.dataset.filterValue);
     return;
   }
+  if (action === "subscribe-opening") {
+    button.textContent = "已订阅候补 / 临时空位提醒";
+    button.dataset.waitlist = "subscribed";
+    return;
+  }
+  if (action === "send-multi-coach-request") {
+    button.textContent = "已发送给多个教练";
+    button.dataset.coachNotification = "multi-coach-request-sent";
+    return;
+  }
   if (action === "choose-time") {
     openStudentSlotOptions((ids || "").split(",").filter(Boolean));
     return;
@@ -922,10 +516,10 @@ function handleSlotAction(event) {
     return;
   }
   if (action === "delete") {
-    const deleted = slots.find((slot) => slot.id === id);
+    const deleted = state.slots.find((slot) => slot.id === id);
     if (deleted) pushUndoState();
     if (deleted) markDeletedSlot(deleted);
-    slots = slots.filter((slot) => slot.id !== id);
+    replaceSlots(state.slots.filter((slot) => slot.id !== id));
     refreshAvailabilityDirty();
     render();
   }
@@ -935,25 +529,25 @@ function handleSlotAction(event) {
       removeRecurringAvailabilityRange(currentCoachId, button.dataset.date, minutesFromTime(button.dataset.start), minutesFromTime(button.dataset.end));
     } else {
       const ids = new Set((button.dataset.ids || "").split(",").filter(Boolean));
-      slots.filter((slot) => ids.has(slot.id)).forEach(markDeletedSlot);
-      slots = slots.filter((slot) => !ids.has(slot.id));
+      state.slots.filter((slot) => ids.has(slot.id)).forEach(markDeletedSlot);
+      replaceSlots(state.slots.filter((slot) => !ids.has(slot.id)));
     }
     refreshAvailabilityDirty();
     render();
   }
   if (action === "delete-block") {
     pushUndoState();
-    if (unsavedBlockExceptionIds.has(id)) {
-      unsavedBlockExceptionIds.delete(id);
+    if (state.unsavedBlockExceptionIds.has(id)) {
+      state.unsavedBlockExceptionIds.delete(id);
     } else {
-      unsavedBlockExceptionIds.add(`delete-${id}`);
+      state.unsavedBlockExceptionIds.add(`delete-${id}`);
     }
-    blockedExceptions = blockedExceptions.filter((block) => block.id !== id);
+    replaceBlockedExceptions(state.blockedExceptions.filter((block) => block.id !== id));
     refreshAvailabilityDirty();
     render();
   }
   if (action === "cancel") {
-    const slot = slots.find((item) => item.id === id);
+    const slot = state.slots.find((item) => item.id === id);
     if (slot) {
       pushUndoState();
       restoreConsumedAvailabilitySlots(slot);
@@ -973,30 +567,30 @@ function handleSlotAction(event) {
   }
 }
 
-function handleStudentDateDraftChange() {
+export function handleStudentDateDraftChange() {
   renderStudentDatePendingState();
 }
 
 function applyStudentDateSelection() {
-  studentSelectedDate = elements.studentDateFilter.value || studentSelectedDate || nextWeekdayIso();
-  elements.studentDateFilter.value = studentSelectedDate;
+  state.studentSelectedDate = elements.studentDateFilter.value || state.studentSelectedDate || nextWeekdayIso();
+  elements.studentDateFilter.value = state.studentSelectedDate;
   renderStudentSlots();
 }
 
 function cancelStudentDateSelection() {
-  elements.studentDateFilter.value = studentSelectedDate || nextWeekdayIso();
+  elements.studentDateFilter.value = state.studentSelectedDate || nextWeekdayIso();
   renderStudentDatePendingState();
 }
 
-function handleStudentDateOutsideClick(event) {
+export function handleStudentDateOutsideClick(event) {
   if (!elements.studentDateActions || elements.studentDateActions.classList.contains("is-hidden")) return;
   if (event.target.closest("#studentDateFilter") || event.target.closest("#studentDateActions")) return;
   cancelStudentDateSelection();
 }
 
-function handleBookingNewSlotChange() {
+export function handleBookingNewSlotChange() {
   if (elements.bookingDialogMode.value !== "modify") return;
-  const currentSlot = slots.find((slot) => slot.id === elements.bookingSlotId.value);
+  const currentSlot = state.slots.find((slot) => slot.id === elements.bookingSlotId.value);
   if (!currentSlot) return;
   syncModifyBookingLocation(currentSlot);
 }
@@ -1017,7 +611,7 @@ function removeStudentFilterChip(name, value) {
   renderStudentSlots();
 }
 
-function handleStudentFilterChange(event) {
+export function handleStudentFilterChange(event) {
   const input = event.target.closest("input[type='checkbox']");
   if (!input) return;
 
@@ -1025,7 +619,7 @@ function handleStudentFilterChange(event) {
   updateStudentFilterSummaries();
 }
 
-function applyStudentFilterPanel(event) {
+export function applyStudentFilterPanel(event) {
   const panelType = event.currentTarget.dataset.studentFilterPanel;
   const panel = panelType === "coach" ? elements.studentCoachFilterPanel : elements.studentRinkFilterPanel;
   if (!panel) return;
@@ -1036,7 +630,7 @@ function applyStudentFilterPanel(event) {
   renderStudentSlots();
 }
 
-function openStudentFilterPanel(event) {
+export function openStudentFilterPanel(event) {
   const search = event.currentTarget;
   const panel = search === elements.studentCoachSearch ? elements.studentCoachFilterPanel : elements.studentRinkFilterPanel;
   const optionGroup = search === elements.studentCoachSearch ? elements.studentCoachFilterGroup : elements.studentRinkFilterGroup;
@@ -1051,7 +645,7 @@ function openStudentFilterPanel(event) {
   panel.classList.remove("is-hidden");
 }
 
-function handleStudentFilterSearch(event) {
+export function handleStudentFilterSearch(event) {
   const search = event.currentTarget;
   const panel = search === elements.studentCoachSearch ? elements.studentCoachFilterGroup : elements.studentRinkFilterGroup;
   const query = search.value.trim().toLowerCase();
@@ -1065,7 +659,7 @@ function handleStudentFilterSearch(event) {
   });
 }
 
-function handleStudentFilterOutsideClick(event) {
+export function handleStudentFilterOutsideClick(event) {
   if (!elements.studentControls || elements.studentControls.contains(event.target)) return;
 
   elements.studentCoachFilterPanel?.classList.add("is-hidden");
@@ -1106,88 +700,74 @@ function syncStudentFilterCheckboxes(changedInput) {
 }
 
 function markDeletedSlot(slot) {
-  if (unsavedAddedSlotIds.has(slot.id)) {
-    unsavedAddedSlotIds.delete(slot.id);
+  if (state.unsavedAddedSlotIds.has(slot.id)) {
+    state.unsavedAddedSlotIds.delete(slot.id);
     return;
   }
 
-  pendingDeletedSlots.set(slot.id, slot);
-  markSlotCells(slot, unsavedBlockedCellKeys);
+  state.pendingDeletedSlots.set(slot.id, slot);
+  markSlotCells(slot, state.unsavedBlockedCellKeys);
 }
 
 function markAddedSlot(slot) {
-  unsavedAddedSlotIds.add(slot.id);
+  state.unsavedAddedSlotIds.add(slot.id);
   for (let minutes = minutesFromTime(slot.start); minutes < minutesFromTime(slot.end); minutes += calendarStep) {
-    unsavedBlockedCellKeys.delete(cellKey(slot.date, minutes));
+    state.unsavedBlockedCellKeys.delete(cellKey(slot.date, minutes));
   }
-}
-
-function rangesOverlap(startA, endA, startB, endB) {
-  return startA < endB && endA > startB;
-}
-
-function slotOverlapsBlockedException(slot) {
-  return blockedExceptions.some((block) => {
-    return (
-      block.coachId === slot.coachId &&
-      block.date === slot.date &&
-      rangesOverlap(minutesFromTime(slot.start), minutesFromTime(slot.end), minutesFromTime(block.start), minutesFromTime(block.end))
-    );
-  });
 }
 
 function undoEditingRange(date, start, end, showMessage = true) {
   const addedIdsToRemove = new Set();
-  slots.forEach((slot) => {
+  state.slots.forEach((slot) => {
     if (
       slot.coachId === currentCoachId &&
       slot.date === date &&
-      unsavedAddedSlotIds.has(slot.id) &&
+      state.unsavedAddedSlotIds.has(slot.id) &&
       rangesOverlap(minutesFromTime(slot.start), minutesFromTime(slot.end), start, end)
     ) {
       addedIdsToRemove.add(slot.id);
     }
   });
 
-  slots = slots.filter((slot) => !addedIdsToRemove.has(slot.id));
-  addedIdsToRemove.forEach((id) => unsavedAddedSlotIds.delete(id));
+  replaceSlots(state.slots.filter((slot) => !addedIdsToRemove.has(slot.id)));
+  addedIdsToRemove.forEach((id) => state.unsavedAddedSlotIds.delete(id));
 
   const restored = [];
-  pendingDeletedSlots.forEach((slot, id) => {
+  state.pendingDeletedSlots.forEach((slot, id) => {
     if (
       slot.coachId === currentCoachId &&
       slot.date === date &&
       rangesOverlap(minutesFromTime(slot.start), minutesFromTime(slot.end), start, end)
     ) {
       restored.push(slot);
-      pendingDeletedSlots.delete(id);
+      state.pendingDeletedSlots.delete(id);
       for (let minutes = minutesFromTime(slot.start); minutes < minutesFromTime(slot.end); minutes += calendarStep) {
-        unsavedBlockedCellKeys.delete(cellKey(slot.date, minutes));
+        state.unsavedBlockedCellKeys.delete(cellKey(slot.date, minutes));
       }
     }
   });
 
   const blockIdsToRemove = new Set();
-  blockedExceptions.forEach((block) => {
+  state.blockedExceptions.forEach((block) => {
     if (
       block.coachId === currentCoachId &&
       block.date === date &&
-      unsavedBlockExceptionIds.has(block.id) &&
+      state.unsavedBlockExceptionIds.has(block.id) &&
       rangesOverlap(minutesFromTime(block.start), minutesFromTime(block.end), start, end)
     ) {
       blockIdsToRemove.add(block.id);
       for (let minutes = minutesFromTime(block.start); minutes < minutesFromTime(block.end); minutes += calendarStep) {
-        unsavedBlockedCellKeys.delete(cellKey(block.date, minutes));
+        state.unsavedBlockedCellKeys.delete(cellKey(block.date, minutes));
       }
     }
   });
-  blockedExceptions = blockedExceptions.filter((block) => !blockIdsToRemove.has(block.id));
-  blockIdsToRemove.forEach((id) => unsavedBlockExceptionIds.delete(id));
+  replaceBlockedExceptions(state.blockedExceptions.filter((block) => !blockIdsToRemove.has(block.id)));
+  blockIdsToRemove.forEach((id) => state.unsavedBlockExceptionIds.delete(id));
   for (let minutes = start; minutes < end; minutes += calendarStep) {
-    unsavedRecurringCellKeys.delete(cellKey(date, minutes));
+    state.unsavedRecurringCellKeys.delete(cellKey(date, minutes));
   }
 
-  slots = [...slots, ...restored];
+  replaceSlots([...state.slots, ...restored]);
   const changed = addedIdsToRemove.size || restored.length || blockIdsToRemove.size;
   refreshAvailabilityDirty(changed ? "已撤销未保存编辑" : "没有可撤销的编辑");
   if (showMessage) {
@@ -1204,7 +784,7 @@ function undoRecurringEditingRange(date, start, end) {
   return changedCount;
 }
 
-function startCalendarDrag(event) {
+export function startCalendarDrag(event) {
   const cell = event.target.closest(".calendar-cell");
   if (!cell) return;
 
@@ -1216,12 +796,12 @@ function startCalendarDrag(event) {
   }
   const slot = findSlotAt(currentCoachId, date, minutes);
   const selectedLocation = elements.calendarLocationType.value;
-  const isUnsavedOpen = Boolean(slot && unsavedAddedSlotIds.has(slot.id));
-  const isUnsavedBlocked = !slot && unsavedBlockedCellKeys.has(cellKey(date, minutes));
+  const isUnsavedOpen = Boolean(slot && state.unsavedAddedSlotIds.has(slot.id));
+  const isUnsavedBlocked = !slot && state.unsavedBlockedCellKeys.has(cellKey(date, minutes));
   const shouldUndoEditing =
     (isUnsavedOpen && selectedLocation === slot.location) ||
     (isUnsavedBlocked && selectedLocation === unavailableSelection);
-  dragState = {
+  state.dragState = {
     dayIndex: Number(cell.dataset.dayIndex),
     start: minutes,
     end: minutes,
@@ -1231,26 +811,26 @@ function startCalendarDrag(event) {
   paintDragSelection();
 }
 
-function moveCalendarDrag(event) {
-  if (!dragState) return;
+export function moveCalendarDrag(event) {
+  if (!state.dragState) return;
 
   const target = document.elementFromPoint(event.clientX, event.clientY);
   const cell = target && target.closest(".calendar-cell");
-  if (!cell || Number(cell.dataset.dayIndex) !== dragState.dayIndex) return;
+  if (!cell || Number(cell.dataset.dayIndex) !== state.dragState.dayIndex) return;
 
-  dragState.end = Number(cell.dataset.minutes);
+  state.dragState.end = Number(cell.dataset.minutes);
   paintDragSelection();
 }
 
-function finishCalendarDrag() {
-  if (!dragState) return;
+export function finishCalendarDrag() {
+  if (!state.dragState) return;
 
-  const start = Math.min(dragState.start, dragState.end);
-  const end = Math.max(dragState.start, dragState.end) + calendarStep;
-  const date = addDaysIso(elements.calendarWeekStart.value, dragState.dayIndex);
+  const start = Math.min(state.dragState.start, state.dragState.end);
+  const end = Math.max(state.dragState.start, state.dragState.end) + calendarStep;
+  const date = addDaysIso(elements.calendarWeekStart.value, state.dragState.dayIndex);
   const undoSnapshot = captureUndoState();
 
-  if (dragState.mode === "undo") {
+  if (state.dragState.mode === "undo") {
     const changedCount = undoRecurringEditingRange(date, start, end);
     if (changedCount) {
       pushUndoState(undoSnapshot);
@@ -1268,7 +848,7 @@ function finishCalendarDrag() {
     const lesson = getAvailabilityLesson();
     if (end - start < calendarStep) {
       showFormMessage(`拖选范围少于 ${calendarStep} 分钟，无法生成可预约时间。`, true);
-      dragState = null;
+      state.dragState = null;
       clearDragSelection();
       return;
     }
@@ -1284,33 +864,33 @@ function finishCalendarDrag() {
     });
   }
 
-  dragState = null;
+  state.dragState = null;
   clearDragSelection();
   render();
 }
 
 function paintDragSelection() {
-  const start = Math.min(dragState.start, dragState.end);
-  const end = Math.max(dragState.start, dragState.end);
+  const start = Math.min(state.dragState.start, state.dragState.end);
+  const end = Math.max(state.dragState.start, state.dragState.end);
   const isRemovingAvailability = elements.calendarLocationType.value === unavailableSelection;
   const selectionColor = isRemovingAvailability ? "#e2e8f0" : getRinkColor(elements.calendarLocationType.value);
   elements.dragCalendar.querySelectorAll(".calendar-cell").forEach((cell) => {
     cell.classList.remove("selecting", "blocking", "reverting", "removing");
-    const sameDay = Number(cell.dataset.dayIndex) === dragState.dayIndex;
+    const sameDay = Number(cell.dataset.dayIndex) === state.dragState.dayIndex;
     const minutes = Number(cell.dataset.minutes);
     const inRange = sameDay && minutes >= start && minutes <= end;
-    if (inRange && dragState.mode === "open") {
+    if (inRange && state.dragState.mode === "open") {
       cell.style.setProperty("--selection-color", selectionColor);
     } else {
       cell.style.removeProperty("--selection-color");
     }
-    cell.classList.toggle("selecting", inRange && dragState.mode === "open");
-    cell.classList.toggle("removing", inRange && dragState.mode === "open" && isRemovingAvailability);
-    cell.classList.toggle("reverting", inRange && dragState.mode === "undo");
+    cell.classList.toggle("selecting", inRange && state.dragState.mode === "open");
+    cell.classList.toggle("removing", inRange && state.dragState.mode === "open" && isRemovingAvailability);
+    cell.classList.toggle("reverting", inRange && state.dragState.mode === "undo");
   });
 }
 
-function clearDragSelection() {
+export function clearDragSelection() {
   elements.dragCalendar.querySelectorAll(".calendar-cell").forEach((cell) => {
     cell.classList.remove("selecting", "blocking", "reverting", "removing");
     cell.style.removeProperty("--selection-color");

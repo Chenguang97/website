@@ -1,17 +1,21 @@
+import { render } from "./render.js";
+import { replaceBlockedExceptions, replaceSlots, state } from "./state.js";
+import { setAvailabilityDirty, showFormMessage } from "./availability-status.js";
+
 function cloneData(value) {
   return JSON.parse(JSON.stringify(value));
 }
 
-function captureUndoState() {
+export function captureUndoState() {
   return {
-    slots: cloneData(slots),
-    blockedExceptions: cloneData(blockedExceptions),
-    unsavedAddedSlotIds: [...unsavedAddedSlotIds],
-    unsavedBlockedCellKeys: [...unsavedBlockedCellKeys],
-    unsavedRecurringCellKeys: [...unsavedRecurringCellKeys],
-    unsavedBlockExceptionIds: [...unsavedBlockExceptionIds],
-    pendingDeletedSlots: cloneData([...pendingDeletedSlots.entries()]),
-    hasUnsavedAvailabilityChanges,
+    slots: cloneData(state.slots),
+    blockedExceptions: cloneData(state.blockedExceptions),
+    unsavedAddedSlotIds: [...state.unsavedAddedSlotIds],
+    unsavedBlockedCellKeys: [...state.unsavedBlockedCellKeys],
+    unsavedRecurringCellKeys: [...state.unsavedRecurringCellKeys],
+    unsavedBlockExceptionIds: [...state.unsavedBlockExceptionIds],
+    pendingDeletedSlots: cloneData([...state.pendingDeletedSlots.entries()]),
+    hasUnsavedAvailabilityChanges: state.hasUnsavedAvailabilityChanges,
   };
 }
 
@@ -25,30 +29,30 @@ function replaceMapContents(target, entries) {
   entries.forEach(([key, value]) => target.set(key, value));
 }
 
-function pushUndoState(snapshot) {
-  undoStack.push(snapshot || captureUndoState());
-  if (undoStack.length > undoStackLimit) {
-    undoStack.shift();
+export function pushUndoState(snapshot) {
+  state.undoStack.push(snapshot || captureUndoState());
+  if (state.undoStack.length > state.undoStackLimit) {
+    state.undoStack.shift();
   }
 }
 
-function clearUndoHistory() {
-  undoStack.length = 0;
+export function clearUndoHistory() {
+  state.undoStack.length = 0;
 }
 
 function restoreUndoState(snapshot) {
-  slots = cloneData(snapshot.slots);
-  blockedExceptions = cloneData(snapshot.blockedExceptions);
-  replaceSetContents(unsavedAddedSlotIds, snapshot.unsavedAddedSlotIds);
-  replaceSetContents(unsavedBlockedCellKeys, snapshot.unsavedBlockedCellKeys);
-  replaceSetContents(unsavedRecurringCellKeys, snapshot.unsavedRecurringCellKeys);
-  replaceSetContents(unsavedBlockExceptionIds, snapshot.unsavedBlockExceptionIds);
-  replaceMapContents(pendingDeletedSlots, cloneData(snapshot.pendingDeletedSlots));
+  replaceSlots(cloneData(snapshot.slots));
+  replaceBlockedExceptions(cloneData(snapshot.blockedExceptions));
+  replaceSetContents(state.unsavedAddedSlotIds, snapshot.unsavedAddedSlotIds);
+  replaceSetContents(state.unsavedBlockedCellKeys, snapshot.unsavedBlockedCellKeys);
+  replaceSetContents(state.unsavedRecurringCellKeys, snapshot.unsavedRecurringCellKeys);
+  replaceSetContents(state.unsavedBlockExceptionIds, snapshot.unsavedBlockExceptionIds);
+  replaceMapContents(state.pendingDeletedSlots, cloneData(snapshot.pendingDeletedSlots));
   setAvailabilityDirty(snapshot.hasUnsavedAvailabilityChanges);
 }
 
-function undoLastChange() {
-  const snapshot = undoStack.pop();
+export function undoLastChange() {
+  const snapshot = state.undoStack.pop();
   if (!snapshot) {
     showFormMessage("没有可以撤销的更改。");
     return;
@@ -59,7 +63,7 @@ function undoLastChange() {
   showFormMessage("已撤销上一步更改。");
 }
 
-function handleGlobalKeydown(event) {
+export function handleGlobalKeydown(event) {
   const isUndo = (event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "z" && !event.shiftKey;
   if (!isUndo) return;
   const target = event.target;

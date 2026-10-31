@@ -1,6 +1,7 @@
 const fs = require("fs");
 const path = require("path");
 const { JSDOM, VirtualConsole } = require("jsdom");
+const esbuild = require("esbuild");
 
 function assert(condition, message) {
   if (!condition) {
@@ -11,7 +12,41 @@ function assert(condition, message) {
 async function loadPage(fileName, options = {}) {
   const [filePathPart, query = ""] = fileName.split("?");
   const filePath = path.resolve(filePathPart);
-  const html = fs.readFileSync(filePath, "utf8");
+  let html = fs.readFileSync(filePath, "utf8");
+  html = html.replace(/<script\s+type="module"\s+src="([^"]+)"\s*><\/script>/g, (_, source) => {
+    const entryPoint = path.resolve(path.dirname(filePath), source.split("?")[0]);
+    const isAppEntry = /(?:admin|coach|student)-entry\.js$/.test(entryPoint);
+    const testBridge = isAppEntry ? `
+      import ${JSON.stringify(entryPoint)};
+      import { state, replaceBlockedExceptions, replaceSlots, getProfile, getSavedProfile, setCoachProfileDraft } from ${JSON.stringify(path.resolve("js/state.js"))};
+      import { openBookingDetails, openBookingDialog, openModifyBookingDialog, syncBookingForSelf } from ${JSON.stringify(path.resolve("js/booking-actions.js"))};
+      import { render, renderDragCalendar, renderExceptionDragCalendar, renderStudentOwnBookings } from ${JSON.stringify(path.resolve("js/render.js"))};
+      import { shiftScheduleWeek } from ${JSON.stringify(path.resolve("js/actions.js"))};
+      import { getCoachBookingStudentKey } from ${JSON.stringify(path.resolve("js/coach-bookings-render.js"))};
+      import { addDaysIso, minutesFromTime, nextWeekdayIso, startOfWeekIso, todayIso, weekdayIndex } from ${JSON.stringify(path.resolve("js/utils-data.js"))};
+      Object.defineProperty(globalThis, "slots", { configurable: true, get: () => state.slots, set: replaceSlots });
+      Object.defineProperty(globalThis, "blockedExceptions", { configurable: true, get: () => state.blockedExceptions, set: replaceBlockedExceptions });
+      Object.defineProperty(globalThis, "hasUnsavedProfileChanges", { configurable: true, get: () => state.hasUnsavedProfileChanges });
+      Object.assign(globalThis, {
+        addDaysIso, getProfile, getSavedProfile, nextWeekdayIso, openBookingDetails, openBookingDialog,
+        openModifyBookingDialog, render, renderDragCalendar, renderExceptionDragCalendar,
+        getCoachBookingStudentKey, minutesFromTime, renderStudentOwnBookings, replaceSlots,
+        setCoachProfileDraft, shiftScheduleWeek, startOfWeekIso, syncBookingForSelf, todayIso, weekdayIndex,
+      });
+    ` : `import ${JSON.stringify(entryPoint)};`;
+    const bundled = esbuild.buildSync({
+      stdin: {
+        contents: testBridge,
+        resolveDir: path.dirname(entryPoint),
+        sourcefile: "smoke-test-entry.js",
+      },
+      bundle: true,
+      format: "iife",
+      platform: "browser",
+      write: false,
+    }).outputFiles[0].text.replace(/<\/script/gi, "<\\/script");
+    return `<script>${bundled}</script>`;
+  });
   const errors = [];
   const virtualConsole = new VirtualConsole();
 
@@ -129,7 +164,7 @@ async function testCoachPage() {
 
   assertNoRuntimeErrors("coach/index.html", errors);
   assert(document.querySelector(".view.active")?.id === "coachView", "Coach page did not open on the coach view.");
-  assert(document.querySelector(".role-page-nav")?.textContent.includes("返回教练列表"), "Coach page navigation label is missing.");
+  assert(document.querySelector('.role-page-nav a[href="../index.html"]')?.textContent.includes("返回首页"), "Coach page home navigation is missing.");
 
   document.querySelector('[data-coach-panel="bookingsPanel"]').click();
   assert(
@@ -153,12 +188,70 @@ async function testStudentPage() {
 
   assertNoRuntimeErrors("student/index.html", errors);
   assert(document.querySelector(".view.active")?.id === "studentView", "Student page did not open on the student view.");
-  assert(document.querySelector(".role-page-nav")?.textContent.includes("学生预约页面"), "Student page navigation label is missing.");
+  assert(document.querySelector('.role-page-nav a[href="../index.html"]')?.textContent.includes("返回首页"), "Student page home navigation is missing.");
+  assert(!document.querySelector(".sidebar"), "Student page should use the layout without a sidebar.");
   assert(document.querySelectorAll(".student-page-tab").length === 3, "Student page tabs did not render.");
   assert(document.querySelector("#studentControls")?.classList.contains("is-hidden"), "Public student page should hide full filters.");
   assert(document.querySelector("#studentSlots .public-calendar-card"), "Public student calendar did not render.");
   assert(!document.querySelector("#studentSlots").textContent.includes("Maya Chen"), "Public student preview should not show coach names.");
   assert(!document.querySelector('#studentSlots [data-action="book"]'), "Public student preview should not show booking buttons.");
+}
+
+async function testPublicCoachProfile() {
+  for (const [id, name, lessonCount] of [["maya", "Maya Chen", 3], ["alex", "Alex Rivera", 2], ["sam", "Sam Patel", 2]]) {
+    const { dom, errors } = await loadPage(`coach/profile.html?coach=${id}`);
+    const document = dom.window.document;
+    assertNoRuntimeErrors(`coach/profile.html?coach=${id}`, errors);
+    assert(document.querySelector("#coachName").textContent === name, "Public profile displayed the wrong coach.");
+    assert(document.querySelectorAll("#publicLessons li").length === lessonCount, "Profile courses do not match existing data.");
+    assert(document.querySelector("#dataNote").textContent.includes("示例资料"), "Default data must be labelled as sample data.");
+    assert(!document.querySelector("#portraitFallback").hidden, "Missing coach photo must show an honest placeholder.");
+    const bookingUrl = new URL(document.querySelector("#bookCoach").href);
+    assert(bookingUrl.searchParams.get("coach") === id, "Booking link lost the coach selection.");
+    assert(!bookingUrl.searchParams.has("access"), "Public profile must not grant full booking access.");
+    dom.window.close();
+  }
+  const savedProfile = { maya: {
+    bio: '<img src=x onerror="alert(1)">Saved introduction',
+    servedRinks: ["Arcadia Ice Arena"],
+    lessonOptions: [{ id: "lesson-30", name: "Custom lesson", duration: 30, price: 77 }, { id: "lesson-45", duration: 45, price: null }, { id: "lesson-60", duration: 60, price: 0 }],
+    photoUrl: "javascript:alert(1)",
+  } };
+  const saved = await loadPage("coach/profile.html?coach=maya", { localStorage: { "ice-skating-coach-profiles-v2": JSON.stringify(savedProfile) } });
+  assertNoRuntimeErrors("Saved public profile", saved.errors);
+  const savedDocument = saved.dom.window.document;
+  assert(savedDocument.querySelector("#publicLessons").textContent.includes("77"), "Saved lesson price was not used.");
+  assert(savedDocument.querySelector("#publicLessons").textContent.includes("价格待提供"), "Missing price was fabricated.");
+  assert(savedDocument.querySelectorAll("#coachRinks li").length === 1, "Saved teaching rinks were not used.");
+  assert(savedDocument.querySelector("#coachBio").textContent === savedProfile.maya.bio && !savedDocument.querySelector("#coachBio img"), "Profile text must not execute HTML.");
+  assert(!savedDocument.querySelector("#coachPhoto").hasAttribute("src"), "Unsafe photo URL must be rejected.");
+  saved.dom.window.close();
+  const missing = await loadPage("coach/profile.html?coach=unknown");
+  assertNoRuntimeErrors("Unknown public coach", missing.errors);
+  assert(!missing.dom.window.document.querySelector("#profileError").hidden, "Unknown coach should show a clear error.");
+  assert(missing.dom.window.document.querySelector("#profileLayout").hidden, "Unknown coach must not silently show Maya.");
+  missing.dom.window.close();
+
+  const login = await loadPage("student/login/index.html?coach=alex");
+  assertNoRuntimeErrors("Profile login context", login.errors);
+  for (const link of login.dom.window.document.querySelectorAll(".auth-button")) {
+    assert(new URL(link.href).searchParams.get("coach") === "alex", "Login or signup lost the profile coach.");
+  }
+  login.dom.window.close();
+  const booking = await loadPage("student/index.html?coach=alex&access=full", { localStorage: { "ice-skating-student-active-panel-v1": "studentAccountPanel" } });
+  assertNoRuntimeErrors("Profile booking context", booking.errors);
+  const bookingDocument = booking.dom.window.document;
+  assert(bookingDocument.querySelector('[data-student-content="studentBookPanel"]').classList.contains("active"), "Profile booking must open the booking tab.");
+  const checked = [...bookingDocument.querySelectorAll('input[name="studentCoachFilter"]:checked')];
+  assert(checked.length === 1 && checked[0].value === "alex", "Profile booking must filter to the chosen coach.");
+  assert(bookingDocument.querySelector("#studentCoachChips").textContent.includes("Alex Rivera"), "Chosen coach must be visible in the booking filter.");
+  assert(bookingDocument.querySelector('[data-action="choose-time"]'), "Chosen coach must still have selectable booking times.");
+  booking.dom.window.close();
+  const publicBooking = await loadPage("student/index.html?coach=sam");
+  assertNoRuntimeErrors("Public profile calendar context", publicBooking.errors);
+  assert(publicBooking.dom.window.document.querySelector("#studentControls").classList.contains("is-hidden"), "Profile entry must preserve public calendar access rules.");
+  assert(new URL(publicBooking.dom.window.document.querySelector("#studentLoginPrompt").href).searchParams.get("coach") === "sam", "Public calendar login link lost the coach.");
+  publicBooking.dom.window.close();
 }
 
 async function testFullStudentPage() {
@@ -173,6 +266,7 @@ async function testFullStudentPage() {
   assert(document.querySelector("#studentSlots .student-calendar-card"), "Full student booking calendar did not render.");
   assert(document.querySelector('#studentSlots .student-time-option[data-action="choose-time"]'), "Full student page should show selectable calendar time slots.");
   assert(document.querySelector("#studentSlots .student-time-option")?.getAttribute("title").includes("3 位教练"), "Default student calendar should expose all selected coaches in hover details.");
+  assert([...document.querySelector("#multiCoachRequestTargets").options].map((option) => option.textContent).join(",") === "Maya Chen,Alex Rivera,Sam Patel", "Multi-coach request options drifted from shared coach data.");
   document.querySelector('input[name="studentCoachFilter"][value="maya"]').click();
   assert(!document.querySelector('input[name="studentCoachFilter"][value="alex"]').checked, "Choosing one coach should narrow the checked coach list.");
   document.querySelector('[data-student-filter-panel="coach"]').click();
@@ -196,6 +290,132 @@ async function testFullStudentPage() {
   assert(accountText.includes("滑冰资料"), "Student account should include skating profile information.");
   assert(accountText.includes("预约默认偏好"), "Student account should include booking preferences.");
   assert(accountText.includes("监护人与安全"), "Student account should include guardian and safety information.");
+}
+
+async function testDesktopPageContracts() {
+  const cases = [
+    ["admin/index.html", "adminView", ".app-shell", ["coachView", "studentView"]],
+    ["coach/index.html", "coachView", ".coach-app-shell", ["adminView", "studentView"]],
+    ["student/index.html", "studentView", ".student-app-shell", ["adminView", "coachView"]],
+  ];
+
+  for (const [fileName, activeView, shellSelector, foreignViews] of cases) {
+    const { dom, errors } = await loadPage(fileName);
+    const { document } = dom.window;
+    assertNoRuntimeErrors(`${fileName} desktop contract`, errors);
+    assert(document.querySelector(shellSelector), `${fileName} lost its desktop application shell.`);
+    assert(document.querySelector(".view.active")?.id === activeView, `${fileName} opened the wrong role view.`);
+    foreignViews.forEach((viewId) => assert(!document.getElementById(viewId), `${fileName} still contains the foreign ${viewId} DOM.`));
+    assert(document.querySelector('.role-page-nav a[href="../index.html"]'), `${fileName} lost its home navigation.`);
+    assert(!document.documentElement.classList.contains("is-mobile"), `${fileName} unexpectedly entered a mobile-only layout.`);
+    dom.window.close();
+  }
+}
+
+async function testAvailabilityConflictActions() {
+  const emptyStorage = {
+    "ice-skating-coach-booking-slots-v12": "[]",
+    "ice-skating-coach-blocked-exceptions-v1": "[]",
+  };
+  const { dom, errors } = await loadPage("coach/index.html", { localStorage: emptyStorage });
+  const win = dom.window;
+  const doc = win.document;
+  const date = nextWeekdayByIndex(win, 6);
+  const form = doc.querySelector("#availabilityForm");
+
+  assertNoRuntimeErrors("coach availability conflict setup", errors);
+  doc.querySelector('[data-coach-panel="availabilityPanel"]').click();
+  doc.querySelector("#slotDate").value = date;
+  doc.querySelector("#startTime").value = "12:00";
+  doc.querySelector("#startTime").dispatchEvent(new win.Event("change", { bubbles: true }));
+  doc.querySelector("#endTime").value = "13:00";
+  doc.querySelector("#locationType").value = "Polar Ice Rink";
+  submit(form);
+
+  const beforeConflict = JSON.stringify(win.slots);
+  doc.querySelector("#startTime").value = "12:30";
+  doc.querySelector("#startTime").dispatchEvent(new win.Event("change", { bubbles: true }));
+  doc.querySelector("#endTime").value = "13:30";
+  doc.querySelector("#locationType").value = "Arcadia Ice Arena";
+  submit(form);
+  assert(doc.querySelector("#conflictDialog").open, "Overlapping rink availability did not open the conflict dialog.");
+  doc.querySelector("#cancelConflictOverride").click();
+  assert(!doc.querySelector("#conflictDialog").open, "Cancel did not close the availability conflict dialog.");
+  assert(JSON.stringify(win.slots) === beforeConflict, "Cancel changed availability despite rejecting the override.");
+
+  submit(form);
+  assert(doc.querySelector("#conflictDialog").open, "Conflict dialog did not reopen for the same unresolved overlap.");
+  doc.querySelector("#confirmConflictOverride").click();
+  assert(!doc.querySelector("#conflictDialog").open, "Override did not close the availability conflict dialog.");
+  assert(
+    win.slots.some((slot) => slot.coachId === "maya" && slot.date === date && slot.start === "12:30" && slot.location === "Arcadia Ice Arena"),
+    "Override did not apply the requested rink availability.",
+  );
+  assertNoRuntimeErrors("coach availability conflict actions", errors);
+  dom.window.close();
+}
+
+async function testCoachProfileDraftAndSave() {
+  const { dom, errors } = await loadPage("coach/index.html");
+  const win = dom.window;
+  const doc = win.document;
+  const originalProfile = JSON.parse(JSON.stringify(win.getProfile("maya")));
+  const rinkInput = [...doc.querySelectorAll('input[name="servedRinks"]')].find((input) => input.value !== originalProfile.homeRink);
+
+  assertNoRuntimeErrors("coach profile draft setup", errors);
+  win.confirm = () => true;
+  rinkInput.checked = false;
+  rinkInput.dispatchEvent(new win.Event("change", { bubbles: true }));
+  assert(win.hasUnsavedProfileChanges, "Editing teaching rinks did not mark the profile draft as unsaved.");
+  assert(JSON.stringify(win.getSavedProfile("maya")) === JSON.stringify(originalProfile), "Editing a profile draft mutated saved profile data before submit.");
+  doc.querySelector('[data-coach-panel="bookingsPanel"]').click();
+  assert(!win.hasUnsavedProfileChanges, "Leaving the profile after confirming discard kept the dirty state.");
+  assert(JSON.stringify(win.getProfile("maya")) === JSON.stringify(originalProfile), "Discarding profile edits changed saved profile data.");
+
+  doc.querySelector('[data-coach-panel="profilePanel"]').click();
+  const newRate = Number(originalProfile.rate) + 5;
+  doc.querySelector("#coachRate").value = String(newRate);
+  doc.querySelector("#coachRate").dispatchEvent(new win.Event("input", { bubbles: true }));
+  submit(doc.querySelector("#coachProfileForm"));
+  assert(win.getProfile("maya").rate === newRate, "Saving the profile did not update the coach rate.");
+  assert(!win.hasUnsavedProfileChanges, "Saving the profile did not clear the dirty state.");
+  assert(JSON.parse(win.localStorage.getItem("ice-skating-coach-profiles-v2")).maya.rate === newRate, "Saved profile data was not persisted.");
+  assertNoRuntimeErrors("coach profile draft and save", errors);
+  dom.window.close();
+}
+
+async function testSafeDynamicRendering() {
+  const { dom, errors } = await loadPage("coach/index.html");
+  const win = dom.window;
+  const doc = win.document;
+  const unsafe = '<img src=x onerror="alert(1)">Unsafe';
+  const profile = JSON.parse(JSON.stringify(win.getSavedProfile("maya")));
+  profile.lessonOptions = [{ id: 'lesson" unsafe', name: unsafe, duration: 30, price: 60 }];
+  win.setCoachProfileDraft(profile);
+  win.render();
+  assert(!doc.querySelector("#lessonOptionsList img"), "Editable lesson names were interpreted as HTML.");
+  assert(doc.querySelector("#lessonOptionsList .lesson-name-input").value === unsafe, "Escaped lesson text did not round-trip through the form.");
+
+  const booking = {
+    id: 'booking" unsafe',
+    coachId: "maya",
+    date: win.nextWeekdayIso(1),
+    start: "08:00",
+    end: "08:30",
+    location: "Polar Ice Rink",
+    availabilityLocation: "Polar Ice Rink",
+    booked: true,
+    lessonName: unsafe,
+    lessonDuration: 30,
+    lessonPrice: 60,
+    student: { name: unsafe, email: "unsafe@example.com", note: unsafe },
+  };
+  win.replaceSlots([booking]);
+  win.openBookingDetails(booking.id);
+  assert(!doc.querySelector("#bookingDetailsBody img"), "Booking details interpreted student content as HTML.");
+  assert(doc.querySelector("#bookingDetailsBody").textContent.includes(unsafe), "Booking details lost escaped student text.");
+  assertNoRuntimeErrors("safe dynamic rendering", errors);
+  dom.window.close();
 }
 
 async function testRecurringAvailabilityAcceptance() {
@@ -261,7 +481,6 @@ async function testRecurringAvailabilityAcceptance() {
   studentDocument.querySelector("#studentEmail").value = "acceptance@example.com";
   studentDocument.querySelector("#studentNote").value = "Acceptance booking";
   submit(studentDocument.querySelector("#bookingForm"));
-  studentPage.dom.window.saveAvailabilityChanges();
   const bookedSlot = studentPage.dom.window.slots.find((slot) => slot.id === studentSlot.id);
   const futureRuleSlot = studentPage.dom.window.slots.find((slot) => slot.coachId === "maya" && slot.date === nextSaturday && slot.start === "17:00");
   assert(bookedSlot.booked, "Booking did not occupy the selected date slot.");
@@ -308,7 +527,9 @@ async function testTicketAcceptanceCoverage() {
     addFinding("移除学生账户冰鞋字段", "Student account still displays skate ownership wording.");
   }
 
-  const firstOpenSlot = studentPage.dom.window.slots.find((slot) => !slot.booked && slot.date >= studentPage.dom.window.todayIso());
+  const firstOpenSlot = studentPage.dom.window.slots.find((slot) => {
+    return slot.coachId === "maya" && !slot.booked && new Date(`${slot.date}T${slot.end}`) > new Date();
+  });
   studentPage.dom.window.openBookingDialog(firstOpenSlot.id);
   if (!studentDocument.querySelector("#bookingForSelf")) {
     addFinding("支持为本人或他人预约", "Booking dialog does not expose a self/another-student control.");
@@ -377,9 +598,6 @@ async function testTicketAcceptanceCoverage() {
     addFinding("准备可测试的教练账号与教练资料", "Student experience does not display coach profile data.");
   }
 
-  if (!adminDocument.querySelector("#servedRinks") || !adminDocument.querySelector("#saveProfileChanges")) {
-    addFinding("Admin 配置并批准教练可授课冰场", "Admin page lacks controls to configure teaching rinks.");
-  }
   if (!/批准|approve|suspend|暂停|remove|移除/i.test(adminDocument.body.textContent)) {
     addFinding("Admin 配置并批准教练可授课冰场", "Admin page has no approval/suspension workflow for teaching rinks.");
   }
@@ -497,12 +715,177 @@ async function testTicketAcceptanceCoverage() {
   }
 }
 
+async function testCoachScheduleFilters() {
+  const { dom, errors } = await loadPage("coach/index.html");
+  const win = dom.window;
+  const doc = win.document;
+  const future = win.nextWeekdayIso(1);
+  const past = win.todayIso(-2);
+  const booking = (id, date, start, end, name, email, extra = {}) => ({
+    id, coachId: "maya", date, start, end, location: "Polar Ice Rink", availabilityLocation: "Polar Ice Rink",
+    booked: true, lessonName: "私教课", lessonDuration: win.minutesFromTime(end) - win.minutesFromTime(start), lessonPrice: 60,
+    status: "Confirmed", student: { name, email, note: "Review edges" }, ...extra,
+  });
+  const adaNear = booking("ada-near", future, "08:00", "09:30", "Ada", "ada@example.com");
+  const beaNear = booking("bea-near", future, "10:00", "11:30", "Bea", "bea@example.com");
+  const adaFar = booking("ada-far", win.addDaysIso(future, 7), "09:00", "10:00", "Ada", "ada@example.com", { location: "Arcadia Ice Arena", status: "Pending" });
+  const sameName = booking("other-ada", win.addDaysIso(future, 14), "14:00", "14:30", "Ada", "another@example.com");
+  const adaPast = booking("ada-past", past, "14:00", "14:30", "Ada", "ada@example.com", { student: { name: "Ada", email: "ada@example.com", note: "<img src=x onerror=alert(1)>" } });
+  const adaOlder = booking("ada-older", win.addDaysIso(past, -14), "14:00", "14:30", "Ada", "ada@example.com");
+  const openSlot = { ...booking("open", future, "12:00", "12:30", "", ""), booked: false, student: null };
+  const blockedSlot = { ...openSlot, id: "blocked-open", start: "13:00", end: "13:30" };
+  const otherCoach = { ...adaNear, id: "other-coach", coachId: "alex" };
+  win.slots = [adaFar, adaOlder, beaNear, sameName, adaNear, adaPast, openSlot, blockedSlot, otherCoach];
+  win.blockedExceptions = [{ id: "block", coachId: "maya", date: future, start: "13:00", end: "13:30", reason: "Unavailable" }];
+  doc.querySelector("#exceptionCalendarWeekStart").value = win.startOfWeekIso(future);
+  win.renderExceptionDragCalendar();
+  win.render();
+  assertNoRuntimeErrors("Coach schedule setup", errors);
+  const select = doc.querySelector("#coachBookingStudentFilter");
+  const search = doc.querySelector("#coachBookingStudentSearch");
+  const rows = () => [...doc.querySelectorAll("#coachSlots .coach-booking-card")];
+  const rowIds = () => rows().map((row) => row.dataset.slotId).join(",");
+  const listTab = doc.querySelector('[data-booking-section="bookingListSection"]');
+  const calendarTab = doc.querySelector('[data-booking-section="bookingCalendarSection"]');
+  assert(listTab.textContent === "预约列表", "Coach list tab must use the appointment-list label.");
+  assert(select.value === "" && select.options[0].textContent === "全部学生", "Student filtering must default to all students.");
+  assert(rowIds() === "ada-near,bea-near,ada-far,other-ada", "Upcoming appointments must be chronological across weeks and limited to this coach.");
+  assert(!doc.querySelector("#coachSlots .student-booking-group"), "Coach list must not group students or rinks.");
+  assert(rows()[0].textContent.includes("Ada") && rows()[0].textContent.includes(future.slice(0, 4)) && rows()[0].textContent.includes("08:00–09:30"), "Appointment row must show student, full date and time.");
+  assert(rows()[0].textContent.includes("90 分钟") && rows()[0].textContent.includes("$60") && rows()[0].textContent.includes("Review edges"), "Appointment row must retain course, price and note details.");
+  assert(doc.querySelector('[data-slot-id="ada-far"]').textContent.includes("待确认"), "Pending status must not be shown as confirmed.");
+  const snapshot = JSON.stringify(win.slots);
+  search.value = "ADA@EXAMPLE.COM";
+  search.dispatchEvent(new win.Event("input", { bubbles: true }));
+  assert(select.options.length === 2, "Student search should match email without case sensitivity.");
+  select.value = win.getCoachBookingStudentKey(adaNear);
+  select.dispatchEvent(new win.Event("change", { bubbles: true }));
+  listTab.click();
+  assert(rowIds() === "ada-near,ada-far", "Selected student must display continuously across rinks and weeks, without matching same-name students.");
+  calendarTab.click();
+  assert(select.value === win.getCoachBookingStudentKey(adaNear), "Calendar/list switching must preserve the selected student.");
+  const dayIndex = (win.weekdayIndex(future) + 6) % 7;
+  const cellAt = (time) => doc.querySelector(`#exceptionDragCalendar [data-day-index="${dayIndex}"][data-minutes="${win.minutesFromTime(time)}"]`);
+  assert(cellAt("08:00").dataset.slotId === "ada-near", "Selected student booking must retain calendar details actions.");
+  assert(cellAt("09:00").classList.contains("has-booking"), "A long lesson must occupy all covered calendar cells.");
+  for (const time of ["10:00", "10:30", "11:00"]) {
+    const cell = cellAt(time);
+    assert(cell.classList.contains("has-booking") && cell.classList.contains("is-filtered-booking"), "Other students' lessons must remain visibly occupied for their whole duration.");
+    assert(!cell.dataset.slotId && cell.title.includes("已占用") && !cell.title.includes("Bea"), "Excluded bookings must hide their details without appearing free.");
+  }
+  assert(cellAt("12:00").classList.contains("has-slot") && !cellAt("12:00").classList.contains("has-booking"), "Student filtering must preserve real availability.");
+  assert(cellAt("13:00").classList.contains("has-blocked"), "Student filtering must preserve unavailable time.");
+  cellAt("10:00").click();
+  assert(!doc.querySelector("#bookingDetailsDialog").open, "Filtered occupied placeholders must not open another student's details.");
+  cellAt("08:00").click();
+  assert(doc.querySelector("#bookingDetailsDialog").open && doc.querySelector("#bookingDetailsBody").textContent.includes("Ada"), "Matching calendar appointments must still open details.");
+  doc.querySelector("#closeBookingDetails").click();
+  listTab.click();
+  doc.querySelector('[data-coach-booking-period="past"]').click();
+  assert(rowIds() === "ada-past,ada-older", "History must be newest first across all weeks.");
+  assert(!doc.querySelector("#coachSlots img") && doc.querySelector("#coachSlots").textContent.includes("<img"), "Booking notes must render safely as text.");
+  calendarTab.click();
+  win.shiftScheduleWeek(5);
+  assert(doc.querySelector("#coachCalendarFilterSummary").textContent.includes("本周暂无该学生"), "Calendar must explain when the selected student has no bookings that week.");
+  listTab.click();
+  assert(rowIds() === "ada-past,ada-older", "List dates must not be restricted by calendar week navigation.");
+  assert(JSON.stringify(win.slots) === snapshot, "Filtering and changing views must not mutate booking data.");
+  search.value = "not-a-student";
+  search.dispatchEvent(new win.Event("input", { bubbles: true }));
+  assert(doc.querySelector("#coachBookingFilterHint").textContent.includes("找到 0 位"), "Unmatched student searches need a clear message.");
+  assert(select.value === win.getCoachBookingStudentKey(adaNear), "Unmatched searches must not silently clear an active student filter.");
+  doc.querySelector("#clearCoachBookingStudent").click();
+  assert(select.value === "" && search.value === "", "Clear must reset both student selection and search text.");
+  calendarTab.click();
+  doc.querySelector("#exceptionCalendarWeekStart").value = win.startOfWeekIso(future);
+  win.renderExceptionDragCalendar();
+  assert(cellAt("10:00").dataset.slotId === "bea-near" && !cellAt("10:00").classList.contains("is-filtered-booking"), "Clearing must restore all students' calendar detail actions.");
+  select.value = win.getCoachBookingStudentKey(adaNear);
+  select.dispatchEvent(new win.Event("change", { bubbles: true }));
+  listTab.click();
+  doc.querySelector('[data-coach-booking-period="upcoming"]').click();
+  doc.querySelector('[data-slot-id="ada-near"] [data-action="coach-booking-details"]').click();
+  assert(doc.querySelector("#bookingDetailsDialog").open, "List details action must retain the existing booking details dialog.");
+  doc.querySelector("#closeBookingDetails").click();
+  let confirmCalls = 0;
+  win.confirm = () => { confirmCalls++; return false; };
+  doc.querySelector('[data-slot-id="ada-near"] [data-action="coach-cancel-booking"]').click();
+  assert(confirmCalls === 1 && adaNear.booked, "Declining cancellation must preserve the booking.");
+  win.confirm = () => true;
+  doc.querySelector('[data-slot-id="ada-near"] [data-action="coach-cancel-booking"]').click();
+  assert(!win.slots.find((slot) => slot.id === "ada-near").booked && beaNear.booked, "List cancellation must use existing rules and leave other students' bookings intact.");
+  assert(select.value === win.getCoachBookingStudentKey(adaFar) && rowIds() === "ada-far", "Cancellation must refresh the list while preserving the student filter.");
+  doc.querySelector('[data-slot-id="ada-far"] [data-action="coach-cancel-booking"]').click();
+  assert(doc.querySelector("#coachSlots .empty-state") && doc.querySelector('#coachSlots [data-action="clear-coach-booking-student"]'), "Empty filtered lists must retain a clear-filter action.");
+  doc.querySelector('#coachSlots [data-action="clear-coach-booking-student"]').click();
+  assert(select.value === "" && rowIds().includes("bea-near"), "Empty-state clear must restore other students' appointments.");
+  assertNoRuntimeErrors("Coach schedule interactions", errors);
+  dom.window.close();
+}
+
+async function testCoachScheduleWeekNavigation() {
+  const { dom, errors } = await loadPage("coach/index.html");
+  const win = dom.window;
+  const doc = win.document;
+  doc.querySelector('[data-coach-panel="bookingsPanel"]').click();
+  const input = doc.querySelector("#exceptionCalendarWeekStart");
+  const range = doc.querySelector("#coachScheduleWeekRange");
+  const bookingSnapshot = JSON.stringify(win.slots);
+  assert(doc.querySelector('[data-coach-panel="bookingsPanel"]').textContent === "预约管理", "Coach navigation must use the appointment management name.");
+  assert(doc.querySelector('.bookings-panel h3').textContent === "预约管理" && !doc.querySelector('.bookings-panel .panel-heading .eyebrow'), "Appointment title must omit the duplicate eyebrow.");
+  assert(doc.querySelectorAll('#previousScheduleWeek').length === 1 && doc.querySelectorAll('#nextScheduleWeek').length === 1, "Week arrows must not be duplicated.");
+  assert(doc.querySelector('#previousScheduleWeek').parentElement === range.parentElement && doc.querySelector('#nextScheduleWeek').parentElement === range.parentElement, "Both arrows must stay with the range.");
+  function assertWeek(start, end, text) {
+    assert(input.value === start, "Selected date must normalize to the existing Monday week start.");
+    assert(range.textContent === text, "Week range must show the correct months and years: " + text);
+    const headers = [...doc.querySelectorAll('#exceptionDragCalendar .calendar-day')];
+    assert(headers.length === 7 && headers[0].dataset.date === start && headers[6].dataset.date === end, "Range must match the actual seven calendar dates.");
+    headers.forEach((header, index) => assert(header.dataset.date === win.addDaysIso(start, index), "Calendar days must be consecutive."));
+  }
+  function choose(date) {
+    input.value = date;
+    input.dispatchEvent(new win.Event("change", { bubbles: true }));
+  }
+  choose("2026-10-29");
+  assertWeek("2026-10-26", "2026-11-01", "2026年10月26日—11月1日");
+  doc.querySelector('#nextScheduleWeek').click();
+  assertWeek("2026-11-02", "2026-11-08", "2026年11月2日—11月8日");
+  doc.querySelector('#previousScheduleWeek').click();
+  assertWeek("2026-10-26", "2026-11-01", "2026年10月26日—11月1日");
+  choose("2027-01-03"); // Sunday belongs to the preceding year's Monday.
+  assertWeek("2026-12-28", "2027-01-03", "2026年12月28日—2027年1月3日");
+  doc.querySelector('#nextScheduleWeek').click();
+  assertWeek("2027-01-04", "2027-01-10", "2027年1月4日—1月10日");
+  doc.querySelector('#previousScheduleWeek').click();
+  assertWeek("2026-12-28", "2027-01-03", "2026年12月28日—2027年1月3日");
+  choose("2028-02-29");
+  assertWeek("2028-02-28", "2028-03-05", "2028年2月28日—3月5日");
+  assert(!doc.querySelector('#exceptionDragCalendar [aria-current="date"]'), "A week away from today must not highlight a different day as today.");
+  const currentWeekButton = doc.querySelector('#todayScheduleWeek');
+  assert(currentWeekButton.textContent === "本周", "Return button must say current week.");
+  currentWeekButton.click();
+  const today = win.todayIso();
+  const start = win.startOfWeekIso(today);
+  assert(input.value === start && doc.querySelectorAll('#exceptionDragCalendar [aria-current="date"]').length === 1, "Returning to this week must highlight exactly today.");
+  assert(doc.querySelector('#exceptionDragCalendar .calendar-day.is-today').dataset.date === today, "Today highlight must use the actual local date.");
+  assert(JSON.stringify(win.slots) === bookingSnapshot, "Date navigation must never change appointments or availability.");
+  assertNoRuntimeErrors("Coach week navigation", errors);
+  dom.window.close();
+}
+
 async function main() {
   await testLandingPage();
   await testLoginPages();
   await testAdminPage();
   await testCoachPage();
+  await testDesktopPageContracts();
+  await testAvailabilityConflictActions();
+  await testCoachProfileDraftAndSave();
+  await testSafeDynamicRendering();
+  await testCoachScheduleFilters();
+  await testCoachScheduleWeekNavigation();
   await testStudentPage();
+  await testPublicCoachProfile();
   await testFullStudentPage();
   await testRecurringAvailabilityAcceptance();
   await testTicketAcceptanceCoverage();

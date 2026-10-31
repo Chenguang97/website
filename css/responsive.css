@@ -1,3 +1,4 @@
+@layer legacy {
 @media (max-width: 920px) {
   .app-shell,
   .coach-layout,
@@ -43,6 +44,10 @@
 }
 
 @media (max-width: 640px) {
+  .coach-app-shell .workspace {
+    padding: 20px;
+  }
+
   .workspace,
   .sidebar {
     padding: 20px;
@@ -138,4 +143,6 @@
   .drag-calendar {
     grid-template-columns: 58px repeat(7, 88px);
   }
+}
+
 }

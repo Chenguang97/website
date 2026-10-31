@@ -1,3 +1,4 @@
+@layer legacy {
 .hero-strip {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 240px;
@@ -397,8 +398,8 @@ html[data-active-coach-panel="availabilityPanel"] .coach-tab[data-coach-panel="a
 }
 
 body:has(#coachView.view.active) .workspace {
-  width: min(100%, 1160px);
-  padding: 28px 32px;
+  width: min(100%, 1360px);
+  padding: 16px 32px;
 }
 
 body:has(#coachView.view.active) .section-header {
@@ -407,7 +408,7 @@ body:has(#coachView.view.active) .section-header {
 }
 
 body:has(#coachView.view.active) .section-header h2 {
-  font-size: 34px;
+  font-size: 28px;
   line-height: 1.08;
 }
 
@@ -516,7 +517,7 @@ html[data-active-coach-panel="availabilityPanel"] .coach-tab[data-coach-panel="a
   background: #fff1f2;
 }
 
-.profile-save-button {
+.coach-app-shell .profile-save-button {
   display: none;
 }
 
@@ -643,4 +644,121 @@ html[data-active-coach-panel="availabilityPanel"] .coach-tab[data-coach-panel="a
 .photo-form {
   display: grid;
   gap: 16px;
+}
+
+/* Keep the coach editor compact without stretching short fields across the page. */
+.coach-app-shell .coach-page-nav {
+  margin-bottom: 8px;
+}
+
+.coach-app-shell #coachView > .section-header {
+  align-items: center;
+  margin-bottom: 18px;
+}
+
+.coach-app-shell #coachView > .section-header .eyebrow {
+  display: none;
+}
+
+.coach-app-shell #coachProfileForm {
+  align-items: start;
+  gap: 16px;
+}
+
+.coach-app-shell .lesson-rate-panel > .panel-heading {
+  margin-bottom: 0;
+}
+
+.coach-app-shell .lesson-rate-layout {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 14px;
+}
+
+.coach-app-shell .rate-summary-card {
+  padding: 12px;
+}
+
+.coach-app-shell .profile-field-rate {
+  grid-template-columns: minmax(0, 1fr) 180px;
+  align-items: center;
+  gap: 4px 16px;
+}
+
+.coach-app-shell .profile-field-rate .field-hint {
+  grid-column: 1;
+  grid-row: 2;
+  font-weight: 500;
+}
+
+.coach-app-shell .profile-field-rate .money-input {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+}
+
+.coach-app-shell .lesson-option-header,
+.coach-app-shell .lesson-option-row {
+  grid-template-columns: minmax(160px, 1.5fr) minmax(80px, 0.55fr) minmax(90px, 0.55fr) 44px;
+}
+
+@media (min-width: 1101px) {
+  .coach-app-shell #coachProfileForm {
+    grid-template-columns: 300px minmax(0, 1fr);
+    grid-template-rows: auto 1fr auto;
+  }
+
+  .coach-app-shell .compact-profile-card {
+    grid-column: 1;
+    flex-wrap: wrap;
+    padding: 16px;
+  }
+
+  .coach-app-shell .compact-edit-link {
+    width: 100%;
+    margin-left: 0;
+    text-align: center;
+  }
+
+  .coach-app-shell .teaching-location-panel {
+    grid-column: 1;
+    grid-row: 2;
+  }
+
+  .coach-app-shell .teaching-location-grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 18px;
+  }
+
+  .coach-app-shell .lesson-rate-panel {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+    min-width: 0;
+  }
+
+  .coach-app-shell #profileMessage {
+    grid-column: 1 / -1;
+    margin: 0;
+  }
+}
+
+@media (max-width: 640px) {
+  .coach-app-shell .profile-field-rate {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
+  }
+
+  .coach-app-shell .profile-field-rate .money-input {
+    grid-column: 1;
+    grid-row: 3;
+  }
+
+  .coach-app-shell .lesson-option-header,
+  .coach-app-shell .lesson-option-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .coach-app-shell #coachView > .section-header {
+    align-items: start;
+  }
+}
+
 }

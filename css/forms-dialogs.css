@@ -1,3 +1,4 @@
+@layer legacy {
 .checkbox-stack {
   display: grid;
   gap: 8px;
@@ -81,4 +82,19 @@ textarea {
   resize: vertical;
 }
 
-.two-column,
+.two-column {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: end;
+  gap: 16px;
+}
+
+.form-panel > label,
+.two-column > label {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  line-height: 1.5;
+}
+
+}

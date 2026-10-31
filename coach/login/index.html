@@ -4,20 +4,16 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>教练登录 · Ice Skating Coach Booking</title>
-    <link rel="stylesheet" href="../../css/base.css" />
-    <link rel="stylesheet" href="../../css/coach-profile.css" />
-    <link rel="stylesheet" href="../../css/responsive.css" />
+    <link rel="stylesheet" href="../../css/base.css?v=warm-ui-1" />
+    <link rel="stylesheet" href="../../css/coach-profile.css?v=warm-ui-1" />
+    <link rel="stylesheet" href="../../css/responsive.css?v=warm-ui-1" />
+    <link rel="stylesheet" href="../../css/design-system.css?v=warm-ui-11" />
   </head>
   <body class="landing-body">
     <main class="student-auth-shell coach-auth-shell" aria-labelledby="authHeading">
       <header class="student-auth-header">
         <div class="student-auth-brand">
           <div class="student-auth-logo" aria-hidden="true">
-            <svg viewBox="0 0 48 48" role="img">
-              <path d="M10 30c0-9.4 6.6-17 14-17s14 7.6 14 17v4.5c0 2.5-2 4.5-4.5 4.5h-19C12 39 10 37 10 34.5V30Z" fill="#2563eb" />
-              <path d="M17 24.5c4.7-4.9 9.4-4.9 14 0" fill="none" stroke="#f8fafc" stroke-width="3.5" stroke-linecap="round" />
-              <path d="M20 32h8" fill="none" stroke="#fbbf24" stroke-width="3.5" stroke-linecap="round" />
-            </svg>
           </div>
           <div>
             <strong>冰场预约</strong>
@@ -74,17 +70,12 @@
       <section class="auth-panel student-login-panel">
         <div class="auth-copy">
           <div class="student-login-mark" aria-hidden="true">
-            <svg viewBox="0 0 48 48" role="img">
-              <path d="M10 30c0-9.4 6.6-17 14-17s14 7.6 14 17v4.5c0 2.5-2.7 6-6 6H20c-3.3 0-6-2.7-6-6v-5Z" fill="none" stroke="#2563eb" stroke-width="3" />
-              <path d="M17 24.5c4.7-4.9 9.4-4.9 14 0" fill="none" stroke="#2563eb" stroke-width="3" stroke-linecap="round" />
-              <path d="M20 32h8" fill="none" stroke="#2563eb" stroke-width="3" stroke-linecap="round" />
-            </svg>
           </div>
           <h2>教练登录</h2>
           <p>登录后管理资料、开放时间和预约课表。</p>
         </div>
 
-        <form class="auth-form">
+        <form id="coachLoginForm" class="auth-form" action="../index.html" method="get">
           <label>
             邮箱
             <span class="auth-input-wrap auth-input-email">

@@ -32,6 +32,4 @@ export const defaultEnd = "16:00";
 export const recurringPastWeeks = 8;
 export const recurringFutureWeeks = 52;
 export const publicStudentPreviewHours = 3;
-export const rescheduleWindowWeeks = 2;
-export const rescheduleOptionLimit = 80;
 export const studentHasFullAccess = new URLSearchParams(window.location.search).get("access") === "full";

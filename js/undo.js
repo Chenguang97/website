@@ -1,5 +1,6 @@
 import { render } from "./render.js";
-import { replaceBlockedExceptions, replaceSlots, state } from "./state.js";
+import { setProfileDirty, showProfileMessage } from "./coach-profile-status.js";
+import { ensureCoachProfileDraft, replaceBlockedExceptions, replaceSlots, setCoachProfileDraft, state } from "./state.js";
 import { setAvailabilityDirty, showFormMessage } from "./availability-status.js";
 
 function cloneData(value) {
@@ -8,6 +9,7 @@ function cloneData(value) {
 
 export function captureUndoState() {
   return {
+    type: "availability",
     slots: cloneData(state.slots),
     blockedExceptions: cloneData(state.blockedExceptions),
     unsavedAddedSlotIds: [...state.unsavedAddedSlotIds],
@@ -16,6 +18,14 @@ export function captureUndoState() {
     unsavedBlockExceptionIds: [...state.unsavedBlockExceptionIds],
     pendingDeletedSlots: cloneData([...state.pendingDeletedSlots.entries()]),
     hasUnsavedAvailabilityChanges: state.hasUnsavedAvailabilityChanges,
+  };
+}
+
+export function captureProfileUndoState() {
+  return {
+    type: "coach-profile",
+    coachProfileDraft: cloneData(ensureCoachProfileDraft()),
+    hasUnsavedProfileChanges: state.hasUnsavedProfileChanges,
   };
 }
 
@@ -36,8 +46,12 @@ export function pushUndoState(snapshot) {
   }
 }
 
-export function clearUndoHistory() {
-  state.undoStack.length = 0;
+export function clearUndoHistory(type) {
+  if (!type) {
+    state.undoStack.length = 0;
+    return;
+  }
+  state.undoStack = state.undoStack.filter((snapshot) => snapshot.type !== type);
 }
 
 function restoreUndoState(snapshot) {
@@ -55,6 +69,14 @@ export function undoLastChange() {
   const snapshot = state.undoStack.pop();
   if (!snapshot) {
     showFormMessage("没有可以撤销的更改。");
+    return;
+  }
+
+  if (snapshot.type === "coach-profile") {
+    setCoachProfileDraft(cloneData(snapshot.coachProfileDraft));
+    setProfileDirty(snapshot.hasUnsavedProfileChanges);
+    render();
+    showProfileMessage("已恢复课程");
     return;
   }
 

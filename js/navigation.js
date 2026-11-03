@@ -1,6 +1,7 @@
 import { setAvailabilityDirty, showFormMessage } from "./availability-status.js";
 import { getCoachBookingStudents, renderCoachBookingStudentFilter, renderCoachSlots } from "./coach-bookings-render.js";
-import { confirmDiscardProfileChanges, setProfileDirty } from "./coach-profile-actions.js";
+import { confirmDiscardProfileChanges } from "./coach-profile-actions.js";
+import { setProfileDirty } from "./coach-profile-status.js";
 import { activeCoachPanelStorageKey, activeStudentPanelStorageKey } from "./config.js";
 import { createDefaultProfiles, createDefaultSlots } from "./demo-data.js";
 import { elements } from "./elements.js";
@@ -22,21 +23,6 @@ export function selectCalendarRink(event) {
 
   elements.calendarLocationType.value = button.dataset.rink;
   renderCalendarRinkOptions();
-}
-
-function switchView(event) {
-  const button = event.currentTarget;
-  const viewId = button.dataset.view;
-
-  elements.modeButtons.forEach((item) => {
-    const isActive = item === button;
-    item.classList.toggle("active", isActive);
-    item.setAttribute("aria-selected", String(isActive));
-  });
-
-  elements.views.forEach((view) => {
-    view.classList.toggle("active", view.id === viewId);
-  });
 }
 
 export function switchMethod(event) {

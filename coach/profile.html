@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="了解滑冰教练的教学方向、服务冰场与课程价格，查看可预约时间。" />
+    <title>教练公开资料 · 冰场预约</title>
+    <link rel="stylesheet" href="../css/public-profile.css?v=warm-ui-1" />
+    <link rel="stylesheet" href="../css/design-system.css?v=warm-ui-11" />
+  </head>
+  <body>
+    <a class="skip-link" href="#profileContent">跳至教练资料</a>
+    <header class="site-header">
+      <a class="site-brand" href="../index.html" aria-label="冰场预约首页">
+        <span class="brand-symbol" aria-hidden="true">✳</span>
+        <span>冰场预约<small>一起，找到冰上的节奏</small></span>
+      </a>
+      <nav aria-label="主导航">
+        <a id="navBookCoach" href="../student/index.html">预约课程 <span aria-hidden="true">↗</span></a>
+        <a class="button button-outline" id="profileLogin" href="../student/login/index.html">学生登录</a>
+      </nav>
+    </header>
+
+    <main id="profileContent" class="profile-shell">
+      <div class="page-context">
+        <a href="../index.html">首页</a><span aria-hidden="true">/</span><span>教练公开资料</span>
+        <span class="data-note" id="dataNote">正在读取教练资料…</span>
+      </div>
+      <div id="profileError" role="status" hidden></div>
+      <div id="profileLayout" class="profile-layout" hidden>
+        <div class="profile-main">
+          <section class="coach-hero" aria-labelledby="coachName">
+            <figure class="coach-portrait" id="coachPortrait">
+              <div class="portrait-fallback" id="portraitFallback">
+                <span id="coachInitials" aria-hidden="true"></span>
+                <p>教练照片暂未提供</p>
+              </div>
+              <img id="coachPhoto" alt="" hidden />
+              <figcaption>认识你的滑冰教练</figcaption>
+            </figure>
+            <div class="hero-copy">
+              <p class="eyebrow">ON THE ICE · 一对一私教</p>
+              <h1 id="coachName"></h1>
+              <p class="coach-subject" id="coachSubject"></p>
+              <p class="hero-description">从了解教练开始，<br />安排适合自己的冰上课程。</p>
+              <div class="specialty-chips" id="heroSpecialties" aria-label="教学专长" hidden></div>
+              <a class="text-link" id="profileDetailsLink" href="#teachingRinks">了解教学信息 <span aria-hidden="true">↓</span></a>
+            </div>
+          </section>
+
+          <nav class="section-nav" aria-label="教练资料内容">
+            <a id="aboutCoachNav" href="#aboutCoach" hidden>教练介绍</a>
+            <a id="teachingSpecialtiesNav" href="#teachingSpecialties" hidden>教学专长</a>
+            <a id="teachingRinksNav" href="#teachingRinks">服务冰场</a>
+          </nav>
+
+          <section class="detail-section" id="aboutCoach" aria-labelledby="aboutHeading" hidden>
+            <p class="section-index">01 / ABOUT</p>
+            <div><h2 id="aboutHeading">认识教练</h2><p id="coachBio"></p></div>
+          </section>
+          <section class="detail-section" id="teachingSpecialties" aria-labelledby="specialtiesHeading" hidden>
+            <p class="section-index">02 / FOCUS</p>
+            <div><h2 id="specialtiesHeading">教学专长</h2><div class="specialty-chips" id="coachSpecialties"></div></div>
+          </section>
+          <section class="detail-section" id="teachingRinks" aria-labelledby="rinksHeading">
+            <p class="section-index">03 / LOCATIONS</p>
+            <div><h2 id="rinksHeading">在哪里上课</h2><ul class="rink-list" id="coachRinks"></ul>
+              <p class="quiet-note" id="travelNote"></p>
+            </div>
+          </section>
+        </div>
+
+        <aside class="lesson-panel" aria-labelledby="lessonsHeading">
+          <p class="eyebrow">给自己一段专注的练习时间</p>
+          <h2 id="lessonsHeading">你的下一节冰上课</h2>
+          <p class="lesson-intro">先了解课程，再选择合适的时间。</p>
+          <ul class="lesson-list" id="publicLessons"></ul>
+          <p class="price-note">价格为单次私教课费用，冰票需另购。</p>
+          <a class="button button-primary" id="bookCoach" href="../student/index.html">查看可预约时间 <span aria-hidden="true">↗</span></a>
+          <p class="booking-help" id="bookingHelp">登录后可查看完整课表并预约。</p>
+          <div class="booking-steps"><span>01 选时间</span><span>02 确认课程</span><span>03 提交预约</span></div>
+          <p class="booking-rule">可预约时段、确认方式及提前预约要求，以预约页为准。</p>
+        </aside>
+      </div>
+      <noscript><p>请启用 JavaScript 读取教练资料。你也可以<a href="../student/index.html">前往预约页面</a>。</p></noscript>
+    </main>
+    <footer class="site-footer"><span>冰场预约 · 让每次练习都有方向</span><span>教练资料与课程费用，以当前站点保存内容为准。</span></footer>
+    <script type="module" src="../js/public-profile.js?v=architecture-3"></script>
+  </body>
+</html>

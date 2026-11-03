@@ -27,67 +27,104 @@
   <body data-page="coach">
     <main class="app-shell coach-app-shell">
       <section class="workspace">
-        <nav class="role-page-nav coach-page-nav" aria-label="页面导航">
-          <a class="role-home-link" href="../index.html">← 返回首页</a>
-        </nav>
+        <div class="coach-workspace-container">
+          <nav class="role-page-nav coach-page-nav" aria-label="页面导航">
+            <a class="role-home-link" href="../index.html">← 返回首页</a>
+          </nav>
 
-        <section id="coachView" class="view active" aria-labelledby="coachHeading">
-          <div class="section-header">
-            <div>
-              <p class="eyebrow">教练后台</p>
-              <h2 id="coachHeading">编辑教练主页</h2>
-              <p class="heading-note">更新学生在预约页面看到的信息</p>
+          <section id="coachView" class="view active" aria-labelledby="coachHeading">
+            <div class="section-header coach-action-bar">
+              <h2 id="coachHeading">教练工作台</h2>
+              <div class="header-actions">
+                <div class="profile-save-state" aria-live="polite">
+                  <span id="profileSaveStatus" class="profile-save-status" data-tone="saved">已保存</span>
+                  <span id="profilePreviewNote" class="profile-preview-note" hidden>预览显示已保存内容</span>
+                </div>
+                <a id="previewCoachProfile" class="ghost-button" href="profile.html?coach=maya" target="_blank" rel="noopener" aria-describedby="profilePreviewNote">预览主页</a>
+                <button id="saveProfileChanges" class="primary-button" type="submit" form="coachProfileForm">保存更改</button>
+              </div>
             </div>
-            <div class="header-actions">
-              <a class="ghost-button" href="profile.html?coach=maya">预览主页</a>
-              <button class="primary-button" type="submit" form="coachProfileForm">保存更改</button>
-            </div>
-          </div>
 
           <div class="coach-tabs" role="tablist" aria-label="Coach settings">
             <button class="coach-tab active" type="button" data-coach-panel="profilePanel" aria-selected="true">基本资料</button>
-            <button class="coach-tab" type="button" data-coach-panel="photoPanel" aria-selected="false">照片</button>
             <button class="coach-tab" type="button" data-coach-panel="bookingsPanel" aria-selected="false">预约管理</button>
             <button class="coach-tab" type="button" data-coach-panel="availabilityPanel" aria-selected="false">开放时间</button>
           </div>
 
           <div class="coach-layout">
             <form id="coachProfileForm" class="profile-panel coach-panel active" data-coach-content="profilePanel">
-              <div class="current-coach-card compact-profile-card">
-                <div class="mini-avatar">MC</div>
-                <div>
-                  <strong>Maya Chen</strong>
-                  <span>花样滑冰教练</span>
+              <section class="photo-panel profile-photo-panel" aria-label="个人资料">
+                <div class="panel-heading">
+                  <div>
+                    <h3>个人资料</h3>
+                  </div>
                 </div>
-                <a class="ghost-button compact-edit-link" href="#photoPanel">编辑公开资料</a>
-              </div>
+                <div class="profile-personal-layout">
+                  <div class="profile-identity-row">
+                    <div class="profile-avatar-action">
+                      <button id="openCoachPhotoDialog" class="avatar-change-button" type="button" aria-label="更换头像" title="更换头像">
+                        <span id="coachPhotoPreview" class="avatar-preview" aria-label="教练头像">MC</span>
+                        <span class="avatar-camera-badge" aria-hidden="true">
+                          <svg viewBox="0 0 24 24" focusable="false">
+                            <path d="M8.6 5.5 10 3.8h4l1.4 1.7H18a3 3 0 0 1 3 3v8a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3v-8a3 3 0 0 1 3-3h2.6ZM12 16.8a4.3 4.3 0 1 0 0-8.6 4.3 4.3 0 0 0 0 8.6Zm0-2a2.3 2.3 0 1 1 0-4.6 2.3 2.3 0 0 1 0 4.6Z" />
+                          </svg>
+                        </span>
+                      </button>
+                    </div>
+                    <div class="profile-identity-copy">
+                      <strong>Maya Chen</strong>
+                    </div>
+                  </div>
+                  <div class="profile-editor-fields">
+                    <label class="profile-field" for="coachBio">
+                      <span class="profile-field-title">个人介绍</span>
+                      <textarea id="coachBio" rows="4" placeholder="简单介绍你的教学经历和方式"></textarea>
+                    </label>
+                    <fieldset class="profile-specialties-field">
+                      <legend>教学专长（选填，可多选）</legend>
+                      <div class="coach-specialty-group" role="group" aria-label="教学专长选项">
+                        <div id="coachSpecialtyOptions" class="coach-specialty-options"></div>
+                        <div id="coachCustomSpecialties" class="coach-custom-specialties" aria-label="其他教学专长"></div>
+                        <button id="toggleCustomSpecialty" class="specialty-add-trigger" type="button" aria-expanded="false" aria-controls="customSpecialtyEditor">＋ 添加专长</button>
+                        <div id="customSpecialtyEditor" class="custom-specialty-editor" hidden>
+                          <label class="visually-hidden" for="customSpecialtyInput">其他专长</label>
+                          <div class="custom-specialty-entry">
+                            <input id="customSpecialtyInput" type="text" maxlength="30" placeholder="例如：成人零基础" />
+                            <button id="addCustomSpecialty" class="specialty-editor-action specialty-editor-add" type="button">添加</button>
+                            <button id="cancelCustomSpecialty" class="specialty-editor-action" type="button">取消</button>
+                          </div>
+                          <p id="customSpecialtyMessage" class="field-hint" aria-live="polite"></p>
+                        </div>
+                      </div>
+                    </fieldset>
+                  </div>
+                </div>
+              </section>
 
               <section class="teaching-location-panel" aria-label="授课地点">
-                <h4>授课地点</h4>
+                <div class="panel-heading">
+                  <h3>授课地点</h3>
+                </div>
                 <div class="teaching-location-grid">
-                  <label class="profile-field profile-field-rinks">
-                    可授课冰场
+                  <div class="profile-field profile-field-rinks">
+                    <span class="profile-field-title">可授课冰场</span>
                     <div id="servedRinks" class="checkbox-stack">
-                      <label><input type="checkbox" name="servedRinks" value="Polar Ice Rink" checked /> Polar Ice Rink</label>
                       <label><input type="checkbox" name="servedRinks" value="Arcadia Ice Arena" /> Arcadia Ice Arena</label>
                       <label><input type="checkbox" name="servedRinks" value="Oceanside Ice Arena" /> Oceanside Ice Arena</label>
+                      <label><input type="checkbox" name="servedRinks" value="Polar Ice Rink" checked /> Polar Ice Rink</label>
                     </div>
-                  </label>
+                  </div>
                   <div class="profile-field profile-field-travel">
-                    <label>
-                      其他冰场预约
+                    <div class="profile-field profile-travel-control">
+                      <label class="profile-field-title" for="travelsToOtherRinks">接受在其他冰场授课</label>
                       <select id="travelsToOtherRinks">
                         <option value="no">不接受</option>
-                        <option value="yes">接受，需额外收费</option>
+                        <option value="negotiable">可协商</option>
                       </select>
-                    </label>
-                    <label id="travelFeeLabel" class="profile-field profile-field-fee is-hidden">
-                      额外出行费
-                      <span class="money-input">
-                        <span>$</span>
-                        <input id="travelFee" type="number" min="0" step="5" placeholder="25" />
-                        <span>/ booking</span>
-                      </span>
+                    </div>
+                    <label id="travelConditionsLabel" class="profile-field profile-field-conditions is-hidden" for="travelConditions">
+                      授课条件说明（选填）
+                      <textarea id="travelConditions" rows="3" maxlength="200" placeholder="例如：可前往的范围、交通安排或额外费用需另议"></textarea>
                     </label>
                   </div>
                 </div>
@@ -95,77 +132,53 @@
 
               <section class="lesson-rate-panel" aria-label="Private lesson rates">
                 <div class="panel-heading">
-                  <div>
-                    <p class="eyebrow">私教课程</p>
-                    <h3>课程时长和价格</h3>
-                  </div>
+                  <h3>课程时长和价格</h3>
                 </div>
                 <div class="lesson-rate-layout">
                   <div class="rate-summary-card">
-                    <label class="profile-field profile-field-rate">
-                      基础时薪
-                      <span class="field-hint">用于自动计算新课程价格，不会覆盖你已经修改的课程。</span>
+                    <div class="profile-field profile-field-rate">
+                      <div class="rate-label-copy">
+                        <label for="coachRate">基础价格</label>
+                      </div>
                       <span class="money-input">
                         <span>$</span>
-                        <input id="coachRate" type="number" min="0" step="5" placeholder="120" />
-                        <span>/小时</span>
+                        <input id="coachRate" type="number" min="1" step="1" placeholder="60" />
+                        <span>/30分钟</span>
                       </span>
-                    </label>
+                    </div>
                   </div>
                   <div class="lesson-options-area">
-                    <p class="default-note">不同课程时长可以独立定价；新增课程会参考基础时薪自动填入价格。</p>
                     <div id="lessonOptionsList" class="lesson-options-list"></div>
                     <div class="lesson-add-card">
                       <p class="lesson-add-title">添加课程选项</p>
                       <div class="lesson-option-form">
                         <label>
-                          名称
+                          课程名称
                           <input id="lessonName" type="text" placeholder="例如：45 分钟私教" />
                         </label>
                         <label>
-                          分钟
+                          时长（分钟）
                           <input id="lessonDuration" type="number" min="15" step="15" placeholder="例如：45" />
                         </label>
                         <label>
-                          价格
-                          <input id="lessonPrice" type="number" min="0" step="5" placeholder="例如：90" />
+                          价格（美元）
+                          <input id="lessonPrice" type="number" min="0" step="0.01" placeholder="例如：90" />
                         </label>
-                        <button id="addLessonOption" class="ghost-button" type="button">添加</button>
+                        <div class="lesson-option-action">
+                          <span>操作</span>
+                          <button id="addLessonOption" class="ghost-button" type="button">添加</button>
+                        </div>
                       </div>
                     </div>
                   </div>
                 </div>
               </section>
 
-              <button id="saveProfileChanges" class="primary-button profile-save-button" type="submit">保存更改</button>
-              <p id="profileMessage" class="form-message" role="status"></p>
+              <div id="profileFeedback" class="profile-feedback" role="status" aria-live="polite">
+                <span id="profileMessage" class="form-message"></span>
+                <button id="undoProfileChange" class="profile-undo-button" type="button" hidden>撤销</button>
+              </div>
             </form>
-
-            <section id="photoPanel" class="photo-panel coach-panel" data-coach-content="photoPanel">
-              <div class="panel-heading">
-                <div>
-                  <p class="eyebrow">Coach photo</p>
-                  <h3>头像和展示图</h3>
-                </div>
-              </div>
-              <div class="photo-layout">
-                <div class="photo-preview" aria-label="Coach photo preview">
-                  <div id="coachPhotoPreview" class="avatar-preview">MC</div>
-                </div>
-                <form id="coachPhotoForm" class="photo-form">
-                  <label>
-                    上传本地照片
-                    <input id="coachPhotoFile" type="file" accept="image/*" />
-                  </label>
-                  <label>
-                    或使用照片 URL
-                    <input id="coachPhotoUrl" type="url" placeholder="https://example.com/photo.jpg" />
-                  </label>
-                  <button class="primary-button" type="submit">保存照片</button>
-                  <p id="photoMessage" class="form-message" role="status"></p>
-                </form>
-              </div>
-            </section>
 
             <section class="availability-panel coach-panel" data-coach-content="availabilityPanel">
               <div class="panel-heading">
@@ -404,6 +417,28 @@ Oceanside Ice Arena → Polar Ice Rink: 40</textarea>
             </section>
           </div>
         </section>
+        </div>
+      </section>
+    </main>
+
+    <dialog id="coachPhotoDialog" class="booking-dialog coach-photo-dialog" aria-labelledby="coachPhotoDialogTitle">
+      <form id="coachPhotoDialogForm" method="dialog">
+        <div class="dialog-heading">
+          <h3 id="coachPhotoDialogTitle">更换头像</h3>
+          <button id="closeCoachPhotoDialog" class="icon-button" type="button" aria-label="关闭">×</button>
+        </div>
+        <div id="coachPhotoDialogPreview" class="avatar-preview coach-photo-dialog-preview" aria-label="照片预览">MC</div>
+        <div class="coach-photo-dialog-controls">
+          <button id="chooseCoachPhoto" class="ghost-button" type="button">选择照片</button>
+          <input id="coachPhotoFile" type="file" accept="image/*" hidden />
+          <p id="photoMessage" class="form-message" role="status" aria-live="polite"></p>
+        </div>
+        <div class="dialog-actions">
+          <button id="cancelCoachPhotoDialog" class="ghost-button" type="button">取消</button>
+          <button id="confirmCoachPhoto" class="primary-button" type="button" disabled>确定</button>
+        </div>
+      </form>
+    </dialog>
 
     <dialog id="bookingDetailsDialog" class="booking-dialog">
       <form method="dialog">

@@ -165,6 +165,10 @@ async function testCoachPage() {
   assertNoRuntimeErrors("coach/index.html", errors);
   assert(document.querySelector(".view.active")?.id === "coachView", "Coach page did not open on the coach view.");
   assert(document.querySelector('.role-page-nav a[href="../index.html"]')?.textContent.includes("返回首页"), "Coach page home navigation is missing.");
+  assert(document.querySelector("#coachHeading")?.textContent === "教练工作台", "Coach workspace title did not use the page-wide meaning.");
+  assert(!document.body.textContent.includes("更新学生在预约页面看到的信息"), "The profile-only subtitle remained on the coach workspace.");
+  const workspaceContainer = document.querySelector(".coach-workspace-container");
+  assert(workspaceContainer?.contains(document.querySelector(".coach-page-nav")) && workspaceContainer.contains(document.querySelector("#coachView")), "Coach navigation and panels must share one content container.");
 
   document.querySelector('[data-coach-panel="bookingsPanel"]').click();
   assert(
@@ -205,15 +209,23 @@ async function testPublicCoachProfile() {
     assert(document.querySelector("#coachName").textContent === name, "Public profile displayed the wrong coach.");
     assert(document.querySelectorAll("#publicLessons li").length === lessonCount, "Profile courses do not match existing data.");
     assert(document.querySelector("#dataNote").textContent.includes("示例资料"), "Default data must be labelled as sample data.");
-    assert(!document.querySelector("#portraitFallback").hidden, "Missing coach photo must show an honest placeholder.");
+    assert(document.querySelector("#aboutCoach").hidden && document.querySelector("#teachingSpecialties").hidden, "Empty demo biography or specialties must not leave public placeholders.");
+    assert(document.querySelector("#heroSpecialties").hidden, "Empty demo specialties must not leave an empty hero group.");
+    assert(!document.querySelector("#travelNote").textContent.includes("暂未提供"), "Empty travel conditions left a public placeholder.");
+    const photoSource = document.querySelector("#coachPhoto").getAttribute("src") || "";
+    assert(photoSource.includes(`/assets/coaches/${id === "maya" ? "maya-chen" : id === "alex" ? "alex-rivera" : "sam-patel"}.jpg`), "Default coach profile did not load its demo portrait.");
     const bookingUrl = new URL(document.querySelector("#bookCoach").href);
     assert(bookingUrl.searchParams.get("coach") === id, "Booking link lost the coach selection.");
     assert(!bookingUrl.searchParams.has("access"), "Public profile must not grant full booking access.");
     dom.window.close();
   }
   const savedProfile = { maya: {
-    bio: '<img src=x onerror="alert(1)">Saved introduction',
+    bio: '<img src=x onerror="alert(1)">Saved introduction\nSecond line',
+    specialties: ["edges", "jumps", "unknown"],
+    customSpecialties: ["成人零基础", '<img src=x onerror="alert(2)">'],
     servedRinks: ["Arcadia Ice Arena"],
+    travelsToOtherRinks: true,
+    travelConditions: "限市区范围，交通费用另议。",
     lessonOptions: [{ id: "lesson-30", name: "Custom lesson", duration: 30, price: 77 }, { id: "lesson-45", duration: 45, price: null }, { id: "lesson-60", duration: 60, price: 0 }],
     photoUrl: "javascript:alert(1)",
   } };
@@ -224,6 +236,10 @@ async function testPublicCoachProfile() {
   assert(savedDocument.querySelector("#publicLessons").textContent.includes("价格待提供"), "Missing price was fabricated.");
   assert(savedDocument.querySelectorAll("#coachRinks li").length === 1, "Saved teaching rinks were not used.");
   assert(savedDocument.querySelector("#coachBio").textContent === savedProfile.maya.bio && !savedDocument.querySelector("#coachBio img"), "Profile text must not execute HTML.");
+  assert(!savedDocument.querySelector("#aboutCoach").hidden && !savedDocument.querySelector("#teachingSpecialties").hidden, "Saved biography and specialties were hidden from the public profile.");
+  assert(savedDocument.querySelectorAll("#coachSpecialties span").length === 4 && savedDocument.querySelector("#coachSpecialties").textContent.includes("Edges") && savedDocument.querySelector("#coachSpecialties").textContent.includes("成人零基础"), "Saved preset and custom specialties were not normalized and rendered together.");
+  assert(!savedDocument.querySelector("#coachSpecialties img"), "Custom specialty text executed as HTML on the public profile.");
+  assert(savedDocument.querySelector("#travelNote").textContent === "其他冰场授课：可协商。 限市区范围，交通费用另议。", "Public profile did not show the negotiable travel setting and condition text.");
   assert(!savedDocument.querySelector("#coachPhoto").hasAttribute("src"), "Unsafe photo URL must be rejected.");
   saved.dom.window.close();
   const missing = await loadPage("coach/profile.html?coach=unknown");
@@ -363,7 +379,133 @@ async function testCoachProfileDraftAndSave() {
   const rinkInput = [...doc.querySelectorAll('input[name="servedRinks"]')].find((input) => input.value !== originalProfile.homeRink);
 
   assertNoRuntimeErrors("coach profile draft setup", errors);
+  assert(doc.querySelectorAll("#saveProfileChanges").length === 1, "Coach profile must have exactly one save button.");
+  assert(doc.querySelector(".coach-action-bar .header-actions #saveProfileChanges")?.getAttribute("form") === "coachProfileForm", "The sticky header save button must submit the full profile form.");
+  assert(doc.querySelectorAll(".coach-action-bar").length === 1 && doc.querySelector("#profileSaveStatus").textContent.trim() === "已保存", "The coach page must expose one initialized sticky action bar.");
+  assert(doc.querySelector("#previewCoachProfile").target === "_blank" && doc.querySelector("#previewCoachProfile").getAttribute("aria-describedby") === "profilePreviewNote", "Profile preview must preserve the draft tab and describe saved-content behavior.");
+  assert(!doc.querySelector('[data-coach-panel="photoPanel"]') && !doc.querySelector("#coachPhotoForm"), "Photo editing must not remain as a second profile editor.");
+  assert(!doc.querySelector("#coachProfileForm").contains(doc.querySelector("#coachPhotoFile")), "Photo controls must not remain as an always-visible profile form.");
+  assert(doc.querySelector("#coachPhotoDialog").contains(doc.querySelector("#coachPhotoFile")), "Photo upload must be contained in the avatar dialog.");
+  assert(!doc.body.textContent.includes("编辑公开资料"), "The ambiguous public-profile edit entry was not removed.");
+  const profileSections = [...doc.querySelectorAll("#coachProfileForm > section")];
+  assert(profileSections[0].classList.contains("profile-photo-panel"), "Personal details must be the first profile section.");
+  assert(profileSections[1].classList.contains("teaching-location-panel"), "Teaching locations must follow personal details and photos.");
+  assert(profileSections[2].classList.contains("lesson-rate-panel"), "Lesson rates must be the last profile section.");
+  assert(profileSections.map((section) => section.querySelector(":scope > .panel-heading h3")?.textContent.trim()).join("|") === "个人资料|授课地点|课程时长和价格", "Profile section titles must share the same heading structure.");
+  assert(doc.querySelector(".profile-personal-layout > .profile-identity-row") && doc.querySelector(".profile-personal-layout > .profile-editor-fields"), "Personal details must place the compact identity row above the editor fields.");
+  assert(!doc.querySelector("#coachCity") && !doc.querySelector(".profile-city-field"), "The removed city field is still present in the profile editor.");
+  assert(!doc.querySelector("#coachBioHint") && !doc.querySelector("#coachBio").hasAttribute("aria-describedby"), "The biography field retained redundant secondary guidance.");
+  assert(doc.querySelector(".profile-specialties-field legend").textContent.trim() === "教学专长（选填，可多选）", "The specialty label does not explain its optional multi-select behavior.");
+  assert(!doc.querySelector(".profile-specialties-field").textContent.includes("用刀"), "The edge specialty contains the incorrect blade wording.");
+  const locationSections = [...doc.querySelector(".teaching-location-grid").children];
+  assert(locationSections[0].classList.contains("profile-field-rinks") && locationSections[1].classList.contains("profile-field-travel"), "Other-rink settings must follow the served-rink list.");
+  assert([...doc.querySelectorAll('input[name="servedRinks"]')].map((input) => input.value).join("|") === "Arcadia Ice Arena|Oceanside Ice Arena|Polar Ice Rink", "Teaching rinks must remain in A-Z display order.");
+  assert(doc.querySelector('label[for="travelsToOtherRinks"]').textContent.trim() === "接受在其他冰场授课" && !doc.querySelector("#otherRinksHint"), "Other-rink teaching control retained redundant guidance.");
+  assert([...doc.querySelector("#travelsToOtherRinks").options].map((option) => option.textContent.trim()).join("|") === "不接受|可协商", "Other-rink willingness is still coupled to an automatic fee choice.");
+  assert(doc.querySelector("#travelConditionsLabel").classList.contains("is-hidden") && !doc.querySelector("#travelFee"), "Travel conditions should be optional and hidden until negotiation is selected.");
+  assert(!doc.querySelector(".profile-field-rate .field-hint") && !doc.querySelector("#rateCalculationHelp"), "The base-price control retained redundant explanatory copy.");
+  assert(!doc.querySelector(".lesson-options-area > .default-note"), "The duplicate always-visible price formula was not removed.");
+  assert(doc.querySelectorAll("#coachProfileForm .avatar-preview").length === 1 && !doc.querySelector("#coachProfileForm .mini-avatar"), "The profile layout must not duplicate the coach avatar.");
+  assert(doc.querySelector(".profile-photo-panel .profile-identity-copy")?.textContent.includes("Maya Chen"), "Coach identity must stay grouped with the profile photo.");
+  assert(!doc.querySelector(".profile-photo-panel").textContent.includes("花样滑冰教练"), "The undifferentiated fixed coach title was not removed from personal details.");
+  assert(doc.querySelector("#coachBio") && doc.querySelectorAll('#coachSpecialtyOptions input[name="coachSpecialties"]').length === 5, "Biography or shared specialty controls are missing.");
+  assert(doc.querySelector("#customSpecialtyInput").maxLength === 30 && doc.querySelector("#toggleCustomSpecialty").getAttribute("aria-controls") === "customSpecialtyEditor", "Custom specialty controls or length limit are missing.");
+  assert([...doc.querySelectorAll(".lesson-option-header span")].map((node) => node.textContent.trim()).join("|") === "课程名称|时长（分钟）|价格（美元）|操作", "Existing lesson columns do not use the required labels.");
+  assert([...doc.querySelectorAll(".lesson-option-form > label, .lesson-option-form > .lesson-option-action > span")].map((node) => node.childNodes[0].textContent.trim()).join("|") === "课程名称|时长（分钟）|价格（美元）|操作", "New lesson fields do not share the existing lesson column labels.");
+  assert(!doc.querySelector(".profile-photo-panel .current-coach-card") && !doc.querySelector(".profile-photo-panel .eyebrow"), "The personal profile card retained duplicate nested card or heading chrome.");
+  assert(!doc.querySelector(".profile-photo-panel").textContent.includes("展示照片"), "The always-visible photo editor heading was not removed.");
+  assert(doc.querySelector("#coachPhotoPreview").style.backgroundImage.includes("/assets/coaches/maya-chen.jpg"), "The coach editor did not load Maya's demo portrait.");
+  assert(doc.querySelectorAll("#openCoachPhotoDialog").length === 1 && !doc.querySelector("#openCoachPhotoDialogText"), "The duplicate change-avatar text action was not removed.");
+  assert(doc.querySelector("#openCoachPhotoDialog").getAttribute("aria-label") === "更换头像" && doc.querySelector("#openCoachPhotoDialog").title === "更换头像", "The avatar button is missing its accessible name or hover hint.");
+  assert(!doc.querySelector("#coachPhotoUrl") && !doc.body.textContent.includes("使用图片链接"), "The removed image-link editor is still present.");
+
+  const photoDialog = doc.querySelector("#coachPhotoDialog");
+  const originalPhotoUrl = originalProfile.photoUrl;
+  const uploadedPhotoUrl = "data:image/jpeg;base64,dGVzdC1waG90bw==";
+  const NativeImage = win.Image;
+  const nativeGetContext = win.HTMLCanvasElement.prototype.getContext;
+  const nativeToDataUrl = win.HTMLCanvasElement.prototype.toDataURL;
+  win.Image = class TestImage {
+    constructor() {
+      this.listeners = {};
+      this.width = 640;
+      this.height = 480;
+    }
+    addEventListener(type, listener) {
+      this.listeners[type] = listener;
+    }
+    set src(value) {
+      this.value = value;
+      this.listeners.load?.();
+    }
+  };
+  win.HTMLCanvasElement.prototype.getContext = () => ({ drawImage() {} });
+  win.HTMLCanvasElement.prototype.toDataURL = () => uploadedPhotoUrl;
+  const photoFileInput = doc.querySelector("#coachPhotoFile");
+  async function selectPhoto(fileName = "coach.png", type = "image/png") {
+    Object.defineProperty(photoFileInput, "files", {
+      configurable: true,
+      value: [new win.File(["photo"], fileName, { type })],
+    });
+    photoFileInput.dispatchEvent(new win.Event("change", { bubbles: true }));
+    assert(doc.querySelector("#confirmCoachPhoto").disabled, "Photo confirmation was enabled while the image was processing.");
+    assert(doc.querySelector("#chooseCoachPhoto").disabled && doc.querySelector("#chooseCoachPhoto").textContent === "处理中…", "The file action did not expose its processing state.");
+    await new Promise((resolve) => setTimeout(resolve, 20));
+  }
+
+  doc.querySelector("#openCoachPhotoDialog").click();
+  assert(photoDialog.open, "The change-avatar text action did not open the photo dialog.");
+  assert(doc.activeElement === doc.querySelector("#chooseCoachPhoto"), "Opening the photo dialog did not move focus to its primary control.");
+  assert(doc.querySelector("#confirmCoachPhoto").disabled, "The photo dialog allowed confirmation before a valid photo was selected.");
+  assert(doc.querySelector("#confirmCoachPhoto").textContent === "确定" && doc.querySelector("#chooseCoachPhoto").textContent === "选择照片", "The compact photo dialog actions have incorrect initial labels.");
+  await selectPhoto("not-an-image.txt", "text/plain");
+  assert(doc.querySelector("#confirmCoachPhoto").disabled && doc.querySelector("#photoMessage").textContent.includes("图片文件"), "An invalid photo format did not keep confirmation disabled or show an error.");
+  await selectPhoto();
+  assert(!doc.querySelector("#confirmCoachPhoto").disabled, "A valid uploaded photo did not enable confirmation.");
+  assert(doc.querySelector("#chooseCoachPhoto").textContent === "重新选择", "The file action did not change to reselect after a valid upload.");
+  assert(doc.querySelector("#photoMessage").textContent === "", "A successful photo selection left an unnecessary persistent message.");
+  assert(doc.querySelector("#coachPhotoDialogPreview").style.backgroundImage.includes("data:image/jpeg"), "The uploaded photo was not previewed.");
+  doc.querySelector("#cancelCoachPhotoDialog").click();
+  assert(!photoDialog.open, "Cancel did not close the photo dialog.");
+  assert(win.getProfile("maya").photoUrl === originalPhotoUrl, "Cancel changed the profile photo draft.");
+  assert(doc.activeElement === doc.querySelector("#openCoachPhotoDialog"), "Closing the photo dialog did not restore focus to its opener.");
+
+  doc.querySelector("#openCoachPhotoDialog").click();
+  await selectPhoto("escaped.png");
+  photoDialog.dispatchEvent(new win.Event("cancel", { cancelable: true }));
+  photoDialog.close();
+  assert(win.getProfile("maya").photoUrl === originalPhotoUrl, "Esc cancellation changed the profile photo draft.");
+  doc.querySelector("#openCoachPhotoDialog").click();
+  assert(doc.querySelector("#confirmCoachPhoto").disabled, "Reopening the photo dialog retained an unconfirmed candidate.");
+  assert(doc.querySelector("#chooseCoachPhoto").textContent === "选择照片", "Reopening the photo dialog retained the reselect label.");
+  doc.querySelector("#closeCoachPhotoDialog").click();
+
+  doc.querySelector("#openCoachPhotoDialog").click();
+  await selectPhoto("confirmed.png");
+  doc.querySelector("#confirmCoachPhoto").click();
+  assert(win.getProfile("maya").photoUrl.startsWith("data:image/jpeg"), "Confirming an uploaded photo did not update the profile draft.");
+  assert(win.getSavedProfile("maya").photoUrl === originalPhotoUrl, "Confirming an uploaded photo persisted it before the unified page save.");
+  doc.querySelector('[data-coach-panel="bookingsPanel"]').click();
+  doc.querySelector('[data-coach-panel="profilePanel"]').click();
+  assert(win.getProfile("maya").photoUrl === originalPhotoUrl, "Discarding an uploaded photo draft changed the saved profile.");
+  assert(doc.querySelector("#coachRate").value === "60", "Maya's default base price must be $60 per 30 minutes.");
+  assert(doc.querySelector("#coachRate").min === "1" && doc.querySelector("#coachRate").step === "1", "Base price input must accept positive integers in increments of one.");
+  assert(doc.querySelector("#coachRate").closest(".money-input").textContent.includes("/30分钟"), "Base price unit must be 30 minutes.");
   win.confirm = () => true;
+  doc.querySelector("#coachBio").value = "这段介绍应被放弃。";
+  doc.querySelector("#coachBio").dispatchEvent(new win.Event("input", { bubbles: true }));
+  assert(doc.querySelector("#profileSaveStatus").textContent.trim() === "有未保存的更改" && !doc.querySelector("#profilePreviewNote").hidden, "Editing the profile did not update the sticky unsaved state or preview note.");
+  const beforeUnload = new win.Event("beforeunload", { cancelable: true });
+  win.dispatchEvent(beforeUnload);
+  assert(beforeUnload.defaultPrevented, "Leaving with an unsaved profile did not trigger the beforeunload guard.");
+  const discardedSpecialty = doc.querySelector('#coachSpecialtyOptions input[value="spins"]');
+  discardedSpecialty.closest("label").click();
+  assert(discardedSpecialty.checked, "Clicking the full specialty option label did not toggle its checkbox.");
+  assert(win.getProfile("maya").bio && win.getProfile("maya").specialties.includes("spins"), "Biography or specialty edits did not enter the profile draft.");
+  assert(!win.getSavedProfile("maya").bio && !win.getSavedProfile("maya").specialties.length, "Personal detail edits mutated saved data before submit.");
+  doc.querySelector('[data-coach-panel="bookingsPanel"]').click();
+  doc.querySelector('[data-coach-panel="profilePanel"]').click();
+  assert(doc.querySelector("#coachBio").value === "" && !doc.querySelector('#coachSpecialtyOptions input[value="spins"]').checked, "Discarding profile edits did not restore biography and specialties.");
   rinkInput.checked = false;
   rinkInput.dispatchEvent(new win.Event("change", { bubbles: true }));
   assert(win.hasUnsavedProfileChanges, "Editing teaching rinks did not mark the profile draft as unsaved.");
@@ -373,14 +515,192 @@ async function testCoachProfileDraftAndSave() {
   assert(JSON.stringify(win.getProfile("maya")) === JSON.stringify(originalProfile), "Discarding profile edits changed saved profile data.");
 
   doc.querySelector('[data-coach-panel="profilePanel"]').click();
+  const rinkInputs = [...doc.querySelectorAll('input[name="servedRinks"]')];
+  rinkInputs.forEach((input) => { input.checked = false; });
+  doc.querySelector("#saveProfileChanges").click();
+  assert(doc.querySelector("#profileMessage").textContent.includes("至少选择一个"), "The unified save lost the teaching-rink validation.");
+  assert(JSON.stringify(win.getSavedProfile("maya")) === JSON.stringify(originalProfile), "Invalid profile data was saved.");
+  rinkInputs.forEach((input) => { input.checked = originalProfile.servedRinks.includes(input.value); });
+  doc.querySelector("#coachRate").value = "47.5";
+  submit(doc.querySelector("#coachProfileForm"));
+  assert(doc.querySelector("#profileMessage").textContent.includes("整数"), "Base price validation accepted a decimal value.");
+  assert(JSON.stringify(win.getSavedProfile("maya")) === JSON.stringify(originalProfile), "Invalid base price changed saved profile data.");
+
+  doc.querySelector("#coachRate").value = "55";
+  doc.querySelector("#coachRate").dispatchEvent(new win.Event("input", { bubbles: true }));
+  doc.querySelector("#lessonDuration").value = "45";
+  doc.querySelector("#lessonDuration").dispatchEvent(new win.Event("input", { bubbles: true }));
+  assert(doc.querySelector("#lessonPrice").value === "82", "New lesson price did not discard the fractional result of 55 × 45 ÷ 30.");
+  doc.querySelector("#lessonPrice").value = "82.75";
+  doc.querySelector("#lessonPrice").dispatchEvent(new win.Event("input", { bubbles: true }));
+  doc.querySelector("#coachRate").value = "56";
+  doc.querySelector("#coachRate").dispatchEvent(new win.Event("input", { bubbles: true }));
+  assert(doc.querySelector("#lessonPrice").value === "82.75", "Changing the base price overwrote a manually edited lesson price.");
+  doc.querySelector("#lessonName").value = "45 分钟测试课";
+  doc.querySelector("#addLessonOption").click();
+  assert(win.getProfile("maya").lessonOptions.some((lesson) => lesson.name === "45 分钟测试课" && lesson.price === 82.75), "A manually edited lesson price was not retained.");
+  assert(doc.querySelector("#coachRate").value === "56", "Adding a lesson reset the unsaved base price.");
+
   const newRate = Number(originalProfile.rate) + 5;
+  const newPhotoUrl = uploadedPhotoUrl;
+  const savedBio = "多年冰上训练经验。\n注重基础滑行，并根据学生目标调整练习。";
   doc.querySelector("#coachRate").value = String(newRate);
   doc.querySelector("#coachRate").dispatchEvent(new win.Event("input", { bubbles: true }));
-  submit(doc.querySelector("#coachProfileForm"));
+  doc.querySelector("#coachBio").value = savedBio;
+  doc.querySelector("#coachBio").dispatchEvent(new win.Event("input", { bubbles: true }));
+  for (const specialtyId of ["edges", "footwork"]) {
+    const input = doc.querySelector(`#coachSpecialtyOptions input[value="${specialtyId}"]`);
+    input.checked = true;
+    input.dispatchEvent(new win.Event("change", { bubbles: true }));
+  }
+  doc.querySelector("#toggleCustomSpecialty").click();
+  assert(!doc.querySelector("#customSpecialtyEditor").hidden && doc.querySelector("#toggleCustomSpecialty").getAttribute("aria-expanded") === "true", "Custom specialty editor did not expand.");
+  doc.querySelector("#customSpecialtyInput").value = "  成人零基础  ";
+  doc.querySelector("#addCustomSpecialty").click();
+  assert(win.getProfile("maya").customSpecialties.join("|") === "成人零基础" && doc.querySelector("#coachCustomSpecialties").textContent.includes("成人零基础"), "Custom specialty was not trimmed and added to the profile draft.");
+  doc.querySelector("#customSpecialtyInput").value = "成人零基础";
+  doc.querySelector("#addCustomSpecialty").click();
+  assert(win.getProfile("maya").customSpecialties.length === 1 && doc.querySelector("#customSpecialtyMessage").textContent.includes("已存在"), "Duplicate custom specialty was accepted.");
+  doc.querySelector("#customSpecialtyInput").value = "冰舞";
+  doc.querySelector("#addCustomSpecialty").click();
+  doc.querySelector('[data-action="remove-custom-specialty"][data-specialty="冰舞"]').click();
+  assert(!win.getProfile("maya").customSpecialties.includes("冰舞"), "Custom specialty tag could not be removed.");
+  doc.querySelector("#travelsToOtherRinks").value = "negotiable";
+  doc.querySelector("#travelsToOtherRinks").dispatchEvent(new win.Event("change", { bubbles: true }));
+  assert(!doc.querySelector("#travelConditionsLabel").classList.contains("is-hidden"), "Negotiable travel selection did not reveal the optional conditions field.");
+  doc.querySelector("#travelConditions").value = "限市区范围，交通费用另议。";
+  doc.querySelector("#travelConditions").dispatchEvent(new win.Event("input", { bubbles: true }));
+  assert(win.getProfile("maya").travelsToOtherRinks && win.getProfile("maya").travelConditions.includes("交通费用"), "Travel preference or conditions did not enter the profile draft.");
+  doc.querySelector("#openCoachPhotoDialog").click();
+  await selectPhoto("saved.png");
+  doc.querySelector("#confirmCoachPhoto").click();
+  assert(win.getProfile("maya").photoUrl === newPhotoUrl, "Confirming the photo did not update the profile draft.");
+  assert(win.getSavedProfile("maya").photoUrl === originalPhotoUrl, "Confirming the photo persisted it before the unified page save.");
+  assert(doc.querySelector("#saveProfileChanges").classList.contains("has-unsaved"), "The header save button did not show the unsaved state.");
+  doc.querySelector("#saveProfileChanges").click();
   assert(win.getProfile("maya").rate === newRate, "Saving the profile did not update the coach rate.");
+  assert(win.getProfile("maya").basePriceUnitMinutes === 30, "Saving the profile lost the 30-minute pricing marker.");
+  assert(win.getProfile("maya").photoUrl === newPhotoUrl, "The unified profile save did not update the coach photo.");
+  assert(win.getProfile("maya").bio === savedBio && JSON.stringify(win.getProfile("maya").specialties) === JSON.stringify(["edges", "footwork"]), "The unified profile save did not retain biography and preset specialties.");
+  assert(JSON.stringify(win.getProfile("maya").customSpecialties) === JSON.stringify(["成人零基础"]), "The unified profile save did not retain custom specialties.");
+  assert(win.getProfile("maya").travelsToOtherRinks && win.getProfile("maya").travelConditions === "限市区范围，交通费用另议。", "The unified profile save did not retain negotiable travel conditions.");
   assert(!win.hasUnsavedProfileChanges, "Saving the profile did not clear the dirty state.");
+  assert(doc.querySelector("#profileMessage").textContent.trim() === "已保存" && doc.querySelector("#profileSaveStatus").textContent.trim() === "已保存", "The unified profile save did not show success feedback in both status locations.");
+  assert(!doc.querySelector("#saveProfileChanges").disabled && !doc.querySelector("#saveProfileChanges").hasAttribute("aria-busy"), "The profile save action remained busy after completion.");
   assert(JSON.parse(win.localStorage.getItem("ice-skating-coach-profiles-v2")).maya.rate === newRate, "Saved profile data was not persisted.");
+  const savedStorage = dumpLocalStorage(win);
+  win.Image = NativeImage;
+  win.HTMLCanvasElement.prototype.getContext = nativeGetContext;
+  win.HTMLCanvasElement.prototype.toDataURL = nativeToDataUrl;
   assertNoRuntimeErrors("coach profile draft and save", errors);
+  dom.window.close();
+
+  const reloaded = await loadPage("coach/index.html", { localStorage: savedStorage });
+  assertNoRuntimeErrors("coach profile reload", reloaded.errors);
+  assert(reloaded.dom.window.getProfile("maya").rate === newRate, "Saved coach rate was lost after reload.");
+  assert(reloaded.dom.window.getProfile("maya").lessonOptions.some((lesson) => lesson.name === "45 分钟测试课" && lesson.price === 82.75), "Saved lesson price was lost or recalculated after reload.");
+  assert(reloaded.dom.window.getProfile("maya").photoUrl === newPhotoUrl, "Saved coach photo was lost after reload.");
+  assert(!reloaded.dom.window.document.querySelector("#coachCity"), "The removed city field returned after reload.");
+  assert(reloaded.dom.window.document.querySelector("#coachBio").value === savedBio, "Saved biography was lost after reload.");
+  assert([...reloaded.dom.window.document.querySelectorAll('#coachSpecialtyOptions input[name="coachSpecialties"]:checked')].map((input) => input.value).join(",") === "edges,footwork", "Saved specialties were lost after reload.");
+  assert(reloaded.dom.window.document.querySelector("#coachCustomSpecialties").textContent.includes("成人零基础"), "Saved custom specialty was lost after reload.");
+  assert(reloaded.dom.window.document.querySelector("#travelsToOtherRinks").value === "negotiable" && reloaded.dom.window.document.querySelector("#travelConditions").value === "限市区范围，交通费用另议。", "Saved travel conditions were lost after reload.");
+  assert(reloaded.dom.window.document.querySelector("#coachPhotoPreview").style.backgroundImage.includes(newPhotoUrl), "Reloaded photo data was not restored to the profile avatar.");
+  reloaded.dom.window.close();
+}
+
+async function testLegacyBasePriceMigration() {
+  const legacyProfiles = {
+    maya: { coachId: "maya", rate: 120, travelsToOtherRinks: true, travelFee: 25, lessonOptions: [{ id: "maya-custom", name: "Maya legacy", duration: 30, price: 61 }] },
+    alex: { coachId: "alex", rate: 95, lessonOptions: [{ id: "alex-custom", name: "Alex legacy", duration: 60, price: 95 }] },
+    sam: { coachId: "sam", rate: 110, lessonOptions: [{ id: "sam-custom", name: "Sam legacy", duration: 45, price: 83 }] },
+  };
+  const firstLoad = await loadPage("coach/index.html", { localStorage: { "ice-skating-coach-profiles-v2": JSON.stringify(legacyProfiles) } });
+  assertNoRuntimeErrors("legacy base price migration", firstLoad.errors);
+  assert(firstLoad.dom.window.getProfile("maya").rate === 60, "Maya's hourly rate did not migrate to a 30-minute base price.");
+  assert(firstLoad.dom.window.getProfile("alex").rate === 47, "Alex's hourly rate did not discard the fractional conversion.");
+  assert(firstLoad.dom.window.getProfile("sam").rate === 55, "Sam's hourly rate did not migrate to a 30-minute base price.");
+  assert(firstLoad.dom.window.getProfile("sam").lessonOptions.find((lesson) => lesson.id === "sam-custom").price === 83, "Migration recalculated an existing lesson price.");
+  assert(firstLoad.dom.window.getProfile("maya").travelFee === 25 && firstLoad.dom.window.getProfile("maya").travelConditions.includes("额外出行费 $25/次"), "Legacy travel fee meaning was not preserved in the negotiable conditions migration.");
+  assert(firstLoad.dom.window.document.querySelector("#travelsToOtherRinks").value === "negotiable", "Legacy other-rink acceptance did not map to negotiable.");
+  const migratedStorage = dumpLocalStorage(firstLoad.dom.window);
+  const storedProfiles = JSON.parse(migratedStorage["ice-skating-coach-profiles-v2"]);
+  assert(["maya", "alex", "sam"].every((coachId) => storedProfiles[coachId].basePriceUnitMinutes === 30), "Migration marker was not persisted.");
+  assert(storedProfiles.maya.demoPhotoVersion === 1 && storedProfiles.maya.photoUrl.endsWith("/assets/coaches/maya-chen.jpg"), "Stored demo data did not receive the default portrait migration.");
+  firstLoad.dom.window.close();
+
+  const secondLoad = await loadPage("coach/index.html", { localStorage: migratedStorage });
+  assertNoRuntimeErrors("migrated base price reload", secondLoad.errors);
+  assert(secondLoad.dom.window.getProfile("alex").rate === 47, "The migrated base price was converted a second time after reload.");
+  assert(secondLoad.dom.window.getProfile("sam").lessonOptions.find((lesson) => lesson.id === "sam-custom").price === 83, "Reload changed an existing lesson price.");
+  secondLoad.dom.window.close();
+}
+
+async function testLessonDeletionDraftAndSave() {
+  const { dom, errors } = await loadPage("coach/index.html");
+  const win = dom.window;
+  const doc = win.document;
+  const lessonName = "45 分钟私教";
+  const initialButtons = [...doc.querySelectorAll('button[data-action="remove-lesson"]')];
+
+  assert(initialButtons.length === win.getProfile("maya").lessonOptions.length, "Each lesson row must expose one delete action.");
+  assert(initialButtons.every((button) => button.querySelector("svg") && !button.textContent.trim() && button.dataset.tooltip === "删除课程"), "Lesson delete actions must render a trash icon with a visible hover/focus tooltip.");
+  assert(initialButtons.every((button) => button.getAttribute("aria-label") === `删除 ${button.closest(".lesson-option-row").querySelector(".lesson-name-input").value}`), "Lesson delete actions must include the course name in their accessible labels.");
+  const findDeleteButton = () => [...doc.querySelectorAll(".lesson-option-row")]
+    .find((row) => row.querySelector(".lesson-name-input").value === lessonName)
+    ?.querySelector('button[data-action="remove-lesson"]');
+  const savedLesson = JSON.parse(JSON.stringify(win.getSavedProfile("maya").lessonOptions.find((lesson) => lesson.name.includes("45"))));
+  const savedIndex = win.getSavedProfile("maya").lessonOptions.findIndex((lesson) => lesson.id === savedLesson.id);
+
+  findDeleteButton().click();
+  assert(!win.getProfile("maya").lessonOptions.some((lesson) => lesson.id === savedLesson.id), "Deleting a lesson did not remove it immediately from the profile draft.");
+  assert(win.getSavedProfile("maya").lessonOptions.some((lesson) => lesson.id === savedLesson.id), "Deleting a lesson persisted before the unified save.");
+  assert(doc.querySelector("#profileMessage").textContent.trim() === "已移除课程，保存后生效" && !doc.querySelector("#undoProfileChange").hidden, "Draft deletion did not expose the required pending-save feedback and undo action.");
+  assert(doc.querySelector("#profileSaveStatus").textContent.trim() === "有未保存的更改", "Draft deletion did not update the sticky unsaved state.");
+
+  doc.querySelector("#undoProfileChange").click();
+  assert(JSON.stringify(win.getProfile("maya").lessonOptions[savedIndex]) === JSON.stringify(savedLesson), "Undo did not restore the removed lesson content and original position.");
+  assert(doc.querySelector("#profileMessage").textContent.trim() === "已恢复课程" && doc.querySelector("#undoProfileChange").hidden, "Undo feedback did not replace the removal action.");
+
+  findDeleteButton().click();
+  win.confirm = () => true;
+  doc.querySelector('[data-coach-panel="bookingsPanel"]').click();
+  doc.querySelector('[data-coach-panel="profilePanel"]').click();
+  assert(win.getProfile("maya").lessonOptions.some((lesson) => lesson.id === savedLesson.id) && findDeleteButton(), "Discarding lesson deletion did not restore the saved course.");
+
+  findDeleteButton().click();
+  doc.querySelector("#saveProfileChanges").click();
+  assert(!win.getSavedProfile("maya").lessonOptions.some((lesson) => lesson.id === savedLesson.id), "Unified save did not persist lesson deletion.");
+  assert(!JSON.parse(win.localStorage.getItem("ice-skating-coach-profiles-v2")).maya.lessonOptions.some((lesson) => lesson.id === savedLesson.id), "Persisted profile storage retained the deleted lesson.");
+  const savedStorage = dumpLocalStorage(win);
+  assertNoRuntimeErrors("lesson deletion draft and save", errors);
+  dom.window.close();
+
+  const reloaded = await loadPage("coach/index.html", { localStorage: savedStorage });
+  assert(!reloaded.dom.window.getProfile("maya").lessonOptions.some((lesson) => lesson.id === savedLesson.id), "Refreshing restored a course that was formally deleted and saved.");
+  assertNoRuntimeErrors("saved lesson deletion reload", reloaded.errors);
+  reloaded.dom.window.close();
+}
+
+async function testProfileSaveFailureKeepsDraft() {
+  const { dom, errors } = await loadPage("coach/index.html");
+  const win = dom.window;
+  const doc = win.document;
+  const originalBio = win.getSavedProfile("maya").bio;
+  const nativeSetItem = win.localStorage.setItem;
+
+  doc.querySelector("#coachBio").value = "保存失败时必须保留的草稿";
+  doc.querySelector("#coachBio").dispatchEvent(new win.Event("input", { bubbles: true }));
+  win.localStorage.setItem = () => { throw new win.DOMException("Storage unavailable", "QuotaExceededError"); };
+  doc.querySelector("#saveProfileChanges").click();
+
+  assert(win.getSavedProfile("maya").bio === originalBio, "A failed save changed the saved profile.");
+  assert(win.getProfile("maya").bio === "保存失败时必须保留的草稿" && win.hasUnsavedProfileChanges, "A failed save discarded the profile draft or dirty state.");
+  assert(doc.querySelector("#profileSaveStatus").textContent.trim() === "保存失败" && doc.querySelector("#profileMessage").textContent.includes("存储"), "A failed save did not explain the storage failure.");
+  assert(!doc.querySelector("#saveProfileChanges").disabled && !doc.querySelector("#saveProfileChanges").hasAttribute("aria-busy"), "The save action remained locked after failure.");
+
+  win.localStorage.setItem = nativeSetItem;
+  assertNoRuntimeErrors("profile save failure", errors);
   dom.window.close();
 }
 
@@ -881,6 +1201,9 @@ async function main() {
   await testDesktopPageContracts();
   await testAvailabilityConflictActions();
   await testCoachProfileDraftAndSave();
+  await testLegacyBasePriceMigration();
+  await testLessonDeletionDraftAndSave();
+  await testProfileSaveFailureKeepsDraft();
   await testSafeDynamicRendering();
   await testCoachScheduleFilters();
   await testCoachScheduleWeekNavigation();

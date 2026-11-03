@@ -15,6 +15,7 @@ import {
   unavailableSelection,
 } from "./config.js";
 import { elements } from "./elements.js";
+import { coachSpecialtyOptions, normalizeCoachSpecialties, normalizeCustomCoachSpecialties } from "./domain/coach-profile.mjs";
 import {
   canFitLessonFromSlot as canFitLessonFrom,
   findSlotAt as findSlotAtIn,
@@ -55,13 +56,6 @@ function isPastStudentBooking(slot) {
 
 function slotOverlapsBlockedException(slot) {
   return overlapsBlocked(slot, state.blockedExceptions);
-}
-
-function coachOptions(includeAll = false) {
-  const options = coaches
-    .map((coach) => `<option value="${coach.id}">${coach.name} · ${coach.subject}</option>`)
-    .join("");
-  return includeAll ? `<option value="all">全部 coach</option>${options}` : options;
 }
 
 function rinkOptionsForCoach(coachId) {
@@ -178,13 +172,61 @@ function syncProfileForm() {
   ensureCoachProfileDraft();
   const profile = getProfile(currentCoachId);
   elements.coachRate.value = profile.rate;
+  elements.coachBio.value = typeof profile.bio === "string" ? profile.bio : "";
+  renderCoachSpecialtyOptions(profile.specialties);
+  renderCoachCustomSpecialties(profile.customSpecialties);
   elements.servedRinkInputs.forEach((input) => {
     input.checked = profile.servedRinks.includes(input.value);
   });
-  elements.travelsToOtherRinks.value = profile.travelsToOtherRinks ? "yes" : "no";
-  elements.travelFee.value = profile.travelFee || "";
-  elements.travelFeeLabel.classList.toggle("is-hidden", !profile.travelsToOtherRinks);
+  elements.travelsToOtherRinks.value = profile.travelsToOtherRinks ? "negotiable" : "no";
+  elements.travelConditions.value = typeof profile.travelConditions === "string" ? profile.travelConditions : "";
+  elements.travelConditionsLabel.classList.toggle("is-hidden", !profile.travelsToOtherRinks);
   renderLessonOptions();
+}
+
+export function renderCoachCustomSpecialties(selectedValues = getProfile(currentCoachId).customSpecialties) {
+  const specialties = normalizeCustomCoachSpecialties(selectedValues);
+  elements.coachCustomSpecialties.replaceChildren(...specialties.map((specialty) => {
+    const tag = document.createElement("span");
+    tag.className = "coach-specialty-tag coach-custom-specialty-tag is-selected";
+    const check = document.createElement("span");
+    check.className = "specialty-check";
+    check.setAttribute("aria-hidden", "true");
+    check.textContent = "✓";
+    const text = document.createElement("span");
+    text.textContent = specialty;
+    const remove = document.createElement("button");
+    remove.type = "button";
+    remove.dataset.action = "remove-custom-specialty";
+    remove.dataset.specialty = specialty;
+    remove.setAttribute("aria-label", `移除专长 ${specialty}`);
+    remove.title = "移除";
+    remove.textContent = "×";
+    tag.append(check, text, remove);
+    return tag;
+  }));
+  elements.coachCustomSpecialties.hidden = !specialties.length;
+}
+
+function renderCoachSpecialtyOptions(selectedValues) {
+  const selected = new Set(normalizeCoachSpecialties(selectedValues));
+  elements.coachSpecialtyOptions.replaceChildren(...coachSpecialtyOptions.map((option) => {
+    const button = document.createElement("button");
+    const isSelected = selected.has(option.id);
+    button.type = "button";
+    button.className = `coach-specialty-tag coach-specialty-preset${isSelected ? " is-selected" : ""}`;
+    button.dataset.action = "toggle-specialty";
+    button.dataset.specialtyId = option.id;
+    button.setAttribute("aria-pressed", String(isSelected));
+    const check = document.createElement("span");
+    check.className = "specialty-check";
+    check.setAttribute("aria-hidden", "true");
+    check.textContent = "✓";
+    const text = document.createElement("span");
+    text.textContent = option.label;
+    button.append(check, text);
+    return button;
+  }));
 }
 
 function renderLessonOptions() {
@@ -199,8 +241,10 @@ function renderLessonOptions() {
         <article class="lesson-option-row" data-lesson-id="${lesson.id}">
           <input class="lesson-name-input" type="text" value="${escapeAttribute(displayName)}" aria-label="课程名称" />
           <input class="lesson-duration-input" type="number" min="15" step="15" value="${lesson.duration}" aria-label="Lesson duration" />
-          <input class="lesson-price-input" type="number" min="0" step="5" value="${lesson.price}" aria-label="Lesson price" />
-          <button class="danger-button" type="button" data-action="remove-lesson" aria-label="删除课程">•••</button>
+          <input class="lesson-price-input" type="number" min="0" step="0.01" value="${lesson.price}" aria-label="Lesson price" />
+          <button class="lesson-delete-button" type="button" data-action="remove-lesson" data-tooltip="删除课程" aria-label="删除 ${escapeAttribute(displayName)}">
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M9 3h6l1 2h4v2h-1l-1 14H6L5 7H4V5h4l1-2Zm-1.86 4 .75 12h8.22l.75-12H7.14ZM10 9h2v7h-2V9Zm4 0h2v7h-2V9Z" /></svg>
+          </button>
         </article>
       `;
     })
@@ -208,64 +252,62 @@ function renderLessonOptions() {
   elements.lessonOptionsList.innerHTML = `
     <div class="lesson-option-header" aria-hidden="true">
       <span>课程名称</span>
-      <span>时长</span>
-      <span>学生支付</span>
+      <span>时长（分钟）</span>
+      <span>价格（美元）</span>
       <span>操作</span>
     </div>
     ${rows}
   `;
 }
 
-export function setCoachPhotoPreview(photoUrl) {
+function setPhotoPreview(element, photoUrl) {
   const coach = getCoach(currentCoachId);
   if (photoUrl) {
-    elements.coachPhotoPreview.textContent = "";
-    elements.coachPhotoPreview.style.backgroundImage = `url("${photoUrl}")`;
+    element.textContent = "";
+    element.style.backgroundImage = `url("${photoUrl}")`;
     return;
   }
 
-  elements.coachPhotoPreview.style.backgroundImage = "";
-  elements.coachPhotoPreview.textContent = coach.name
+  element.style.backgroundImage = "";
+  element.textContent = coach.name
     .split(" ")
     .map((part) => part[0])
     .join("")
     .slice(0, 2);
 }
 
+export function setCoachPhotoPreview(photoUrl) {
+  setPhotoPreview(elements.coachPhotoPreview, photoUrl);
+}
+
+export function setCoachPhotoDialogPreview(photoUrl) {
+  setPhotoPreview(elements.coachPhotoDialogPreview, photoUrl);
+}
+
 export function syncPhotoForm() {
   const profile = getProfile(currentCoachId);
-  elements.coachPhotoUrl.value = profile.photoUrl || "";
-  elements.coachPhotoFile.value = "";
-  state.pendingPhotoDataUrl = "";
-  setCoachPhotoPreview(profile.photoUrl);
+  setCoachPhotoPreview(profile.photoUrl || "");
 }
 
 export function handlePhotoFileChange() {
   const file = elements.coachPhotoFile.files && elements.coachPhotoFile.files[0];
-  if (!file) {
-    state.pendingPhotoDataUrl = "";
-    setCoachPhotoPreview(elements.coachPhotoUrl.value.trim() || getProfile(currentCoachId).photoUrl);
-    return;
-  }
+  if (!file) return Promise.resolve("");
   if (!file.type.startsWith("image/")) {
     elements.photoMessage.textContent = "请选择图片文件。";
     elements.photoMessage.style.color = "var(--red)";
     elements.coachPhotoFile.value = "";
-    return;
+    return Promise.resolve("");
   }
 
-  readResizedImage(file)
+  return readResizedImage(file)
     .then((dataUrl) => {
-      state.pendingPhotoDataUrl = dataUrl;
-      elements.coachPhotoUrl.value = "";
-      setCoachPhotoPreview(state.pendingPhotoDataUrl);
-      elements.photoMessage.textContent = "已选择本地照片，记得保存。";
-      elements.photoMessage.style.color = "var(--green)";
+      return dataUrl;
     })
     .catch(() => {
       elements.photoMessage.textContent = "照片读取失败，请换一张图片。";
       elements.photoMessage.style.color = "var(--red)";
       elements.coachPhotoFile.value = "";
+      return "";
     });
 }
 
@@ -950,7 +992,7 @@ function renderStudentSlotCard(slot) {
   const coach = getCoach(slot.coachId);
   const profile = getProfile(slot.coachId);
   const travelText = profile.travelsToOtherRinks
-    ? `可去其他冰场 · 附加费 $${profile.travelFee || 0}`
+    ? "其他冰场授课可协商"
     : `可授课冰场：${(profile.servedRinks || [profile.homeRink]).map(formatLocationLabel).join(", ")} 或 Zoom`;
 
   return `

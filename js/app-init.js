@@ -30,12 +30,27 @@ import {
 import { confirmBooking, handleScheduleCalendarClick, removeBookingFromDetails, syncBookingForSelf } from "./booking-actions.js";
 import {
   addLessonOption,
+  addCustomSpecialty,
+  closeCoachPhotoDialog,
+  closeCustomSpecialtyEditor,
+  confirmCoachPhoto,
+  handleCoachPhotoDialogCancel,
+  handleCoachPhotoFileChange,
+  handleCoachBioInput,
+  handleCoachSpecialtyClick,
+  handleCustomSpecialtyClick,
+  handleCustomSpecialtyKeydown,
+  handleBasePriceInput,
   handleLessonOptionChange,
   handleLessonOptionClick,
+  handleNewLessonDurationInput,
+  handleNewLessonPriceInput,
+  handleTravelConditionsInput,
+  handleTravelPreferenceChange,
   previewServedRinksChange,
-  saveCoachPhoto,
   saveCoachProfile,
-  setProfileDirty,
+  openCoachPhotoDialog,
+  toggleCustomSpecialtyEditor,
 } from "./coach-profile-actions.js";
 import { activeCoachPanelStorageKey, activeStudentPanelStorageKey } from "./config.js";
 import { elements } from "./elements.js";
@@ -55,7 +70,6 @@ import {
   switchStudentPanel,
 } from "./navigation.js";
 import {
-  handlePhotoFileChange,
   populateCoachSelects,
   populateTimeSelects,
   render,
@@ -63,12 +77,11 @@ import {
   renderDropdownOpenSlots,
   renderExceptionDragCalendar,
   renderStudentSlots,
-  setCoachPhotoPreview,
   syncEndTimeOptions,
 } from "./render.js";
 import { state } from "./state.js";
 import { storageGetItem } from "./storage-adapter.js";
-import { handleGlobalKeydown } from "./undo.js";
+import { handleGlobalKeydown, undoLastChange } from "./undo.js";
 import { nextWeekdayIso, startOfWeekIso } from "./utils-data.js";
 
 function bindCoachEvents() {
@@ -81,23 +94,34 @@ function bindCoachEvents() {
   elements.coachBookingPanel?.addEventListener("click", handleCoachBookingFilterAction);
   elements.coachBookingPeriods.forEach((button) => button.addEventListener("click", switchCoachBookingPeriod));
   elements.coachProfileForm.addEventListener("submit", saveCoachProfile);
-  elements.coachPhotoForm.addEventListener("submit", saveCoachPhoto);
-  elements.coachPhotoFile.addEventListener("change", handlePhotoFileChange);
-  elements.coachPhotoUrl.addEventListener("input", () => {
-    state.pendingPhotoDataUrl = "";
+  elements.coachBio.addEventListener("input", handleCoachBioInput);
+  elements.coachSpecialtyOptions.addEventListener("click", handleCoachSpecialtyClick);
+  elements.toggleCustomSpecialty.addEventListener("click", toggleCustomSpecialtyEditor);
+  elements.addCustomSpecialty.addEventListener("click", addCustomSpecialty);
+  elements.cancelCustomSpecialty.addEventListener("click", closeCustomSpecialtyEditor);
+  elements.customSpecialtyInput.addEventListener("keydown", handleCustomSpecialtyKeydown);
+  elements.coachCustomSpecialties.addEventListener("click", handleCustomSpecialtyClick);
+  elements.openCoachPhotoDialog.addEventListener("click", openCoachPhotoDialog);
+  elements.closeCoachPhotoDialog.addEventListener("click", closeCoachPhotoDialog);
+  elements.cancelCoachPhotoDialog.addEventListener("click", closeCoachPhotoDialog);
+  elements.coachPhotoDialogForm.addEventListener("submit", (event) => event.preventDefault());
+  elements.coachPhotoDialog.addEventListener("cancel", handleCoachPhotoDialogCancel);
+  elements.chooseCoachPhoto.addEventListener("click", () => {
     elements.coachPhotoFile.value = "";
-    setCoachPhotoPreview(elements.coachPhotoUrl.value.trim());
+    elements.coachPhotoFile.click();
   });
+  elements.coachPhotoFile.addEventListener("change", handleCoachPhotoFileChange);
+  elements.confirmCoachPhoto.addEventListener("click", confirmCoachPhoto);
   elements.addLessonOption.addEventListener("click", addLessonOption);
+  elements.lessonDuration.addEventListener("input", handleNewLessonDurationInput);
+  elements.lessonPrice.addEventListener("input", handleNewLessonPriceInput);
   elements.lessonOptionsList.addEventListener("change", handleLessonOptionChange);
   elements.lessonOptionsList.addEventListener("click", handleLessonOptionClick);
-  elements.coachRate.addEventListener("input", () => setProfileDirty(true, "有未保存的更改。"));
-  elements.travelFee.addEventListener("input", () => setProfileDirty(true, "有未保存的更改。"));
+  elements.undoProfileChange.addEventListener("click", undoLastChange);
+  elements.coachRate.addEventListener("input", handleBasePriceInput);
+  elements.travelConditions.addEventListener("input", handleTravelConditionsInput);
   elements.servedRinkInputs.forEach((input) => input.addEventListener("change", previewServedRinksChange));
-  elements.travelsToOtherRinks.addEventListener("change", () => {
-    elements.travelFeeLabel.classList.toggle("is-hidden", elements.travelsToOtherRinks.value !== "yes");
-    setProfileDirty(true, "有未保存的更改。");
-  });
+  elements.travelsToOtherRinks.addEventListener("change", handleTravelPreferenceChange);
   elements.availabilityForm.addEventListener("submit", addAvailability);
   elements.openBlockDialog.addEventListener("click", openBlockTimeDialog);
   elements.blockDialogForm.addEventListener("submit", addBlockException);
@@ -205,11 +229,4 @@ export function initializeStudentApp() {
 export function initializeAdminApp() {
   bindAdminEvents();
   render();
-}
-
-function initializeApp() {
-  const page = document.body.dataset.page;
-  if (page === "coach") initializeCoachApp();
-  else if (page === "student") initializeStudentApp();
-  else if (page === "admin") initializeAdminApp();
 }

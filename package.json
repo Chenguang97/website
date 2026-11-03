@@ -1,6 +1,6 @@
 {
   "scripts": {
-    "test": "node tests/domain-rules.mjs && node tests/smoke.js"
+    "test": "node tests/module-architecture.mjs && node tests/domain-rules.mjs && node tests/smoke.js"
   },
   "devDependencies": {
     "esbuild": "^0.28.2",

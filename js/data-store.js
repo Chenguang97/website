@@ -8,7 +8,12 @@ import {
 } from "./config.js";
 import { createDefaultLessonOptions, createDefaultProfile, createDefaultProfiles, createDefaultSlots } from "./demo-data.js";
 import { migrateLegacyProfilePricing } from "./domain/pricing.mjs";
-import { normalizeCoachSpecialties, normalizeCustomCoachSpecialties } from "./domain/coach-profile.mjs";
+import {
+  normalizeCoachSpecialties,
+  normalizeCoachTeachingDisciplines,
+  normalizeStartYear,
+  normalizeCustomCoachSpecialties,
+} from "./domain/coach-profile.mjs";
 import { isQuotaError, storageGetItem, storageKeys, storageRemoveItem, storageSetItem } from "./storage-adapter.js";
 let lastStorageRecoveryMessage = "";
 function getLastStorageRecoveryMessage() {
@@ -54,8 +59,17 @@ function normalizeProfile(profile) {
   normalized.demoPhotoVersion = defaultProfile.demoPhotoVersion;
   normalized.city = typeof normalized.city === "string" ? normalized.city : "";
   normalized.bio = typeof normalized.bio === "string" ? normalized.bio : "";
+  normalized.teachingDisciplines = normalizeCoachTeachingDisciplines(normalized.teachingDisciplines);
+  normalized.skatingStartYear = normalizeStartYear(normalized.skatingStartYear);
+  normalized.coachingStartYear = normalizeStartYear(normalized.coachingStartYear);
   normalized.specialties = normalizeCoachSpecialties(normalized.specialties);
   normalized.customSpecialties = normalizeCustomCoachSpecialties(normalized.customSpecialties);
+  const hadSelectedCustomSpecialties = Array.isArray(profile.selectedCustomSpecialties);
+  const selectedCustomSpecialties = hadSelectedCustomSpecialties
+    ? normalizeCustomCoachSpecialties(profile.selectedCustomSpecialties)
+    : normalized.customSpecialties;
+  const customSpecialtySet = new Set(normalized.customSpecialties);
+  normalized.selectedCustomSpecialties = selectedCustomSpecialties.filter((specialty) => customSpecialtySet.has(specialty));
   const hadTravelConditions = typeof profile.travelConditions === "string";
   normalized.travelConditions = hadTravelConditions ? profile.travelConditions.trim() : "";
   if (!hadTravelConditions && normalized.travelsToOtherRinks && Number(normalized.travelFee) > 0) {
@@ -69,7 +83,12 @@ function normalizeProfile(profile) {
   } else {
     normalized.lessonOptions = normalized.lessonOptions.slice().sort((a, b) => Number(a.duration) - Number(b.duration));
   }
-  const migratedProfileFields = !Array.isArray(profile.customSpecialties) || !hadTravelConditions;
+  const migratedProfileFields = !Array.isArray(profile.customSpecialties)
+    || !hadSelectedCustomSpecialties
+    || !hadTravelConditions
+    || !Array.isArray(profile.teachingDisciplines)
+    || !Object.prototype.hasOwnProperty.call(profile, "skatingStartYear")
+    || !Object.prototype.hasOwnProperty.call(profile, "coachingStartYear");
   return { profile: normalized, migrated: migration.migrated || !profile.demoPhotoVersion || migratedProfileFields };
 }
 function loadProfiles() {

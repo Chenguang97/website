@@ -8,6 +8,7 @@ import {
 import {
   coachSpecialtyOptions,
   customCoachSpecialtyMaxLength,
+  normalizeCoachTeachingDisciplines,
   normalizeCustomCoachSpecialties,
 } from "./domain/coach-profile.mjs";
 import { elements } from "./elements.js";
@@ -144,6 +145,7 @@ function saveCoachProfile(event) {
     servedRinks,
     travelsToOtherRinks: travels,
     travelConditions: elements.travelConditions.value.trim(),
+    teachingDisciplines: getSelectedTeachingDisciplines(),
     lessonOptions,
   };
   setProfileSaving(true);
@@ -168,6 +170,12 @@ function saveCoachProfile(event) {
 function getSelectedServedRinks() {
   const selectedRinks = new Set(Array.from(elements.servedRinkInputs).filter((input) => input.checked).map((input) => input.value));
   return rinks.filter((rink) => selectedRinks.has(rink));
+}
+function getSelectedTeachingDisciplines() {
+  return normalizeCoachTeachingDisciplines(
+    [...elements.coachTeachingDisciplines.querySelectorAll('input[name="coachTeachingDisciplines"]:checked')]
+      .map((input) => input.value),
+  );
 }
 function getLessonOptionsFromForm() {
   const existingProfile = ensureCoachProfileDraft();
@@ -200,17 +208,15 @@ function handleCoachBioInput() {
   setCoachProfileDraft({ ...ensureCoachProfileDraft(), bio: elements.coachBio.value });
   setProfileDirty(true, "有未保存的个人介绍更改。");
 }
-function handleCoachSpecialtyClick(event) {
-  const button = event.target.closest("button[data-action='toggle-specialty']");
-  if (!button) return;
-  const profile = ensureCoachProfileDraft();
-  const specialties = new Set(profile.specialties);
-  if (specialties.has(button.dataset.specialtyId)) specialties.delete(button.dataset.specialtyId);
-  else specialties.add(button.dataset.specialtyId);
-  const normalized = [...specialties];
-  setCoachProfileDraft({ ...profile, specialties: normalized });
-  button.classList.toggle("is-selected", specialties.has(button.dataset.specialtyId));
-  button.setAttribute("aria-pressed", String(specialties.has(button.dataset.specialtyId)));
+function handleCoachTeachingDisciplinesChange() {
+  const profile = { ...ensureCoachProfileDraft(), teachingDisciplines: getSelectedTeachingDisciplines() };
+  setCoachProfileDraft(profile);
+  setProfileDirty(true, "有未保存的教学项目更改。");
+}
+function handleCoachSpecialtiesChange() {
+  const specialties = [...elements.coachSpecialtyOptions.querySelectorAll('input[name="coachSpecialties"]:checked')]
+    .map((input) => input.value);
+  setCoachProfileDraft({ ...ensureCoachProfileDraft(), specialties });
   setProfileDirty(true, "有未保存的教学专长更改。");
 }
 
@@ -256,10 +262,14 @@ function addCustomSpecialty() {
     return;
   }
   const customSpecialties = [...current, value];
-  setCoachProfileDraft({ ...profile, customSpecialties });
+  const selectedCustomSpecialties = [
+    ...normalizeCustomCoachSpecialties(profile.selectedCustomSpecialties),
+    value,
+  ];
+  setCoachProfileDraft({ ...profile, customSpecialties, selectedCustomSpecialties });
   elements.customSpecialtyInput.value = "";
   showCustomSpecialtyMessage("");
-  renderCoachCustomSpecialties(customSpecialties);
+  renderCoachCustomSpecialties(customSpecialties, selectedCustomSpecialties);
   setProfileDirty(true, "有未保存的教学专长更改。");
   closeCustomSpecialtyEditor();
 }
@@ -274,14 +284,27 @@ function handleCustomSpecialtyKeydown(event) {
   }
 }
 
-function handleCustomSpecialtyClick(event) {
-  const button = event.target.closest("button[data-action='remove-custom-specialty']");
+function handleCustomSpecialtyChange(event) {
+  const input = event.target.closest('input[data-action="toggle-custom-specialty"]');
+  if (!input) return;
+  const profile = ensureCoachProfileDraft();
+  const selected = new Set(normalizeCustomCoachSpecialties(profile.selectedCustomSpecialties));
+  if (input.checked) selected.add(input.dataset.specialty);
+  else selected.delete(input.dataset.specialty);
+  setCoachProfileDraft({ ...profile, selectedCustomSpecialties: [...selected] });
+  setProfileDirty(true, "有未保存的教学专长更改。");
+}
+
+function handleCustomSpecialtyDelete(event) {
+  const button = event.target.closest('button[data-action="delete-custom-specialty"]');
   if (!button) return;
   const profile = ensureCoachProfileDraft();
   const customSpecialties = normalizeCustomCoachSpecialties(profile.customSpecialties)
     .filter((specialty) => specialty !== button.dataset.specialty);
-  setCoachProfileDraft({ ...profile, customSpecialties });
-  renderCoachCustomSpecialties(customSpecialties);
+  const selectedCustomSpecialties = normalizeCustomCoachSpecialties(profile.selectedCustomSpecialties)
+    .filter((specialty) => specialty !== button.dataset.specialty);
+  setCoachProfileDraft({ ...profile, customSpecialties, selectedCustomSpecialties });
+  renderCoachCustomSpecialties(customSpecialties, selectedCustomSpecialties);
   setProfileDirty(true, "有未保存的教学专长更改。");
 }
 
@@ -297,18 +320,58 @@ function handleTravelConditionsInput() {
   setCoachProfileDraft({ ...ensureCoachProfileDraft(), travelConditions: elements.travelConditions.value });
   setProfileDirty(true, "有未保存的更改。");
 }
+
+function setLessonFieldError(input, errorElement, message = "") {
+  errorElement.textContent = message;
+  input.toggleAttribute("aria-invalid", Boolean(message));
+}
+
+function clearLessonOptionErrors() {
+  setLessonFieldError(elements.lessonName, elements.lessonNameError);
+  setLessonFieldError(elements.lessonDuration, elements.lessonDurationError);
+  setLessonFieldError(elements.lessonPrice, elements.lessonPriceError);
+}
+
+function openLessonOptionEditor() {
+  clearLessonOptionErrors();
+  elements.lessonOptionEditor.hidden = false;
+  elements.openLessonOptionEditor.hidden = true;
+  elements.openLessonOptionEditor.setAttribute("aria-expanded", "true");
+  elements.lessonName.focus();
+}
+
+function closeLessonOptionEditor({ restoreFocus = true } = {}) {
+  elements.lessonName.value = "";
+  elements.lessonDuration.value = "";
+  elements.lessonPrice.value = "";
+  state.newLessonPriceIsCustom = false;
+  clearLessonOptionErrors();
+  elements.lessonOptionEditor.hidden = true;
+  elements.openLessonOptionEditor.hidden = false;
+  elements.openLessonOptionEditor.setAttribute("aria-expanded", "false");
+  if (restoreFocus) elements.openLessonOptionEditor.focus();
+}
+
 function addLessonOption() {
   const profile = ensureCoachProfileDraft();
   const duration = Number(elements.lessonDuration.value || 0);
   const priceValue = elements.lessonPrice.value;
   const price = Number(priceValue);
   const name = elements.lessonName.value.trim() || `${duration}-minute private lesson`;
-  if (!duration || !priceValue) {
-    showProfileMessage("请填写课程时长和价格。", true);
-    return;
+  clearLessonOptionErrors();
+  let hasError = false;
+  if (!duration) {
+    setLessonFieldError(elements.lessonDuration, elements.lessonDurationError, "请填写课程时长。");
+    hasError = true;
   }
-  if (!isValidLessonPrice(priceValue)) {
-    showProfileMessage("课程价格最多保留两位小数。", true);
+  if (!priceValue) {
+    setLessonFieldError(elements.lessonPrice, elements.lessonPriceError, "请填写课程价格。");
+    hasError = true;
+  } else if (!isValidLessonPrice(priceValue)) {
+    setLessonFieldError(elements.lessonPrice, elements.lessonPriceError, "价格最多保留两位小数。");
+    hasError = true;
+  }
+  if (hasError) {
     return;
   }
   profile.lessonOptions.push({
@@ -319,11 +382,8 @@ function addLessonOption() {
     custom: true
   });
   setCoachProfileDraft(profile);
-  elements.lessonName.value = "";
-  elements.lessonDuration.value = "";
-  elements.lessonPrice.value = "";
-  state.newLessonPriceIsCustom = false;
-  setProfileDirty(true, "已添加课程选项，记得保存更改。");
+  closeLessonOptionEditor();
+  setProfileDirty(true, "已添加课程，记得保存更改。");
   render();
 }
 function updateNewLessonDefaultPrice() {
@@ -347,10 +407,12 @@ function handleBasePriceInput() {
   updateNewLessonDefaultPrice();
 }
 function handleNewLessonDurationInput() {
+  setLessonFieldError(elements.lessonDuration, elements.lessonDurationError);
   state.newLessonPriceIsCustom = false;
   updateNewLessonDefaultPrice();
 }
 function handleNewLessonPriceInput() {
+  setLessonFieldError(elements.lessonPrice, elements.lessonPriceError);
   state.newLessonPriceIsCustom = true;
 }
 function handleLessonOptionChange(event) {
@@ -401,12 +463,15 @@ export {
   handleCoachPhotoDialogCancel,
   handleCoachPhotoFileChange,
   handleCoachBioInput,
-  handleCoachSpecialtyClick,
+  handleCoachTeachingDisciplinesChange,
+  handleCoachSpecialtiesChange,
   addCustomSpecialty,
-  handleCustomSpecialtyClick,
+  handleCustomSpecialtyChange,
+  handleCustomSpecialtyDelete,
   handleCustomSpecialtyKeydown,
   handleTravelConditionsInput,
   handleTravelPreferenceChange,
+  closeLessonOptionEditor,
   handleLessonOptionChange,
   handleLessonOptionClick,
   handleBasePriceInput,
@@ -415,6 +480,7 @@ export {
   previewServedRinksChange,
   saveCoachProfile,
   openCoachPhotoDialog,
+  openLessonOptionEditor,
   closeCustomSpecialtyEditor,
   toggleCustomSpecialtyEditor,
 };

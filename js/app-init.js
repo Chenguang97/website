@@ -33,12 +33,15 @@ import {
   addCustomSpecialty,
   closeCoachPhotoDialog,
   closeCustomSpecialtyEditor,
+  closeLessonOptionEditor,
   confirmCoachPhoto,
   handleCoachPhotoDialogCancel,
   handleCoachPhotoFileChange,
   handleCoachBioInput,
-  handleCoachSpecialtyClick,
-  handleCustomSpecialtyClick,
+  handleCoachTeachingDisciplinesChange,
+  handleCoachSpecialtiesChange,
+  handleCustomSpecialtyChange,
+  handleCustomSpecialtyDelete,
   handleCustomSpecialtyKeydown,
   handleBasePriceInput,
   handleLessonOptionChange,
@@ -50,6 +53,7 @@ import {
   previewServedRinksChange,
   saveCoachProfile,
   openCoachPhotoDialog,
+  openLessonOptionEditor,
   toggleCustomSpecialtyEditor,
 } from "./coach-profile-actions.js";
 import { activeCoachPanelStorageKey, activeStudentPanelStorageKey } from "./config.js";
@@ -95,12 +99,14 @@ function bindCoachEvents() {
   elements.coachBookingPeriods.forEach((button) => button.addEventListener("click", switchCoachBookingPeriod));
   elements.coachProfileForm.addEventListener("submit", saveCoachProfile);
   elements.coachBio.addEventListener("input", handleCoachBioInput);
-  elements.coachSpecialtyOptions.addEventListener("click", handleCoachSpecialtyClick);
+  elements.coachTeachingDisciplines.addEventListener("change", handleCoachTeachingDisciplinesChange);
+  elements.coachSpecialtyOptions.addEventListener("change", handleCoachSpecialtiesChange);
   elements.toggleCustomSpecialty.addEventListener("click", toggleCustomSpecialtyEditor);
   elements.addCustomSpecialty.addEventListener("click", addCustomSpecialty);
   elements.cancelCustomSpecialty.addEventListener("click", closeCustomSpecialtyEditor);
   elements.customSpecialtyInput.addEventListener("keydown", handleCustomSpecialtyKeydown);
-  elements.coachCustomSpecialties.addEventListener("click", handleCustomSpecialtyClick);
+  elements.coachCustomSpecialties.addEventListener("change", handleCustomSpecialtyChange);
+  elements.coachCustomSpecialties.addEventListener("click", handleCustomSpecialtyDelete);
   elements.openCoachPhotoDialog.addEventListener("click", openCoachPhotoDialog);
   elements.closeCoachPhotoDialog.addEventListener("click", closeCoachPhotoDialog);
   elements.cancelCoachPhotoDialog.addEventListener("click", closeCoachPhotoDialog);
@@ -112,7 +118,9 @@ function bindCoachEvents() {
   });
   elements.coachPhotoFile.addEventListener("change", handleCoachPhotoFileChange);
   elements.confirmCoachPhoto.addEventListener("click", confirmCoachPhoto);
+  elements.openLessonOptionEditor.addEventListener("click", openLessonOptionEditor);
   elements.addLessonOption.addEventListener("click", addLessonOption);
+  elements.cancelLessonOption.addEventListener("click", closeLessonOptionEditor);
   elements.lessonDuration.addEventListener("input", handleNewLessonDurationInput);
   elements.lessonPrice.addEventListener("input", handleNewLessonPriceInput);
   elements.lessonOptionsList.addEventListener("change", handleLessonOptionChange);

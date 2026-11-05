@@ -60,43 +60,62 @@
                   </div>
                 </div>
                 <div class="profile-personal-layout">
-                  <div class="profile-identity-row">
-                    <div class="profile-avatar-action">
-                      <button id="openCoachPhotoDialog" class="avatar-change-button" type="button" aria-label="更换头像" title="更换头像">
-                        <span id="coachPhotoPreview" class="avatar-preview" aria-label="教练头像">MC</span>
-                        <span class="avatar-camera-badge" aria-hidden="true">
-                          <svg viewBox="0 0 24 24" focusable="false">
-                            <path d="M8.6 5.5 10 3.8h4l1.4 1.7H18a3 3 0 0 1 3 3v8a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3v-8a3 3 0 0 1 3-3h2.6ZM12 16.8a4.3 4.3 0 1 0 0-8.6 4.3 4.3 0 0 0 0 8.6Zm0-2a2.3 2.3 0 1 1 0-4.6 2.3 2.3 0 0 1 0 4.6Z" />
-                          </svg>
-                        </span>
-                      </button>
-                    </div>
-                    <div class="profile-identity-copy">
-                      <strong>Maya Chen</strong>
-                    </div>
-                  </div>
-                  <div class="profile-editor-fields">
-                    <label class="profile-field" for="coachBio">
-                      <span class="profile-field-title">个人介绍</span>
-                      <textarea id="coachBio" rows="4" placeholder="简单介绍你的教学经历和方式"></textarea>
-                    </label>
-                    <fieldset class="profile-specialties-field">
-                      <legend>教学专长（选填，可多选）</legend>
-                      <div class="coach-specialty-group" role="group" aria-label="教学专长选项">
-                        <div id="coachSpecialtyOptions" class="coach-specialty-options"></div>
-                        <div id="coachCustomSpecialties" class="coach-custom-specialties" aria-label="其他教学专长"></div>
-                        <button id="toggleCustomSpecialty" class="specialty-add-trigger" type="button" aria-expanded="false" aria-controls="customSpecialtyEditor">＋ 添加专长</button>
-                        <div id="customSpecialtyEditor" class="custom-specialty-editor" hidden>
-                          <label class="visually-hidden" for="customSpecialtyInput">其他专长</label>
-                          <div class="custom-specialty-entry">
-                            <input id="customSpecialtyInput" type="text" maxlength="30" placeholder="例如：成人零基础" />
-                            <button id="addCustomSpecialty" class="specialty-editor-action specialty-editor-add" type="button">添加</button>
-                            <button id="cancelCustomSpecialty" class="specialty-editor-action" type="button">取消</button>
-                          </div>
-                          <p id="customSpecialtyMessage" class="field-hint" aria-live="polite"></p>
+                  <div class="profile-form-row profile-avatar-row">
+                    <span class="profile-row-label">头像</span>
+                    <div class="profile-row-control profile-identity-control">
+                      <div class="profile-avatar-action">
+                        <button id="openCoachPhotoDialog" class="avatar-change-button" type="button" aria-label="更换头像" title="更换头像">
+                          <span id="coachPhotoPreview" class="avatar-preview" aria-label="教练头像">MC</span>
+                          <span class="avatar-camera-badge" aria-hidden="true">
+                            <svg viewBox="0 0 24 24" focusable="false">
+                              <path d="M8.6 5.5 10 3.8h4l1.4 1.7H18a3 3 0 0 1 3 3v8a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3v-8a3 3 0 0 1 3-3h2.6ZM12 16.8a4.3 4.3 0 1 0 0-8.6 4.3 4.3 0 0 0 0 8.6Zm0-2a2.3 2.3 0 1 1 0-4.6 2.3 2.3 0 0 1 0 4.6Z" />
+                            </svg>
+                          </span>
+                        </button>
+                      </div>
+                      <div class="profile-identity-copy">
+                        <strong>Maya Chen</strong>
+                        <div class="profile-identity-meta" aria-label="教练身份信息">
+                          <span class="coach-role-badge">
+                            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 2a5 5 0 0 1 3.9 8.13A8 8 0 0 1 20 17v3H4v-3a8 8 0 0 1 4.1-6.87A5 5 0 0 1 12 2Zm0 2a3 3 0 1 0 0 6 3 3 0 0 0 0-6Zm0 8c-3.31 0-6 2.24-6 5v1h12v-1c0-2.76-2.69-5-6-5Z" /></svg>
+                            教练
+                          </span>
                         </div>
                       </div>
-                    </fieldset>
+                    </div>
+                  </div>
+                  <div class="profile-form-row profile-disciplines-field" role="group" aria-labelledby="coachTeachingDisciplinesLabel" aria-describedby="coachTeachingDisciplinesHint">
+                    <div class="profile-row-heading">
+                      <span id="coachTeachingDisciplinesLabel" class="profile-row-label">教学项目</span>
+                      <span id="coachTeachingDisciplinesHint" class="profile-row-hint">选填，可多选</span>
+                    </div>
+                    <div id="coachTeachingDisciplines" class="profile-row-control coach-teaching-disciplines"></div>
+                  </div>
+                  <div class="profile-form-row profile-bio-row">
+                    <label class="profile-row-label" for="coachBio">个人介绍</label>
+                    <div class="profile-row-control">
+                      <textarea id="coachBio" rows="4" placeholder="介绍你擅长帮助哪些学员、通常如何开展教学，也可以分享相关经历。"></textarea>
+                    </div>
+                  </div>
+                  <div class="profile-form-row profile-specialties-field" role="group" aria-labelledby="coachSpecialtiesLabel" aria-describedby="coachSpecialtiesHint">
+                    <div class="profile-row-heading">
+                      <span id="coachSpecialtiesLabel" class="profile-row-label">教学专长</span>
+                      <span id="coachSpecialtiesHint" class="profile-row-hint">选填，可多选</span>
+                    </div>
+                    <div class="profile-row-control coach-specialty-group">
+                      <div id="coachSpecialtyOptions" class="coach-specialty-options"></div>
+                      <div id="coachCustomSpecialties" class="coach-custom-specialties" aria-label="其他教学专长"></div>
+                      <button id="toggleCustomSpecialty" class="specialty-add-trigger" type="button" aria-expanded="false" aria-controls="customSpecialtyEditor">＋ 添加专长</button>
+                      <div id="customSpecialtyEditor" class="custom-specialty-editor" hidden>
+                        <label class="visually-hidden" for="customSpecialtyInput">其他专长</label>
+                        <div class="custom-specialty-entry">
+                          <input id="customSpecialtyInput" type="text" maxlength="30" placeholder="例如：成人零基础" />
+                          <button id="addCustomSpecialty" class="specialty-editor-action specialty-editor-add" type="button">添加</button>
+                          <button id="cancelCustomSpecialty" class="specialty-editor-action" type="button">取消</button>
+                        </div>
+                        <p id="customSpecialtyMessage" class="field-hint" aria-live="polite"></p>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </section>
@@ -148,25 +167,36 @@
                     </div>
                   </div>
                   <div class="lesson-options-area">
-                    <div id="lessonOptionsList" class="lesson-options-list"></div>
-                    <div class="lesson-add-card">
-                      <p class="lesson-add-title">添加课程选项</p>
-                      <div class="lesson-option-form">
-                        <label>
-                          课程名称
-                          <input id="lessonName" type="text" placeholder="例如：45 分钟私教" />
-                        </label>
-                        <label>
-                          时长（分钟）
-                          <input id="lessonDuration" type="number" min="15" step="15" placeholder="例如：45" />
-                        </label>
-                        <label>
-                          价格（美元）
-                          <input id="lessonPrice" type="number" min="0" step="0.01" placeholder="例如：90" />
-                        </label>
-                        <div class="lesson-option-action">
-                          <span>操作</span>
-                          <button id="addLessonOption" class="ghost-button" type="button">添加</button>
+                    <div class="lesson-options-list">
+                      <div class="lesson-option-header" aria-hidden="true">
+                        <span>课程名称</span>
+                        <span>时长（分钟）</span>
+                        <span>价格（美元）</span>
+                        <span>操作</span>
+                      </div>
+                      <div id="lessonOptionsList" class="lesson-options-rows"></div>
+                      <div class="lesson-add-section">
+                        <button id="openLessonOptionEditor" class="lesson-add-trigger" type="button" aria-expanded="false" aria-controls="lessonOptionEditor">＋ 添加课程</button>
+                        <div id="lessonOptionEditor" class="lesson-option-editor" hidden>
+                          <div class="lesson-option-new-row">
+                            <div class="lesson-new-field">
+                              <input id="lessonName" type="text" placeholder="例如：45 分钟私教" aria-label="课程名称" />
+                              <span id="lessonNameError" class="lesson-field-error" aria-live="polite"></span>
+                            </div>
+                            <div class="lesson-new-field">
+                              <input id="lessonDuration" type="number" min="15" step="15" placeholder="例如：45" aria-label="时长（分钟）" aria-describedby="lessonDurationError" />
+                              <span id="lessonDurationError" class="lesson-field-error" aria-live="polite"></span>
+                            </div>
+                            <div class="lesson-new-field">
+                              <input id="lessonPrice" type="number" min="0" step="0.01" placeholder="例如：90" aria-label="价格（美元）" aria-describedby="lessonPriceError" />
+                              <span id="lessonPriceError" class="lesson-field-error" aria-live="polite"></span>
+                            </div>
+                            <span class="lesson-new-operation" aria-hidden="true"></span>
+                          </div>
+                          <div class="lesson-new-actions">
+                            <button id="addLessonOption" class="primary-button" type="button">添加</button>
+                            <button id="cancelLessonOption" class="ghost-button" type="button">取消</button>
+                          </div>
                         </div>
                       </div>
                     </div>

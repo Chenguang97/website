@@ -10,7 +10,7 @@
   .lesson-rate-layout,
   .lesson-option-header,
   .lesson-option-row,
-  .lesson-option-form,
+  .lesson-option-new-row,
   .calendar-controls {
     grid-template-columns: 1fr;
   }

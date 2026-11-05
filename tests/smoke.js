@@ -133,6 +133,8 @@ async function testLandingPage() {
   assert(!document.querySelector('a[href^="admin"]'), "Landing page should not expose an admin link.");
   assert(document.querySelector('a[href="coach/login/index.html"]'), "Landing page is missing the coach login link.");
   assert(document.querySelector('a[href="student/login/index.html"]'), "Landing page is missing the student login link.");
+  const coachEntryIcon = document.querySelector('a[href="coach/login/index.html"] .check-icon svg');
+  assert(coachEntryIcon?.querySelector("rect") && coachEntryIcon.querySelector("path")?.getAttribute("d") === "m7.5 12.25 3 3 6-6", "The coach entry is missing its centered complete check icon.");
   assert(!document.querySelector(".view"), "Landing page should not render the full app views.");
 }
 
@@ -210,7 +212,8 @@ async function testPublicCoachProfile() {
     assert(document.querySelectorAll("#publicLessons li").length === lessonCount, "Profile courses do not match existing data.");
     assert(document.querySelector("#dataNote").textContent.includes("示例资料"), "Default data must be labelled as sample data.");
     assert(document.querySelector("#aboutCoach").hidden && document.querySelector("#teachingSpecialties").hidden, "Empty demo biography or specialties must not leave public placeholders.");
-    assert(document.querySelector("#heroSpecialties").hidden, "Empty demo specialties must not leave an empty hero group.");
+    assert(document.querySelector("#coachDisciplines").hidden && !document.querySelector("#coachSkatingExperience") && !document.querySelector("#coachCoachingExperience"), "Removed experience details left public placeholders.");
+    assert(!document.querySelector("#coachSubject") && !document.body.textContent.includes("花样滑冰教练"), "The public identity must not fabricate a generic skating discipline.");
     assert(!document.querySelector("#travelNote").textContent.includes("暂未提供"), "Empty travel conditions left a public placeholder.");
     const photoSource = document.querySelector("#coachPhoto").getAttribute("src") || "";
     assert(photoSource.includes(`/assets/coaches/${id === "maya" ? "maya-chen" : id === "alex" ? "alex-rivera" : "sam-patel"}.jpg`), "Default coach profile did not load its demo portrait.");
@@ -221,8 +224,12 @@ async function testPublicCoachProfile() {
   }
   const savedProfile = { maya: {
     bio: '<img src=x onerror="alert(1)">Saved introduction\nSecond line',
+    teachingDisciplines: ["singles", "ice-dance"],
+    skatingStartYear: 2010,
+    coachingStartYear: 2018,
     specialties: ["edges", "jumps", "unknown"],
     customSpecialties: ["成人零基础", '<img src=x onerror="alert(2)">'],
+    selectedCustomSpecialties: ["成人零基础"],
     servedRinks: ["Arcadia Ice Arena"],
     travelsToOtherRinks: true,
     travelConditions: "限市区范围，交通费用另议。",
@@ -237,7 +244,10 @@ async function testPublicCoachProfile() {
   assert(savedDocument.querySelectorAll("#coachRinks li").length === 1, "Saved teaching rinks were not used.");
   assert(savedDocument.querySelector("#coachBio").textContent === savedProfile.maya.bio && !savedDocument.querySelector("#coachBio img"), "Profile text must not execute HTML.");
   assert(!savedDocument.querySelector("#aboutCoach").hidden && !savedDocument.querySelector("#teachingSpecialties").hidden, "Saved biography and specialties were hidden from the public profile.");
-  assert(savedDocument.querySelectorAll("#coachSpecialties span").length === 4 && savedDocument.querySelector("#coachSpecialties").textContent.includes("Edges") && savedDocument.querySelector("#coachSpecialties").textContent.includes("成人零基础"), "Saved preset and custom specialties were not normalized and rendered together.");
+  assert(savedDocument.querySelectorAll("#coachSpecialties span").length === 3 && savedDocument.querySelector("#coachSpecialties").textContent.includes("Edges") && savedDocument.querySelector("#coachSpecialties").textContent.includes("成人零基础"), "Saved selected preset and custom specialties were not rendered together.");
+  assert(savedDocument.querySelector("#coachDisciplines").textContent === "单人滑、冰舞", "Saved teaching disciplines were not rendered separately in the public identity.");
+  assert(!savedDocument.querySelector("#coachSkatingExperience") && !savedDocument.querySelector("#coachCoachingExperience") && !savedDocument.body.textContent.includes("滑冰经历") && !savedDocument.body.textContent.includes("执教经验"), "Saved legacy years were exposed on the public profile.");
+  assert(!savedDocument.querySelector("#coachSpecialties").textContent.includes("onerror"), "An unselected custom specialty appeared on the public profile.");
   assert(!savedDocument.querySelector("#coachSpecialties img"), "Custom specialty text executed as HTML on the public profile.");
   assert(savedDocument.querySelector("#travelNote").textContent === "其他冰场授课：可协商。 限市区范围，交通费用另议。", "Public profile did not show the negotiable travel setting and condition text.");
   assert(!savedDocument.querySelector("#coachPhoto").hasAttribute("src"), "Unsafe photo URL must be rejected.");
@@ -392,10 +402,16 @@ async function testCoachProfileDraftAndSave() {
   assert(profileSections[1].classList.contains("teaching-location-panel"), "Teaching locations must follow personal details and photos.");
   assert(profileSections[2].classList.contains("lesson-rate-panel"), "Lesson rates must be the last profile section.");
   assert(profileSections.map((section) => section.querySelector(":scope > .panel-heading h3")?.textContent.trim()).join("|") === "个人资料|授课地点|课程时长和价格", "Profile section titles must share the same heading structure.");
-  assert(doc.querySelector(".profile-personal-layout > .profile-identity-row") && doc.querySelector(".profile-personal-layout > .profile-editor-fields"), "Personal details must place the compact identity row above the editor fields.");
+  const personalLayout = doc.querySelector(".profile-personal-layout");
+  assert([...personalLayout.children].every((row) => row.classList.contains("profile-form-row")), "Personal details do not use one shared form-row layout.");
+  assert(personalLayout.children[0].querySelector(":scope > .profile-row-label").textContent.trim() === "头像" && personalLayout.children[0].querySelector(".profile-identity-control > .profile-avatar-action + .profile-identity-copy"), "Avatar and name are not grouped in the first form row.");
+  assert(personalLayout.children[1].querySelector("#coachTeachingDisciplines") && personalLayout.children[1].querySelector(".profile-row-label").textContent.trim() === "教学项目", "Teaching disciplines are not placed after the identity row.");
+  assert(personalLayout.children[2].querySelector("label[for='coachBio']").textContent.trim() === "个人介绍" && personalLayout.children[2].querySelector(":scope > .profile-row-control > #coachBio"), "Biography is not placed in the shared form layout.");
+  assert(personalLayout.children[3].classList.contains("profile-specialties-field") && personalLayout.children[3].querySelector(".profile-row-label").textContent.trim() === "教学专长" && personalLayout.children[3].querySelector(".profile-row-hint").textContent.trim() === "选填，可多选", "Teaching specialties and helper copy are not placed in the shared form layout.");
+  assert(doc.querySelector("#coachBio").rows === 4, "Biography did not retain its resizable four-row initial height.");
   assert(!doc.querySelector("#coachCity") && !doc.querySelector(".profile-city-field"), "The removed city field is still present in the profile editor.");
-  assert(!doc.querySelector("#coachBioHint") && !doc.querySelector("#coachBio").hasAttribute("aria-describedby"), "The biography field retained redundant secondary guidance.");
-  assert(doc.querySelector(".profile-specialties-field legend").textContent.trim() === "教学专长（选填，可多选）", "The specialty label does not explain its optional multi-select behavior.");
+  assert(!doc.querySelector("#coachBioHint") && !doc.querySelector("#coachBio").hasAttribute("aria-describedby") && doc.querySelector("#coachBio").placeholder === "介绍你擅长帮助哪些学员、通常如何开展教学，也可以分享相关经历。", "The biography field guidance is missing or duplicated.");
+  assert(doc.querySelector(".profile-specialties-field").getAttribute("aria-describedby") === "coachSpecialtiesHint", "The specialty helper copy is not associated with the group.");
   assert(!doc.querySelector(".profile-specialties-field").textContent.includes("用刀"), "The edge specialty contains the incorrect blade wording.");
   const locationSections = [...doc.querySelector(".teaching-location-grid").children];
   assert(locationSections[0].classList.contains("profile-field-rinks") && locationSections[1].classList.contains("profile-field-travel"), "Other-rink settings must follow the served-rink list.");
@@ -408,10 +424,18 @@ async function testCoachProfileDraftAndSave() {
   assert(doc.querySelectorAll("#coachProfileForm .avatar-preview").length === 1 && !doc.querySelector("#coachProfileForm .mini-avatar"), "The profile layout must not duplicate the coach avatar.");
   assert(doc.querySelector(".profile-photo-panel .profile-identity-copy")?.textContent.includes("Maya Chen"), "Coach identity must stay grouped with the profile photo.");
   assert(!doc.querySelector(".profile-photo-panel").textContent.includes("花样滑冰教练"), "The undifferentiated fixed coach title was not removed from personal details.");
-  assert(doc.querySelector("#coachBio") && doc.querySelectorAll('#coachSpecialtyOptions input[name="coachSpecialties"]').length === 5, "Biography or shared specialty controls are missing.");
-  assert(doc.querySelector("#customSpecialtyInput").maxLength === 30 && doc.querySelector("#toggleCustomSpecialty").getAttribute("aria-controls") === "customSpecialtyEditor", "Custom specialty controls or length limit are missing.");
+  assert(doc.querySelector(".coach-role-badge")?.textContent.trim() === "教练" && doc.querySelector(".coach-role-badge svg") && !doc.querySelector(".coach-role-badge").textContent.includes("●"), "Coach identity badge is missing or uses an online-status dot.");
+  assert(doc.querySelectorAll('#coachTeachingDisciplines input[name="coachTeachingDisciplines"][type="checkbox"]').length === 4, "Teaching discipline checkbox controls are missing.");
+  assert(!doc.querySelector("#skatingStartYear") && !doc.querySelector("#coachingStartYear") && !doc.querySelector(".profile-years-row") && !doc.body.textContent.includes("开始滑冰年份") && !doc.body.textContent.includes("开始执教年份"), "Removed start-year controls remain in the profile editor.");
+  assert(!doc.querySelector("#coachIdentityDisciplines") && !doc.querySelector("#coachIdentityExperience"), "The editor identity row still duplicates editable project or experience summaries.");
+  assert(doc.querySelector("#coachBio") && doc.querySelectorAll('#coachSpecialtyOptions input[name="coachSpecialties"][type="checkbox"]').length === 5, "Biography or shared specialty checkbox controls are missing.");
+  assert([...doc.querySelectorAll("#coachSpecialtyOptions .coach-specialty-checkbox")].every((label) => label.tagName === "LABEL" && label.contains(label.querySelector('input[type="checkbox"]'))), "Preset specialty text is not wrapped in a fully clickable checkbox label.");
+  assert(doc.querySelector("#customSpecialtyInput").maxLength === 30 && doc.querySelector("#toggleCustomSpecialty").textContent.trim() === "＋ 添加专长" && doc.querySelector("#toggleCustomSpecialty").getAttribute("aria-controls") === "customSpecialtyEditor", "Inline custom specialty controls or length limit are missing.");
   assert([...doc.querySelectorAll(".lesson-option-header span")].map((node) => node.textContent.trim()).join("|") === "课程名称|时长（分钟）|价格（美元）|操作", "Existing lesson columns do not use the required labels.");
-  assert([...doc.querySelectorAll(".lesson-option-form > label, .lesson-option-form > .lesson-option-action > span")].map((node) => node.childNodes[0].textContent.trim()).join("|") === "课程名称|时长（分钟）|价格（美元）|操作", "New lesson fields do not share the existing lesson column labels.");
+  assert(doc.querySelector(".lesson-options-list > .lesson-option-header") && doc.querySelector(".lesson-options-list > #lessonOptionsList") && doc.querySelector(".lesson-options-list > .lesson-add-section"), "The header, existing rows, and add interaction are not integrated into one lesson table.");
+  assert(doc.querySelector("#openLessonOptionEditor").textContent.trim() === "＋ 添加课程" && doc.querySelector("#lessonOptionEditor").hidden, "The lesson table did not initialize with the low-emphasis add entry.");
+  assert(!doc.querySelector(".lesson-add-card") && !doc.body.textContent.includes("添加课程选项"), "The detached dashed lesson form or duplicate title remains.");
+  assert(doc.querySelector(".lesson-option-new-row").children.length === 4 && doc.querySelector(".lesson-option-header").children.length === 4, "The new lesson row does not share the table's four-column structure.");
   assert(!doc.querySelector(".profile-photo-panel .current-coach-card") && !doc.querySelector(".profile-photo-panel .eyebrow"), "The personal profile card retained duplicate nested card or heading chrome.");
   assert(!doc.querySelector(".profile-photo-panel").textContent.includes("展示照片"), "The always-visible photo editor heading was not removed.");
   assert(doc.querySelector("#coachPhotoPreview").style.backgroundImage.includes("/assets/coaches/maya-chen.jpg"), "The coach editor did not load Maya's demo portrait.");
@@ -494,18 +518,19 @@ async function testCoachProfileDraftAndSave() {
   win.confirm = () => true;
   doc.querySelector("#coachBio").value = "这段介绍应被放弃。";
   doc.querySelector("#coachBio").dispatchEvent(new win.Event("input", { bubbles: true }));
+  doc.querySelector('#coachTeachingDisciplines input[value="pairs"]').click();
   assert(doc.querySelector("#profileSaveStatus").textContent.trim() === "有未保存的更改" && !doc.querySelector("#profilePreviewNote").hidden, "Editing the profile did not update the sticky unsaved state or preview note.");
   const beforeUnload = new win.Event("beforeunload", { cancelable: true });
   win.dispatchEvent(beforeUnload);
   assert(beforeUnload.defaultPrevented, "Leaving with an unsaved profile did not trigger the beforeunload guard.");
   const discardedSpecialty = doc.querySelector('#coachSpecialtyOptions input[value="spins"]');
   discardedSpecialty.closest("label").click();
-  assert(discardedSpecialty.checked, "Clicking the full specialty option label did not toggle its checkbox.");
-  assert(win.getProfile("maya").bio && win.getProfile("maya").specialties.includes("spins"), "Biography or specialty edits did not enter the profile draft.");
-  assert(!win.getSavedProfile("maya").bio && !win.getSavedProfile("maya").specialties.length, "Personal detail edits mutated saved data before submit.");
+  assert(discardedSpecialty.checked, "Clicking the preset specialty text did not toggle its square checkbox.");
+  assert(win.getProfile("maya").bio && win.getProfile("maya").specialties.includes("spins") && win.getProfile("maya").teachingDisciplines.includes("pairs"), "Personal identity edits did not enter the profile draft.");
+  assert(!win.getSavedProfile("maya").bio && !win.getSavedProfile("maya").specialties.length && !win.getSavedProfile("maya").teachingDisciplines.length, "Personal detail edits mutated saved data before submit.");
   doc.querySelector('[data-coach-panel="bookingsPanel"]').click();
   doc.querySelector('[data-coach-panel="profilePanel"]').click();
-  assert(doc.querySelector("#coachBio").value === "" && !doc.querySelector('#coachSpecialtyOptions input[value="spins"]').checked, "Discarding profile edits did not restore biography and specialties.");
+  assert(doc.querySelector("#coachBio").value === "" && !doc.querySelector('#coachSpecialtyOptions input[value="spins"]').checked && !doc.querySelector('#coachTeachingDisciplines input[value="pairs"]').checked, "Discarding profile edits did not restore biography, disciplines, and specialties.");
   rinkInput.checked = false;
   rinkInput.dispatchEvent(new win.Event("change", { bubbles: true }));
   assert(win.hasUnsavedProfileChanges, "Editing teaching rinks did not mark the profile draft as unsaved.");
@@ -528,6 +553,17 @@ async function testCoachProfileDraftAndSave() {
 
   doc.querySelector("#coachRate").value = "55";
   doc.querySelector("#coachRate").dispatchEvent(new win.Event("input", { bubbles: true }));
+  const lessonCountBeforeCancel = win.getProfile("maya").lessonOptions.length;
+  doc.querySelector("#openLessonOptionEditor").click();
+  assert(!doc.querySelector("#lessonOptionEditor").hidden && doc.querySelector("#openLessonOptionEditor").hidden, "Add lesson did not expand an inline table row.");
+  doc.querySelector("#lessonName").value = "不应添加的课程";
+  doc.querySelector("#cancelLessonOption").click();
+  assert(doc.querySelector("#lessonOptionEditor").hidden && !doc.querySelector("#openLessonOptionEditor").hidden && doc.querySelector("#lessonName").value === "", "Cancel did not clear and collapse the uncommitted lesson row.");
+  assert(win.getProfile("maya").lessonOptions.length === lessonCountBeforeCancel, "Cancel changed the lesson draft collection.");
+  doc.querySelector("#openLessonOptionEditor").click();
+  doc.querySelector("#addLessonOption").click();
+  assert(doc.querySelector("#lessonDurationError").textContent.includes("时长") && doc.querySelector("#lessonPriceError").textContent.includes("价格"), "Missing lesson fields did not show errors beside their inputs.");
+  assert(!doc.querySelector("#lessonOptionEditor").hidden, "Validation failure collapsed the new lesson inputs.");
   doc.querySelector("#lessonDuration").value = "45";
   doc.querySelector("#lessonDuration").dispatchEvent(new win.Event("input", { bubbles: true }));
   assert(doc.querySelector("#lessonPrice").value === "82", "New lesson price did not discard the fractional result of 55 × 45 ÷ 30.");
@@ -539,6 +575,7 @@ async function testCoachProfileDraftAndSave() {
   doc.querySelector("#lessonName").value = "45 分钟测试课";
   doc.querySelector("#addLessonOption").click();
   assert(win.getProfile("maya").lessonOptions.some((lesson) => lesson.name === "45 分钟测试课" && lesson.price === 82.75), "A manually edited lesson price was not retained.");
+  assert(doc.querySelector("#lessonOptionEditor").hidden && !doc.querySelector("#openLessonOptionEditor").hidden, "Successful lesson addition did not restore the table add entry.");
   assert(doc.querySelector("#coachRate").value === "56", "Adding a lesson reset the unsaved base price.");
 
   const newRate = Number(originalProfile.rate) + 5;
@@ -548,23 +585,46 @@ async function testCoachProfileDraftAndSave() {
   doc.querySelector("#coachRate").dispatchEvent(new win.Event("input", { bubbles: true }));
   doc.querySelector("#coachBio").value = savedBio;
   doc.querySelector("#coachBio").dispatchEvent(new win.Event("input", { bubbles: true }));
+  for (const disciplineId of ["singles", "ice-dance"]) {
+    doc.querySelector(`#coachTeachingDisciplines input[value="${disciplineId}"]`).click();
+  }
+  assert(doc.querySelector(".profile-identity-meta").textContent.trim() === "教练", "Editable identity values were duplicated beside the avatar.");
   for (const specialtyId of ["edges", "footwork"]) {
-    const input = doc.querySelector(`#coachSpecialtyOptions input[value="${specialtyId}"]`);
-    input.checked = true;
-    input.dispatchEvent(new win.Event("change", { bubbles: true }));
+    doc.querySelector(`#coachSpecialtyOptions input[value="${specialtyId}"]`).closest("label").click();
   }
   doc.querySelector("#toggleCustomSpecialty").click();
   assert(!doc.querySelector("#customSpecialtyEditor").hidden && doc.querySelector("#toggleCustomSpecialty").getAttribute("aria-expanded") === "true", "Custom specialty editor did not expand.");
   doc.querySelector("#customSpecialtyInput").value = "  成人零基础  ";
-  doc.querySelector("#addCustomSpecialty").click();
-  assert(win.getProfile("maya").customSpecialties.join("|") === "成人零基础" && doc.querySelector("#coachCustomSpecialties").textContent.includes("成人零基础"), "Custom specialty was not trimmed and added to the profile draft.");
+  doc.querySelector("#customSpecialtyInput").dispatchEvent(new win.KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+  assert(win.getProfile("maya").customSpecialties.join("|") === "成人零基础" && doc.querySelector("#coachCustomSpecialties").textContent.includes("成人零基础"), "Enter did not trim and add a custom specialty to the profile draft.");
+  assert(win.getProfile("maya").selectedCustomSpecialties.join("|") === "成人零基础", "New custom specialty was not selected by default.");
+  assert(doc.querySelector("#customSpecialtyEditor").hidden && !doc.querySelector("#toggleCustomSpecialty").hidden, "Adding a custom specialty did not collapse the inline editor.");
+  assert(doc.querySelector('#coachCustomSpecialties input[data-action="toggle-custom-specialty"]:checked')?.dataset.specialty === "成人零基础", "Custom specialty did not render as the same selected square checkbox control.");
+  doc.querySelector("#toggleCustomSpecialty").click();
   doc.querySelector("#customSpecialtyInput").value = "成人零基础";
   doc.querySelector("#addCustomSpecialty").click();
   assert(win.getProfile("maya").customSpecialties.length === 1 && doc.querySelector("#customSpecialtyMessage").textContent.includes("已存在"), "Duplicate custom specialty was accepted.");
   doc.querySelector("#customSpecialtyInput").value = "冰舞";
   doc.querySelector("#addCustomSpecialty").click();
-  doc.querySelector('[data-action="remove-custom-specialty"][data-specialty="冰舞"]').click();
-  assert(!win.getProfile("maya").customSpecialties.includes("冰舞"), "Custom specialty tag could not be removed.");
+  const iceDanceInput = doc.querySelector('input[data-action="toggle-custom-specialty"][data-specialty="冰舞"]');
+  iceDanceInput.click();
+  assert(win.getProfile("maya").customSpecialties.includes("冰舞") && !win.getProfile("maya").selectedCustomSpecialties.includes("冰舞") && !iceDanceInput.checked, "Unchecking a custom specialty removed its option instead of only changing selection.");
+  iceDanceInput.click();
+  doc.querySelector('button[data-action="delete-custom-specialty"][data-specialty="冰舞"]').click();
+  assert(!win.getProfile("maya").customSpecialties.includes("冰舞") && !win.getProfile("maya").selectedCustomSpecialties.includes("冰舞"), "Custom specialty trash action did not delete the option and selection state.");
+  doc.querySelector("#toggleCustomSpecialty").click();
+  doc.querySelector("#customSpecialtyInput").value = "待选专长";
+  doc.querySelector("#addCustomSpecialty").click();
+  doc.querySelector('input[data-action="toggle-custom-specialty"][data-specialty="待选专长"]').click();
+  assert(win.getProfile("maya").customSpecialties.includes("待选专长") && !win.getProfile("maya").selectedCustomSpecialties.includes("待选专长"), "Unselected custom specialty was not retained in the draft.");
+  doc.querySelector("#toggleCustomSpecialty").click();
+  doc.querySelector("#customSpecialtyInput").value = "不应添加";
+  doc.querySelector("#customSpecialtyInput").dispatchEvent(new win.KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+  assert(doc.querySelector("#customSpecialtyEditor").hidden && !win.getProfile("maya").customSpecialties.includes("不应添加"), "Escape did not cancel and collapse the custom specialty editor.");
+  doc.querySelector("#toggleCustomSpecialty").click();
+  doc.querySelector("#customSpecialtyInput").value = "同样不应添加";
+  doc.querySelector("#cancelCustomSpecialty").click();
+  assert(doc.querySelector("#customSpecialtyEditor").hidden && doc.querySelector("#customSpecialtyInput").value === "", "Cancel did not clear and collapse the custom specialty editor.");
   doc.querySelector("#travelsToOtherRinks").value = "negotiable";
   doc.querySelector("#travelsToOtherRinks").dispatchEvent(new win.Event("change", { bubbles: true }));
   assert(!doc.querySelector("#travelConditionsLabel").classList.contains("is-hidden"), "Negotiable travel selection did not reveal the optional conditions field.");
@@ -582,7 +642,9 @@ async function testCoachProfileDraftAndSave() {
   assert(win.getProfile("maya").basePriceUnitMinutes === 30, "Saving the profile lost the 30-minute pricing marker.");
   assert(win.getProfile("maya").photoUrl === newPhotoUrl, "The unified profile save did not update the coach photo.");
   assert(win.getProfile("maya").bio === savedBio && JSON.stringify(win.getProfile("maya").specialties) === JSON.stringify(["edges", "footwork"]), "The unified profile save did not retain biography and preset specialties.");
-  assert(JSON.stringify(win.getProfile("maya").customSpecialties) === JSON.stringify(["成人零基础"]), "The unified profile save did not retain custom specialties.");
+  assert(JSON.stringify(win.getProfile("maya").teachingDisciplines) === JSON.stringify(["singles", "ice-dance"]), "The unified profile save did not retain teaching disciplines.");
+  assert(JSON.stringify(win.getProfile("maya").customSpecialties) === JSON.stringify(["成人零基础", "待选专长"]), "The unified profile save did not retain selected and unselected custom specialty options.");
+  assert(JSON.stringify(win.getProfile("maya").selectedCustomSpecialties) === JSON.stringify(["成人零基础"]), "The unified profile save did not retain custom specialty selection state.");
   assert(win.getProfile("maya").travelsToOtherRinks && win.getProfile("maya").travelConditions === "限市区范围，交通费用另议。", "The unified profile save did not retain negotiable travel conditions.");
   assert(!win.hasUnsavedProfileChanges, "Saving the profile did not clear the dirty state.");
   assert(doc.querySelector("#profileMessage").textContent.trim() === "已保存" && doc.querySelector("#profileSaveStatus").textContent.trim() === "已保存", "The unified profile save did not show success feedback in both status locations.");
@@ -602,8 +664,10 @@ async function testCoachProfileDraftAndSave() {
   assert(reloaded.dom.window.getProfile("maya").photoUrl === newPhotoUrl, "Saved coach photo was lost after reload.");
   assert(!reloaded.dom.window.document.querySelector("#coachCity"), "The removed city field returned after reload.");
   assert(reloaded.dom.window.document.querySelector("#coachBio").value === savedBio, "Saved biography was lost after reload.");
-  assert([...reloaded.dom.window.document.querySelectorAll('#coachSpecialtyOptions input[name="coachSpecialties"]:checked')].map((input) => input.value).join(",") === "edges,footwork", "Saved specialties were lost after reload.");
+  assert([...reloaded.dom.window.document.querySelectorAll('#coachTeachingDisciplines input[name="coachTeachingDisciplines"]:checked')].map((input) => input.value).join(",") === "singles,ice-dance", "Saved teaching disciplines were lost after reload.");
+  assert([...reloaded.dom.window.document.querySelectorAll('#coachSpecialtyOptions input[name="coachSpecialties"]:checked')].map((input) => input.value).join(",") === "edges,footwork", "Saved preset specialties were lost after reload.");
   assert(reloaded.dom.window.document.querySelector("#coachCustomSpecialties").textContent.includes("成人零基础"), "Saved custom specialty was lost after reload.");
+  assert(reloaded.dom.window.document.querySelector('input[data-specialty="成人零基础"]').checked && !reloaded.dom.window.document.querySelector('input[data-specialty="待选专长"]').checked, "Custom specialty checked states were lost after reload.");
   assert(reloaded.dom.window.document.querySelector("#travelsToOtherRinks").value === "negotiable" && reloaded.dom.window.document.querySelector("#travelConditions").value === "限市区范围，交通费用另议。", "Saved travel conditions were lost after reload.");
   assert(reloaded.dom.window.document.querySelector("#coachPhotoPreview").style.backgroundImage.includes(newPhotoUrl), "Reloaded photo data was not restored to the profile avatar.");
   reloaded.dom.window.close();
@@ -611,9 +675,9 @@ async function testCoachProfileDraftAndSave() {
 
 async function testLegacyBasePriceMigration() {
   const legacyProfiles = {
-    maya: { coachId: "maya", rate: 120, travelsToOtherRinks: true, travelFee: 25, lessonOptions: [{ id: "maya-custom", name: "Maya legacy", duration: 30, price: 61 }] },
-    alex: { coachId: "alex", rate: 95, lessonOptions: [{ id: "alex-custom", name: "Alex legacy", duration: 60, price: 95 }] },
-    sam: { coachId: "sam", rate: 110, lessonOptions: [{ id: "sam-custom", name: "Sam legacy", duration: 45, price: 83 }] },
+    maya: { coachId: "maya", rate: 120, travelsToOtherRinks: true, travelFee: 25, customSpecialties: ["旧自定义专长"], coachingStartYear: 2015, lessonOptions: [{ id: "maya-custom", name: "Maya legacy", duration: 30, price: 61 }] },
+    alex: { coachId: "alex", rate: 95, skatingStartYear: 2012, showSkatingExperience: false, lessonOptions: [{ id: "alex-custom", name: "Alex legacy", duration: 60, price: 95 }] },
+    sam: { coachId: "sam", rate: 110, coachingStartYear: 2014, showCoachingExperience: true, lessonOptions: [{ id: "sam-custom", name: "Sam legacy", duration: 45, price: 83 }] },
   };
   const firstLoad = await loadPage("coach/index.html", { localStorage: { "ice-skating-coach-profiles-v2": JSON.stringify(legacyProfiles) } });
   assertNoRuntimeErrors("legacy base price migration", firstLoad.errors);
@@ -622,9 +686,15 @@ async function testLegacyBasePriceMigration() {
   assert(firstLoad.dom.window.getProfile("sam").rate === 55, "Sam's hourly rate did not migrate to a 30-minute base price.");
   assert(firstLoad.dom.window.getProfile("sam").lessonOptions.find((lesson) => lesson.id === "sam-custom").price === 83, "Migration recalculated an existing lesson price.");
   assert(firstLoad.dom.window.getProfile("maya").travelFee === 25 && firstLoad.dom.window.getProfile("maya").travelConditions.includes("额外出行费 $25/次"), "Legacy travel fee meaning was not preserved in the negotiable conditions migration.");
+  assert(firstLoad.dom.window.getProfile("maya").selectedCustomSpecialties.join("|") === "旧自定义专长", "Legacy custom specialties were not selected during migration.");
+  assert(!firstLoad.dom.window.getProfile("maya").teachingDisciplines.length && firstLoad.dom.window.getProfile("maya").skatingStartYear === null, "Legacy profiles fabricated missing skating identity details during migration.");
+  assert(firstLoad.dom.window.getProfile("maya").coachingStartYear === 2015, "A legacy year without a visibility flag was not preserved.");
+  assert(firstLoad.dom.window.getProfile("alex").skatingStartYear === 2012, "A formerly private retained year was discarded during migration.");
+  assert(firstLoad.dom.window.getProfile("sam").coachingStartYear === 2014, "A formerly public year was lost during migration.");
   assert(firstLoad.dom.window.document.querySelector("#travelsToOtherRinks").value === "negotiable", "Legacy other-rink acceptance did not map to negotiable.");
   const migratedStorage = dumpLocalStorage(firstLoad.dom.window);
   const storedProfiles = JSON.parse(migratedStorage["ice-skating-coach-profiles-v2"]);
+  assert(storedProfiles.alex.skatingStartYear === 2012 && storedProfiles.sam.coachingStartYear === 2014, "Legacy year data was not retained in migrated storage.");
   assert(["maya", "alex", "sam"].every((coachId) => storedProfiles[coachId].basePriceUnitMinutes === 30), "Migration marker was not persisted.");
   assert(storedProfiles.maya.demoPhotoVersion === 1 && storedProfiles.maya.photoUrl.endsWith("/assets/coaches/maya-chen.jpg"), "Stored demo data did not receive the default portrait migration.");
   firstLoad.dom.window.close();

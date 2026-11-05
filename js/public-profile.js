@@ -2,7 +2,10 @@ import { coaches, currentCoachId, profileStorageKey, studentHasFullAccess } from
 import { loadProfiles } from "./data-store.js";
 import { createDefaultProfile } from "./demo-data.js";
 import { storageGetItem } from "./storage-adapter.js";
-import { getCoachSpecialtyLabels } from "./domain/coach-profile.mjs";
+import {
+  getCoachSpecialtyLabels,
+  getCoachTeachingDisciplineLabels,
+} from "./domain/coach-profile.mjs";
 const coachProfiles = loadProfiles();
 function getProfile(coachId) {
   return coachProfiles[coachId] || createDefaultProfile(coachId);
@@ -19,13 +22,8 @@ function getProfile(coachId) {
     return;
   }
   const profile = getProfile(coachId);
-  const subjects = {
-    "Figure Skating Coach": "花样滑冰教练",
-    "Hockey Skating Coach": "冰球滑行教练",
-    "Off-ice & Jumps Coach": "陆地与跳跃训练教练"
-  };
-  const subject = subjects[coach.subject] || coach.subject;
-  const specialties = getCoachSpecialtyLabels(profile.specialties, profile.customSpecialties);
+  const disciplines = getCoachTeachingDisciplineLabels(profile.teachingDisciplines);
+  const specialties = getCoachSpecialtyLabels(profile.specialties, profile.selectedCustomSpecialties);
   const bookingUrl = new URL("../student/index.html", location.href);
   bookingUrl.searchParams.set("coach", coach.id);
   if (studentHasFullAccess) bookingUrl.searchParams.set("access", "full");
@@ -39,9 +37,10 @@ function getProfile(coachId) {
     byId("profileLogin").href = bookingUrl.href;
     byId("bookingHelp").textContent = "进入完整课表，选择上课时间。";
   }
-  document.title = `${coach.name} · ${subject} · 冰场预约`;
+  document.title = `${coach.name} · ${disciplines.length ? disciplines.join("、") : "教练"} · 冰场预约`;
   byId("coachName").textContent = coach.name;
-  byId("coachSubject").textContent = subject;
+  byId("coachDisciplines").textContent = disciplines.join("、");
+  byId("coachDisciplines").hidden = !disciplines.length;
   byId("coachInitials").textContent = coach.name.split(/\s+/).map((part) => part[0]).slice(0, 2).join("");
   const saved = storageGetItem(profileStorageKey);
   let isSaved = false;
@@ -56,13 +55,10 @@ function getProfile(coachId) {
   byId("aboutCoachNav").hidden = !bio;
   byId("teachingSpecialties").hidden = !specialties.length;
   byId("teachingSpecialtiesNav").hidden = !specialties.length;
-  byId("heroSpecialties").hidden = !specialties.length;
-  for (const id of ["heroSpecialties", "coachSpecialties"]) {
-    for (const specialty of specialties) {
-      const chip = document.createElement("span");
-      chip.textContent = specialty;
-      byId(id).append(chip);
-    }
+  for (const specialty of specialties) {
+    const chip = document.createElement("span");
+    chip.textContent = specialty;
+    byId("coachSpecialties").append(chip);
   }
   const firstVisibleSection = bio ? "aboutCoach" : specialties.length ? "teachingSpecialties" : "teachingRinks";
   byId("profileDetailsLink").href = `#${firstVisibleSection}`;

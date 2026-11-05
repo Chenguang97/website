@@ -19,9 +19,13 @@ import {
 import { escapeAttribute, escapeHtml } from "../js/ui/safe-html.mjs";
 import {
   coachSpecialtyOptions,
+  coachTeachingDisciplineOptions,
   customCoachSpecialtyMaxLength,
   getCoachSpecialtyLabels,
+  getCoachTeachingDisciplineLabels,
   normalizeCoachSpecialties,
+  normalizeCoachTeachingDisciplines,
+  normalizeStartYear,
   normalizeCustomCoachSpecialties,
 } from "../js/domain/coach-profile.mjs";
 
@@ -64,5 +68,10 @@ assert.deepEqual(getCoachSpecialtyLabels(["edges", "jumps"]), ["滑行与用刃�
 assert.equal(customCoachSpecialtyMaxLength, 30);
 assert.deepEqual(normalizeCustomCoachSpecialties(["  成人零基础  ", "成人零基础", "ADULT", "adult", ""]), ["成人零基础", "ADULT"]);
 assert.deepEqual(getCoachSpecialtyLabels(["edges"], ["成人零基础"]), ["滑行与用刃（Edges）", "成人零基础"]);
+assert.equal(coachTeachingDisciplineOptions.length, 4);
+assert.deepEqual(normalizeCoachTeachingDisciplines(["singles", "unknown", "ice-dance", "singles"]), ["singles", "ice-dance"]);
+assert.deepEqual(getCoachTeachingDisciplineLabels(["pairs", "synchronized"]), ["双人滑", "同步滑"]);
+assert.equal(normalizeStartYear("2018", 2026), 2018);
+assert.equal(normalizeStartYear("2027", 2026), null);
 
 console.log("Domain rule tests passed.");

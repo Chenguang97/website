@@ -1,1163 +1,1260 @@
 @layer legacy {
-.hero-strip {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 240px;
-  align-items: center;
-  gap: 24px;
-  margin-bottom: 28px;
-  padding: 28px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: linear-gradient(120deg, #ffffff 0%, #eef7f3 100%);
-  box-shadow: var(--shadow);
-}
-
-.coach-visual {
-  display: grid;
-  place-items: center;
-  min-height: 160px;
-}
-
-.calendar-art {
-  display: grid;
-  grid-template-columns: repeat(3, 52px);
-  gap: 10px;
-  padding: 18px;
-  border: 1px solid #bed2ea;
-  border-radius: 8px;
-  background: #ffffff;
-  transform: rotate(-2deg);
-  box-shadow: 0 18px 40px rgba(29, 78, 216, 0.16);
-}
-
-.calendar-art span {
-  width: 52px;
-  height: 38px;
-  border-radius: 8px;
-  background: #dbeafe;
-}
-
-.calendar-art span:nth-child(2),
-.calendar-art span:nth-child(5),
-.calendar-art span:nth-child(7) {
-  background: #bbf7d0;
-}
-
-.calendar-art span:nth-child(4) {
-  background: var(--yellow);
-}
-
-.view {
-  display: none;
-}
-
-.view.active {
-  display: block;
-}
-
-.section-header,
-.panel-heading,
-.dialog-heading {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 18px;
-  margin-bottom: 18px;
-}
-
-.coach-tabs {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-bottom: 18px;
-  padding: 6px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: #ffffff;
-  box-shadow: 0 8px 28px rgba(23, 32, 51, 0.08);
-}
-
-.coach-tab {
-  min-height: 42px;
-  border: 0;
-  border-radius: 6px;
-  padding: 9px 16px;
-  background: transparent;
-  color: var(--muted);
-  font-weight: 900;
-}
-
-.coach-tab.active {
-  background: var(--blue);
-  color: #ffffff;
-}
-
-.coach-layout {
-  display: block;
-}
-
-.form-panel,
-.profile-panel,
-.availability-panel,
-.calendar-panel,
-.bookings-panel,
-.photo-panel,
-.student-controls,
-.booking-dialog form {
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: var(--surface);
-  box-shadow: 0 8px 28px rgba(23, 32, 51, 0.08);
-}
-
-.form-panel,
-.profile-panel,
-.photo-panel,
-.booking-dialog form {
-  display: grid;
-  gap: 16px;
-  padding: 20px;
-}
-
-.coach-layout > .coach-panel {
-  display: none;
-}
-
-.coach-layout > .coach-panel.active {
-  display: grid;
-}
-
-.admin-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 14px;
-}
-
-.admin-card {
-  display: grid;
-  gap: 8px;
-  padding: 16px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: var(--surface);
-  box-shadow: 0 8px 28px rgba(23, 32, 51, 0.08);
-}
-
-.admin-card strong {
-  color: #172033;
-  font-size: 30px;
-}
-
-.admin-card span {
-  color: var(--muted);
-  font-size: 13px;
-  font-weight: 800;
-  line-height: 1.45;
-}
-
-html[data-active-coach-panel="bookingsPanel"] .coach-layout > .coach-panel.active:not([data-coach-content="bookingsPanel"]),
-html[data-active-coach-panel="availabilityPanel"] .coach-layout > .coach-panel.active:not([data-coach-content="availabilityPanel"]) {
-  display: none;
-}
-
-html[data-active-coach-panel="bookingsPanel"] .coach-layout > [data-coach-content="bookingsPanel"],
-html[data-active-coach-panel="availabilityPanel"] .coach-layout > [data-coach-content="availabilityPanel"] {
-  display: grid;
-}
-
-html[data-active-coach-panel="bookingsPanel"] .coach-tab.active:not([data-coach-panel="bookingsPanel"]),
-html[data-active-coach-panel="availabilityPanel"] .coach-tab.active:not([data-coach-panel="availabilityPanel"]) {
-  background: transparent;
-  color: var(--muted);
-}
-
-html[data-active-coach-panel="bookingsPanel"] .coach-tab[data-coach-panel="bookingsPanel"],
-html[data-active-coach-panel="availabilityPanel"] .coach-tab[data-coach-panel="availabilityPanel"] {
-  background: var(--blue);
-  color: #ffffff;
-}
-
-.availability-panel {
-  display: grid;
-  gap: 10px;
-  padding: 20px;
-}
-
-.profile-field {
-  display: grid;
-  align-content: start;
-  gap: 8px;
-  min-width: 0;
-}
-
-.field-hint {
-  display: block;
-  color: var(--muted);
-  font-size: 12px;
-  font-weight: 800;
-  line-height: 1.4;
-}
-
-.money-input {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  align-items: center;
-  min-height: 44px;
-  border: 1px solid #cbd5e1;
-  border-radius: 8px;
-  background: #ffffff;
-  color: var(--muted);
-  font-size: 13px;
-  font-weight: 900;
-  overflow: hidden;
-}
-
-.money-input span {
-  padding: 0 10px;
-  white-space: nowrap;
-}
-
-.money-input input {
-  min-height: 42px;
-  border: 0;
-  border-radius: 0;
-  padding: 9px 4px;
-}
-
-.money-input input:focus {
-  outline: none;
-}
-
-.teaching-location-panel,
-.lesson-rate-panel {
-  display: grid;
-  gap: 14px;
-  padding: 18px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: #ffffff;
-}
-
-.teaching-location-grid {
-  display: grid;
-  grid-template-columns: minmax(0, 3fr) minmax(220px, 2fr);
-  gap: 14px;
-  align-items: start;
-}
-
-.lesson-rate-layout {
-  display: grid;
-  grid-template-columns: minmax(220px, 0.7fr) minmax(0, 2.3fr);
-  gap: 18px;
-  align-items: start;
-}
-
-.rate-summary-card {
-  padding: 14px;
-  border: 1px solid #dbe5f1;
-  border-radius: 8px;
-  background: #f8fafc;
-}
-
-.profile-field-rate {
-  gap: 10px;
-}
-
-.lesson-options-area {
-  display: grid;
-  gap: 12px;
-  min-width: 0;
-}
-
-.lesson-options-list {
-  display: grid;
-  gap: 0;
-  overflow: hidden;
-  border: 1px solid #dbe5f1;
-  border-radius: 8px;
-  background: #ffffff;
-}
-
-.lesson-option-header {
-  display: grid;
-  grid-template-columns: minmax(220px, 1.5fr) minmax(96px, 0.55fr) minmax(96px, 0.55fr) 82px;
-  gap: 12px;
-  padding: 10px 12px;
-  border-bottom: 1px solid #e6edf6;
-  background: #f8fafc;
-  color: var(--muted);
-  font-size: 12px;
-  font-weight: 900;
-}
-
-.lesson-option-row {
-  display: grid;
-  grid-template-columns: minmax(220px, 1.5fr) minmax(96px, 0.55fr) minmax(96px, 0.55fr) 82px;
-  gap: 12px;
-  align-items: center;
-  padding: 10px 12px;
-  border-bottom: 1px solid #eef3f8;
-}
-
-.lesson-option-row:last-child {
-  border-bottom: 0;
-}
-
-.lesson-option-row input,
-.lesson-option-form input {
-  min-height: 40px;
-  border-color: #dbe5f1;
-  background: #fbfdff;
-}
-
-.coach-app-shell .lesson-option-row .lesson-delete-button {
-  position: relative;
-  display: inline-grid;
-  place-items: center;
-  justify-self: center;
-  width: 40px;
-  min-height: 40px;
-  padding: 8px;
-  border: 1px solid transparent;
-  border-radius: 50%;
-  background: transparent;
-  color: #786f67;
-}
-
-.coach-app-shell .lesson-option-row .lesson-delete-button svg {
-  width: 18px;
-  height: 18px;
-  fill: currentColor;
-}
-
-.coach-app-shell .lesson-option-row .lesson-delete-button:hover {
-  color: #742f27;
-  border-color: #dfb9ad;
-  background: var(--danger-soft);
-}
-
-.coach-app-shell .lesson-option-row .lesson-delete-button:focus-visible {
-  color: #742f27;
-  border-color: #c98f80;
-  background: var(--danger-soft);
-  outline: 3px solid rgba(138, 63, 53, 0.28);
-  outline-offset: 2px;
-}
-
-.coach-app-shell .lesson-option-row .lesson-delete-button::after {
-  position: absolute;
-  right: 0;
-  bottom: calc(100% + 6px);
-  z-index: 4;
-  width: max-content;
-  padding: 5px 8px;
-  border-radius: 6px;
-  background: var(--text);
-  color: var(--surface);
-  content: attr(data-tooltip);
-  font-size: 12px;
-  font-weight: 500;
-  line-height: 1;
-  opacity: 0;
-  pointer-events: none;
-  transform: translateY(3px);
-  transition: opacity 120ms ease, transform 120ms ease;
-}
-
-.coach-app-shell .lesson-option-row .lesson-delete-button:hover::after,
-.coach-app-shell .lesson-option-row .lesson-delete-button:focus-visible::after {
-  opacity: 1;
-  transform: translateY(0);
-}
-
-.lesson-add-card {
-  display: grid;
-  gap: 10px;
-  padding: 12px;
-  border: 1px dashed #cbd5e1;
-  border-radius: 8px;
-  background: #fbfdff;
-}
-
-.lesson-add-title {
-  margin: 0;
-  color: #334155;
-  font-size: 13px;
-  font-weight: 900;
-}
-
-.lesson-option-form {
-  display: grid;
-  grid-template-columns: minmax(220px, 1.5fr) minmax(96px, 0.55fr) minmax(96px, 0.55fr) 82px;
-  gap: 12px;
-  align-items: end;
-}
-
-.lesson-option-form label {
-  display: grid;
-  gap: 6px;
-  color: var(--muted);
-  font-size: 12px;
-  font-weight: 900;
-}
-
-.lesson-option-form .ghost-button {
-  min-height: 40px;
-  padding: 8px 10px;
-}
-
-.primary-button.has-unsaved {
-  box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.22);
-}
-
-body:has(#coachView.view.active) .workspace {
-  width: min(100%, 1360px);
-  padding: 16px 32px;
-}
-
-.coach-workspace-container {
-  width: min(100%, 1160px);
-  margin-inline: auto;
-}
-
-body:has(#coachView.view.active) .section-header {
-  align-items: flex-start;
-  margin-bottom: 14px;
-}
-
-.coach-app-shell #coachView > .coach-action-bar {
-  position: sticky;
-  top: 0;
-  z-index: 20;
-  align-items: center;
-  min-height: 58px;
-  margin-bottom: 14px;
-  padding: 10px 0;
-  border-bottom: 1px solid var(--line);
-  background: var(--bg);
-}
-
-body:has(#coachView.view.active) .section-header h2 {
-  font-size: 28px;
-  line-height: 1.08;
-}
-
-.coach-app-shell .header-actions {
-  display: flex;
-  align-items: center;
-  flex-wrap: nowrap;
-  gap: 10px;
-}
-
-.header-actions .ghost-button,
-.header-actions .primary-button {
-  min-height: 38px;
-  border-radius: 8px;
-  padding: 8px 14px;
-  text-decoration: none;
-}
-
-.profile-save-state {
-  display: grid;
-  justify-items: end;
-  min-width: 138px;
-  font-size: 12px;
-  line-height: 1.35;
-}
-
-.profile-save-status {
-  color: var(--muted);
-  font-weight: 600;
-}
-
-.profile-save-status[data-tone="dirty"] { color: #8a5a37; }
-.profile-save-status[data-tone="saving"] { color: var(--brand); }
-.profile-save-status[data-tone="error"] { color: #8a3f35; }
-
-.profile-preview-note {
-  color: var(--muted);
-  font-weight: 400;
-}
-
-.profile-save-state[hidden],
-.profile-preview-note[hidden] {
-  display: none;
-}
-
-html[data-active-coach-panel="bookingsPanel"] .profile-save-state,
-html[data-active-coach-panel="availabilityPanel"] .profile-save-state,
-html[data-active-coach-panel="bookingsPanel"] #saveProfileChanges,
-html[data-active-coach-panel="availabilityPanel"] #saveProfileChanges {
-  display: none;
-}
-
-.profile-feedback {
-  display: flex;
-  align-items: center;
-  min-height: 24px;
-  gap: 10px;
-}
-
-.profile-undo-button {
-  min-height: 32px;
-  padding: 4px 8px;
-  border: 0;
-  border-radius: 6px;
-  background: transparent;
-  color: var(--brand);
-  font-weight: 600;
-  text-decoration: underline;
-  text-underline-offset: 3px;
-}
-
-.profile-undo-button:hover {
-  background: var(--brand-soft);
-  color: var(--brand-hover);
-}
-
-.profile-undo-button[hidden] { display: none; }
-
-.coach-tabs {
-  gap: 28px;
-  margin-bottom: 20px;
-  padding: 0;
-  border: 0;
-  border-bottom: 1px solid var(--line);
-  border-radius: 0;
-  background: transparent;
-  box-shadow: none;
-}
-
-.coach-tab {
-  min-height: 40px;
-  border-radius: 0;
-  padding: 0 0 10px;
-  border-bottom: 2px solid transparent;
-  color: #64748b;
-  font-weight: 800;
-}
-
-.coach-tab.active,
-html[data-active-coach-panel="bookingsPanel"] .coach-tab[data-coach-panel="bookingsPanel"],
-html[data-active-coach-panel="availabilityPanel"] .coach-tab[data-coach-panel="availabilityPanel"] {
-  background: transparent;
-  color: var(--blue);
-  border-bottom-color: var(--blue);
-}
-
-.profile-panel {
-  gap: 14px;
-  width: min(100%, 960px);
-  margin-inline: auto;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  box-shadow: none;
-}
-
-.profile-personal-layout {
-  display: grid;
-  gap: 14px;
-  align-items: start;
-}
-
-.profile-identity-row {
-  display: grid;
-  grid-template-columns: 80px max-content;
-  align-items: center;
-  gap: 16px;
-}
-
-.profile-editor-fields {
-  display: grid;
-  gap: 14px;
-  min-width: 0;
-}
-
-.profile-editor-fields textarea {
-  min-height: 112px;
-  line-height: 1.6;
-  resize: vertical;
-}
-
-.profile-field-title,
-.profile-specialties-field legend {
-  color: var(--text);
-  font-size: 13px;
-  font-weight: 600;
-  line-height: 1.45;
-}
-
-.profile-specialties-field {
-  min-width: 0;
-  margin: 0;
-  padding: 0;
-  border: 0;
-}
-
-.profile-specialties-field legend {
-  margin-bottom: 8px;
-}
-
-.profile-panel .field-hint {
-  color: var(--muted);
-  font-size: 12px;
-  font-weight: 400;
-  line-height: 1.45;
-}
-
-.coach-specialty-group {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-start;
-  gap: 8px;
-}
-
-.coach-specialty-options,
-.coach-custom-specialties {
-  display: contents;
-}
-
-.coach-custom-specialties[hidden] {
-  display: none;
-}
-
-.coach-specialty-tag,
-.specialty-add-trigger {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  min-height: 36px;
-  padding: 7px 12px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-pill);
-  background: var(--surface-white);
-  color: var(--text);
-  font-size: 13px;
-  font-weight: 500;
-  line-height: 1.3;
-}
-
-.coach-specialty-tag:hover,
-.specialty-add-trigger:hover {
-  border-color: var(--brand-border);
-  background: #f6f5ef;
-  color: var(--brand-hover);
-}
-
-.coach-specialty-tag.is-selected {
-  border-color: var(--brand-border);
-  background: var(--brand-soft);
-  color: var(--brand-hover);
-}
-
-.specialty-check {
-  display: none;
-  font-weight: 700;
-}
-
-.coach-specialty-tag.is-selected .specialty-check {
-  display: inline;
-}
-
-.coach-custom-specialty-tag {
-  padding-right: 6px;
-}
-
-.coach-custom-specialty-tag button {
-  display: inline-grid;
-  place-items: center;
-  width: 24px;
-  min-height: 24px;
-  padding: 0;
-  border: 0;
-  border-radius: 50%;
-  background: transparent;
-  color: currentColor;
-  line-height: 1;
-}
-
-.coach-custom-specialty-tag button:hover {
-  background: rgba(82, 97, 73, 0.12);
-}
-
-.specialty-add-trigger {
-  min-height: 36px;
-  border-style: dashed;
-  background: transparent;
-  color: var(--brand);
-  font-weight: 600;
-}
-
-.specialty-add-trigger[hidden] {
-  display: none;
-}
-
-.custom-specialty-editor {
-  display: flex;
-  flex: 1 1 100%;
-  flex-wrap: wrap;
-  gap: 6px;
-  min-width: 0;
-}
-
-.custom-specialty-editor[hidden] {
-  display: none;
-}
-
-.custom-specialty-entry {
-  display: flex;
-  flex: 0 1 500px;
-  gap: 8px;
-  min-width: 0;
-}
-
-.custom-specialty-entry input {
-  flex: 1 1 240px;
-  min-height: 36px;
-  padding-block: 7px;
-}
-
-.specialty-editor-action {
-  min-height: 36px;
-  padding: 7px 12px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-pill);
-  background: var(--surface-white);
-  color: var(--text);
-  font-size: 13px;
-  font-weight: 600;
-}
-
-.specialty-editor-add {
-  border-color: var(--brand);
-  background: var(--brand);
-  color: #fffdf8;
-}
-
-.specialty-editor-action:hover {
-  border-color: var(--brand-border);
-  background: var(--brand-soft);
-  color: var(--brand-hover);
-}
-
-.specialty-editor-add:hover {
-  border-color: var(--brand-hover);
-  background: var(--brand-hover);
-  color: #fffdf8;
-}
-
-#customSpecialtyMessage {
-  flex: 1 1 100%;
-  min-height: 18px;
-  margin: 0;
-}
-
-#customSpecialtyMessage.error {
-  color: var(--red);
-}
-
-.profile-photo-panel {
-  gap: 8px;
-  padding-top: 16px;
-  padding-bottom: 16px;
-}
-
-.profile-photo-panel > .panel-heading {
-  margin-bottom: 0;
-}
-
-.profile-photo-panel > .panel-heading h3,
-.teaching-location-panel > .panel-heading h3,
-.lesson-rate-panel > .panel-heading h3 {
-  margin: 0;
-}
-
-.teaching-location-panel > .panel-heading,
-.lesson-rate-panel > .panel-heading {
-  margin-bottom: 0;
-}
-
-.profile-identity-copy strong {
-  display: block;
-  font-size: 20px;
-}
-
-.profile-avatar-action {
-  width: max-content;
-}
-
-.avatar-change-button {
-  position: relative;
-  display: block;
-  padding: 0;
-  border: 0;
-  border-radius: 50%;
-  background: transparent;
-}
-
-.avatar-change-button::after {
-  position: absolute;
-  right: -12px;
-  bottom: -34px;
-  z-index: 2;
-  padding: 5px 8px;
-  border-radius: 6px;
-  background: var(--text);
-  color: var(--surface);
-  content: attr(aria-label);
-  font-size: 12px;
-  font-weight: 500;
-  line-height: 1;
-  opacity: 0;
-  pointer-events: none;
-  transform: translateY(-4px);
-  transition: opacity 120ms ease, transform 120ms ease;
-  white-space: nowrap;
-}
-
-.avatar-change-button:hover::after,
-.avatar-change-button:focus-visible::after {
-  opacity: 1;
-  transform: translateY(0);
-}
-
-.avatar-change-button:focus-visible {
-  outline: 3px solid color-mix(in srgb, var(--brand) 28%, transparent);
-  outline-offset: 4px;
-}
-
-.avatar-camera-badge {
-  position: absolute;
-  right: 0;
-  bottom: 0;
-  display: grid;
-  place-items: center;
-  width: 30px;
-  height: 30px;
-  border: 3px solid var(--surface);
-  border-radius: 50%;
-  background: var(--brand);
-  color: #fff;
-  pointer-events: none;
-}
-
-.avatar-camera-badge svg {
-  width: 15px;
-  height: 15px;
-  fill: currentColor;
-}
-
-.coach-photo-dialog {
-  width: min(440px, calc(100vw - 32px));
-}
-
-.coach-photo-dialog form {
-  gap: 16px;
-}
-
-.coach-photo-dialog-preview {
-  width: 148px;
-  height: 148px;
-  margin: 0 auto;
-  font-size: 36px;
-}
-
-.coach-photo-dialog-controls {
-  display: grid;
-  justify-items: center;
-  gap: 10px;
-}
-
-.coach-photo-dialog #photoMessage {
-  width: 100%;
-  text-align: center;
-}
-
-.teaching-location-panel,
-.lesson-rate-panel {
-  border-color: rgba(217, 226, 239, 0.82);
-  box-shadow: 0 8px 24px rgba(23, 32, 51, 0.05);
-}
-
-.teaching-location-grid {
-  grid-template-columns: minmax(0, 1fr);
-  gap: 12px;
-}
-
-.lesson-rate-layout {
-  grid-template-columns: minmax(0, 1fr);
-  gap: 14px;
-}
-
-.rate-summary-card {
-  background: #f8fafc;
-}
-
-.profile-field-rinks .checkbox-stack {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-}
-
-.profile-field-travel {
-  grid-template-columns: minmax(200px, 260px) minmax(0, 1fr);
-  align-items: end;
-  gap: 12px;
-}
-
-.profile-field-travel > label {
-  display: grid;
-  gap: 8px;
-}
-
-.profile-travel-control {
-  gap: 6px;
-}
-
-.profile-field-conditions textarea {
-  min-height: 88px;
-  resize: vertical;
-}
-
-.rate-label-copy {
-  display: grid;
-  gap: 4px;
-}
-
-.rate-label-copy > label {
-  font-weight: 600;
-}
-
-.lesson-option-header,
-.lesson-option-row {
-  grid-template-columns: minmax(220px, 1.5fr) minmax(110px, 0.55fr) minmax(110px, 0.55fr) 72px;
-}
-
-.method-switch,
-.exception-method-switch {
-  display: inline-grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 6px;
-  padding: 4px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: #f8fafc;
-}
-
-.availability-subnav {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  padding: 6px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: #ffffff;
-}
-
-.availability-subtab {
-  min-height: 40px;
-  border: 0;
-  border-radius: 6px;
-  padding: 8px 14px;
-  background: transparent;
-  color: var(--muted);
-  font-weight: 900;
-}
-
-.availability-subtab.active {
-  background: var(--blue);
-  color: #ffffff;
-}
-
-.availability-section,
-.booking-section {
-  display: none;
-  gap: 14px;
-}
-
-.availability-section.active,
-.booking-section.active {
-  display: grid;
-}
-
-.method-button,
-.exception-method-button {
-  min-height: 38px;
-  border: 0;
-  border-radius: 6px;
-  padding: 8px 14px;
-  background: transparent;
-  color: var(--muted);
-  font-weight: 900;
-}
-
-.method-button.active,
-.exception-method-button.active {
-  background: var(--blue);
-  color: #ffffff;
-}
-
-.exception-method-panel {
-  display: grid;
-  gap: 14px;
-}
-
-.default-note {
-  margin: 0;
-  color: var(--muted);
-  font-size: 14px;
-  line-height: 1.5;
-}
-
-.heading-note {
-  max-width: 680px;
-  margin: 6px 0 0;
-  color: var(--muted);
-  font-size: 13px;
-  line-height: 1.45;
-}
-
-.is-hidden {
-  display: none !important;
-}
-
-.bookings-panel {
-  padding: 20px;
-}
-
-.photo-layout {
-  display: grid;
-  grid-template-columns: 260px minmax(0, 1fr);
-  gap: 20px;
-  align-items: start;
-}
-
-.photo-preview {
-  display: grid;
-  place-items: center;
-  min-height: 260px;
-  border: 1px dashed #94a3b8;
-  border-radius: 8px;
-  background: #f8fafc;
-}
-
-.avatar-preview {
-  display: grid;
-  place-items: center;
-  width: 170px;
-  height: 170px;
-  border-radius: 50%;
-  background: #dbeafe center / cover no-repeat;
-  color: #1d4ed8;
-  font-size: 42px;
-  font-weight: 900;
-}
-
-.photo-form {
-  display: grid;
-  gap: 16px;
-}
-
-/* Keep the coach editor compact without stretching short fields across the page. */
-.coach-app-shell .coach-page-nav {
-  margin-bottom: 4px;
-}
-
-.coach-app-shell .coach-page-nav .role-home-link {
-  min-height: 32px;
-}
-
-.coach-app-shell #coachView > .section-header {
-  align-items: center;
-  margin-bottom: 10px;
-}
-
-.coach-app-shell #coachProfileForm {
-  align-items: start;
-  gap: 14px;
-}
-
-.coach-app-shell .lesson-rate-panel > .panel-heading {
-  margin-bottom: 0;
-}
-
-.coach-app-shell .lesson-rate-layout {
-  grid-template-columns: minmax(0, 1fr);
-  gap: 14px;
-}
-
-.coach-app-shell .rate-summary-card {
-  padding: 12px;
-}
-
-.coach-app-shell .profile-field-rate {
-  grid-template-columns: minmax(0, 1fr) 180px;
-  align-items: center;
-  gap: 4px 16px;
-}
-
-.coach-app-shell .profile-field-rate .money-input {
-  grid-column: 2;
-  grid-row: 1;
-}
-
-.coach-app-shell .lesson-option-header,
-.coach-app-shell .lesson-option-row,
-.coach-app-shell .lesson-option-form {
-  grid-template-columns: var(--lesson-option-columns);
-}
-
-.coach-app-shell .lesson-options-area {
-  --lesson-option-columns: minmax(160px, 1fr) 124px 124px 72px;
-}
-
-.lesson-option-action {
-  display: grid;
-  gap: 6px;
-  color: var(--muted);
-  font-size: 12px;
-  font-weight: 900;
-}
-
-@media (min-width: 1101px) {
-  .coach-app-shell #coachProfileForm {
-    grid-template-columns: minmax(0, 1fr);
+  .hero-strip {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 240px;
+    align-items: center;
+    gap: 24px;
+    margin-bottom: 28px;
+    padding: 28px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: linear-gradient(120deg, #ffffff 0%, #eef7f3 100%);
+    box-shadow: var(--shadow);
   }
 
-  .coach-app-shell .profile-identity-row .avatar-preview {
-    width: 80px;
-    height: 80px;
-    font-size: 24px;
+  .coach-visual {
+    display: grid;
+    place-items: center;
+    min-height: 160px;
+  }
+
+  .calendar-art {
+    display: grid;
+    grid-template-columns: repeat(3, 52px);
+    gap: 10px;
+    padding: 18px;
+    border: 1px solid #bed2ea;
+    border-radius: 8px;
+    background: #ffffff;
+    transform: rotate(-2deg);
+    box-shadow: 0 18px 40px rgba(29, 78, 216, 0.16);
+  }
+
+  .calendar-art span {
+    width: 52px;
+    height: 38px;
+    border-radius: 8px;
+    background: #dbeafe;
+  }
+
+  .calendar-art span:nth-child(2),
+  .calendar-art span:nth-child(5),
+  .calendar-art span:nth-child(7) {
+    background: #bbf7d0;
+  }
+
+  .calendar-art span:nth-child(4) {
+    background: var(--yellow);
+  }
+
+  .view {
+    display: none;
+  }
+
+  .view.active {
+    display: block;
+  }
+
+  .section-header,
+  .panel-heading,
+  .dialog-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 18px;
+    margin-bottom: 18px;
+  }
+
+  .coach-tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 18px;
+    padding: 6px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: #ffffff;
+    box-shadow: 0 8px 28px rgba(23, 32, 51, 0.08);
+  }
+
+  .coach-tab {
+    min-height: 42px;
+    border: 0;
+    border-radius: 6px;
+    padding: 9px 16px;
+    background: transparent;
+    color: var(--muted);
+    font-weight: 900;
+  }
+
+  .coach-tab.active {
+    background: var(--blue);
+    color: #ffffff;
+  }
+
+  .coach-layout {
+    display: block;
+  }
+
+  .form-panel,
+  .profile-panel,
+  .availability-panel,
+  .calendar-panel,
+  .bookings-panel,
+  .photo-panel,
+  .student-controls,
+  .booking-dialog form {
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--surface);
+    box-shadow: 0 8px 28px rgba(23, 32, 51, 0.08);
+  }
+
+  .form-panel,
+  .profile-panel,
+  .photo-panel,
+  .booking-dialog form {
+    display: grid;
+    gap: 16px;
+    padding: 20px;
+  }
+
+  .coach-layout > .coach-panel {
+    display: none;
+  }
+
+  .coach-layout > .coach-panel.active {
+    display: grid;
+  }
+
+  .admin-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 14px;
+  }
+
+  .admin-card {
+    display: grid;
+    gap: 8px;
+    padding: 16px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--surface);
+    box-shadow: 0 8px 28px rgba(23, 32, 51, 0.08);
+  }
+
+  .admin-card strong {
+    color: #172033;
+    font-size: 30px;
+  }
+
+  .admin-card span {
+    color: var(--muted);
+    font-size: 13px;
+    font-weight: 800;
+    line-height: 1.45;
+  }
+
+  html[data-active-coach-panel="bookingsPanel"] .coach-layout > .coach-panel.active:not([data-coach-content="bookingsPanel"]),
+  html[data-active-coach-panel="availabilityPanel"] .coach-layout > .coach-panel.active:not([data-coach-content="availabilityPanel"]) {
+    display: none;
+  }
+
+  html[data-active-coach-panel="bookingsPanel"] .coach-layout > [data-coach-content="bookingsPanel"],
+  html[data-active-coach-panel="availabilityPanel"] .coach-layout > [data-coach-content="availabilityPanel"] {
+    display: grid;
+  }
+
+  html[data-active-coach-panel="bookingsPanel"] .coach-tab.active:not([data-coach-panel="bookingsPanel"]),
+  html[data-active-coach-panel="availabilityPanel"] .coach-tab.active:not([data-coach-panel="availabilityPanel"]) {
+    background: transparent;
+    color: var(--muted);
+  }
+
+  html[data-active-coach-panel="bookingsPanel"] .coach-tab[data-coach-panel="bookingsPanel"],
+  html[data-active-coach-panel="availabilityPanel"] .coach-tab[data-coach-panel="availabilityPanel"] {
+    background: var(--blue);
+    color: #ffffff;
+  }
+
+  .availability-panel {
+    display: grid;
+    gap: 10px;
+    padding: 20px;
+  }
+
+  .profile-field {
+    display: grid;
+    align-content: start;
+    gap: 8px;
+    min-width: 0;
+  }
+
+  .field-hint {
+    display: block;
+    color: var(--muted);
+    font-size: 12px;
+    font-weight: 800;
+    line-height: 1.4;
+  }
+
+  .money-input {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    min-height: 44px;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    background: #ffffff;
+    color: var(--muted);
+    font-size: 13px;
+    font-weight: 900;
+    overflow: hidden;
+  }
+
+  .money-input span {
+    padding: 0 10px;
+    white-space: nowrap;
+  }
+
+  .money-input input {
+    min-height: 42px;
+    border: 0;
+    border-radius: 0;
+    padding: 9px 4px;
+  }
+
+  .money-input input:focus {
+    outline: none;
+  }
+
+  .teaching-location-panel,
+  .lesson-rate-panel {
+    display: grid;
+    gap: 14px;
+    padding: 18px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: #ffffff;
+  }
+
+  .teaching-location-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 3fr) minmax(220px, 2fr);
+    gap: 14px;
+    align-items: start;
+  }
+
+  .lesson-rate-layout {
+    display: grid;
+    grid-template-columns: minmax(220px, 0.7fr) minmax(0, 2.3fr);
+    gap: 18px;
+    align-items: start;
+  }
+
+  .rate-summary-card {
+    padding: 14px;
+    border: 1px solid #dbe5f1;
+    border-radius: 8px;
+    background: #f8fafc;
+  }
+
+  .profile-field-rate {
+    gap: 10px;
+  }
+
+  .lesson-options-area {
+    display: grid;
+    gap: 12px;
+    min-width: 0;
+  }
+
+  .lesson-options-list {
+    --lesson-option-columns: minmax(160px, 1fr) 124px 124px 72px;
+    display: grid;
+    gap: 0;
+    overflow: hidden;
+    border: 1px solid #dbe5f1;
+    border-radius: 8px;
+    background: #ffffff;
+  }
+
+  .lesson-option-header {
+    display: grid;
+    grid-template-columns: var(--lesson-option-columns);
+    gap: 12px;
+    align-items: center;
+    padding: 10px 12px;
+    border-bottom: 1px solid #e6edf6;
+    background: #f8fafc;
+    color: var(--muted);
+    font-size: 12px;
+    font-weight: 900;
+  }
+
+  .lesson-option-row {
+    display: grid;
+    grid-template-columns: var(--lesson-option-columns);
+    gap: 12px;
+    align-items: center;
+    padding: 10px 12px;
+    border-bottom: 1px solid #eef3f8;
+  }
+
+  .lesson-option-row:last-child {
+    border-bottom: 0;
+  }
+
+  .lesson-option-row input,
+  .lesson-option-new-row input {
+    min-height: 40px;
+    border-color: #dbe5f1;
+    background: #fbfdff;
+  }
+
+  .lesson-option-header > :last-child,
+  .lesson-option-row > :last-child,
+  .lesson-option-new-row > :last-child {
+    width: 100%;
+    justify-self: center;
+    text-align: center;
+  }
+
+  .coach-app-shell .lesson-option-row .lesson-delete-button {
+    position: relative;
+    display: inline-grid;
+    place-items: center;
+    justify-self: center;
+    width: 40px;
+    min-height: 40px;
+    padding: 8px;
+    border: 1px solid transparent;
+    border-radius: 50%;
+    background: transparent;
+    color: #786f67;
+  }
+
+  .coach-app-shell .lesson-option-row .lesson-delete-button svg {
+    width: 18px;
+    height: 18px;
+    fill: currentColor;
+  }
+
+  .coach-app-shell .lesson-option-row .lesson-delete-button:hover {
+    color: #742f27;
+    border-color: #dfb9ad;
+    background: var(--danger-soft);
+  }
+
+  .coach-app-shell .lesson-option-row .lesson-delete-button:focus-visible {
+    color: #742f27;
+    border-color: #c98f80;
+    background: var(--danger-soft);
+    outline: 3px solid rgba(138, 63, 53, 0.28);
+    outline-offset: 2px;
+  }
+
+  .coach-app-shell .lesson-option-row .lesson-delete-button::after {
+    position: absolute;
+    right: 0;
+    bottom: calc(100% + 6px);
+    z-index: 4;
+    width: max-content;
+    padding: 5px 8px;
+    border-radius: 6px;
+    background: var(--text);
+    color: var(--surface);
+    content: attr(data-tooltip);
+    font-size: 12px;
+    font-weight: 500;
+    line-height: 1;
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(3px);
+    transition: opacity 120ms ease, transform 120ms ease;
+  }
+
+  .coach-app-shell .lesson-option-row .lesson-delete-button:hover::after,
+  .coach-app-shell .lesson-option-row .lesson-delete-button:focus-visible::after {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  .lesson-add-section {
+    display: grid;
+    border-top: 1px solid var(--line);
+  }
+
+  .lesson-add-trigger {
+    min-height: 44px;
+    padding: 10px 12px;
+    border: 0;
+    background: transparent;
+    color: var(--brand);
+    text-align: left;
+    font-size: 13px;
+    font-weight: 600;
+  }
+
+  .lesson-add-trigger:hover {
+    background: var(--brand-soft);
+    color: var(--brand-hover);
+  }
+
+  .lesson-add-trigger[hidden],
+  .lesson-option-editor[hidden] {
+    display: none;
+  }
+
+  .lesson-option-editor {
+    display: grid;
+    gap: 10px;
+    padding: 12px;
+    background: #fbfdf9;
+  }
+
+  .lesson-option-new-row {
+    display: grid;
+    grid-template-columns: var(--lesson-option-columns);
+    gap: 12px;
+    align-items: start;
+  }
+
+  .lesson-new-field {
+    display: grid;
+    gap: 4px;
+    min-width: 0;
+  }
+
+  .lesson-field-error {
+    min-height: 17px;
+    color: var(--red);
+    font-size: 12px;
+    font-weight: 500;
+    line-height: 1.35;
+  }
+
+  .lesson-new-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+  }
+
+  .lesson-new-actions .primary-button,
+  .lesson-new-actions .ghost-button {
+    min-height: 38px;
+    padding: 7px 16px;
+  }
+
+  .primary-button.has-unsaved {
+    box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.22);
+  }
+
+  body:has(#coachView.view.active) .workspace {
+    width: min(100%, 1360px);
+    padding: 16px 32px;
+  }
+
+  .coach-workspace-container {
+    --coach-workspace-width: 1160px;
+    width: min(100%, var(--coach-workspace-width));
+    margin-inline: auto;
+  }
+
+  .coach-page-nav,
+  #coachView,
+  .coach-layout,
+  .coach-layout > .coach-panel {
+    width: 100%;
+    min-width: 0;
+  }
+
+  body:has(#coachView.view.active) .section-header {
+    align-items: flex-start;
+    margin-bottom: 14px;
+  }
+
+  .coach-app-shell #coachView > .coach-action-bar {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    align-items: center;
+    min-height: 58px;
+    margin-bottom: 14px;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--line);
+    background: var(--bg);
+  }
+
+  body:has(#coachView.view.active) .section-header h2 {
+    font-size: 28px;
+    line-height: 1.08;
+  }
+
+  .coach-app-shell .header-actions {
+    display: flex;
+    align-items: center;
+    flex-wrap: nowrap;
+    gap: 10px;
+  }
+
+  .header-actions .ghost-button,
+  .header-actions .primary-button {
+    min-height: 38px;
+    border-radius: 8px;
+    padding: 8px 14px;
+    text-decoration: none;
+  }
+
+  .profile-save-state {
+    display: grid;
+    justify-items: end;
+    min-width: 138px;
+    font-size: 12px;
+    line-height: 1.35;
+  }
+
+  .profile-save-status {
+    color: var(--muted);
+    font-weight: 600;
+  }
+
+  .profile-save-status[data-tone="dirty"] {
+    color: #8a5a37;
+  }
+
+  .profile-save-status[data-tone="saving"] {
+    color: var(--brand);
+  }
+
+  .profile-save-status[data-tone="error"] {
+    color: #8a3f35;
+  }
+
+  .profile-preview-note {
+    color: var(--muted);
+    font-weight: 400;
+  }
+
+  .profile-save-state[hidden],
+  .profile-preview-note[hidden] {
+    display: none;
+  }
+
+  html[data-active-coach-panel="bookingsPanel"] .profile-save-state,
+  html[data-active-coach-panel="availabilityPanel"] .profile-save-state,
+  html[data-active-coach-panel="bookingsPanel"] #saveProfileChanges,
+  html[data-active-coach-panel="availabilityPanel"] #saveProfileChanges {
+    display: none;
+  }
+
+  .profile-feedback {
+    display: flex;
+    align-items: center;
+    min-height: 24px;
+    gap: 10px;
+  }
+
+  .profile-undo-button {
+    min-height: 32px;
+    padding: 4px 8px;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--brand);
+    font-weight: 600;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+
+  .profile-undo-button:hover {
+    background: var(--brand-soft);
+    color: var(--brand-hover);
+  }
+
+  .profile-undo-button[hidden] {
+    display: none;
+  }
+
+  .coach-tabs {
+    gap: 28px;
+    margin-bottom: 20px;
+    padding: 0;
+    border: 0;
+    border-bottom: 1px solid var(--line);
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+  }
+
+  .coach-tab {
+    min-height: 40px;
+    border-radius: 0;
+    padding: 0 0 10px;
+    border-bottom: 2px solid transparent;
+    color: #64748b;
+    font-weight: 800;
+  }
+
+  .coach-tab.active,
+  html[data-active-coach-panel="bookingsPanel"] .coach-tab[data-coach-panel="bookingsPanel"],
+  html[data-active-coach-panel="availabilityPanel"] .coach-tab[data-coach-panel="availabilityPanel"] {
+    background: transparent;
+    color: var(--blue);
+    border-bottom-color: var(--blue);
+  }
+
+  .profile-panel {
+    gap: 14px;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    box-shadow: none;
+  }
+
+  .profile-personal-layout {
+    display: grid;
+    gap: 20px;
+    align-items: start;
+  }
+
+  .profile-form-row {
+    display: grid;
+    grid-template-columns: 120px minmax(0, 1fr);
+    gap: 20px;
+    align-items: start;
+    min-width: 0;
+  }
+
+  .profile-avatar-row {
+    align-items: center;
+  }
+
+  .profile-row-label {
+    color: var(--text);
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 1.5;
+  }
+
+  .profile-row-heading {
+    display: grid;
+    gap: 2px;
+    align-content: start;
+  }
+
+  .profile-row-hint {
+    color: var(--muted);
+    font-size: 12px;
+    font-weight: 400;
+    line-height: 1.45;
+  }
+
+  .profile-row-control {
+    min-width: 0;
+  }
+
+  .profile-identity-control {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .profile-bio-row textarea {
+    width: 100%;
+    min-height: 104px;
+    line-height: 1.6;
+    resize: vertical;
+  }
+
+  .profile-field-title {
+    color: var(--text);
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 1.45;
+  }
+
+  .profile-specialties-field {
+    min-width: 0;
+  }
+
+  .profile-panel .field-hint {
+    color: var(--muted);
+    font-size: 12px;
+    font-weight: 400;
+    line-height: 1.45;
+  }
+
+  .coach-specialty-group {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 18px;
+  }
+
+  .coach-specialty-options,
+  .coach-custom-specialties {
+    display: contents;
+  }
+
+  .coach-custom-specialties[hidden] {
+    display: none;
+  }
+
+  .coach-specialty-checkbox {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 32px;
+    color: var(--text);
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 400;
+    line-height: 1.5;
+  }
+
+  .coach-specialty-checkbox input {
+    width: 16px;
+    height: 16px;
+    min-height: 16px;
+    margin: 0;
+    flex: 0 0 auto;
+    cursor: pointer;
+    accent-color: var(--brand);
+  }
+
+  .coach-custom-specialty-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .custom-specialty-delete {
+    display: inline-grid;
+    place-items: center;
+    width: 30px;
+    min-height: 30px;
+    padding: 6px;
+    border: 1px solid transparent;
+    border-radius: 50%;
+    background: transparent;
+    color: var(--muted);
+  }
+
+  .custom-specialty-delete svg {
+    width: 15px;
+    height: 15px;
+    fill: currentColor;
+  }
+
+  .custom-specialty-delete:hover,
+  .custom-specialty-delete:focus-visible {
+    border-color: #dfb9ad;
+    background: var(--danger-soft);
+    color: #742f27;
+  }
+
+  .specialty-add-trigger {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 36px;
+    padding: 7px 12px;
+    border: 1px dashed var(--line);
+    border-radius: var(--radius-pill);
+    background: transparent;
+    color: var(--brand);
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 1.3;
+  }
+
+  .specialty-add-trigger:hover {
+    border-color: var(--brand-border);
+    background: #f6f5ef;
+    color: var(--brand-hover);
+  }
+
+  .specialty-add-trigger[hidden] {
+    display: none;
+  }
+
+  .custom-specialty-editor {
+    display: flex;
+    flex: 1 1 100%;
+    flex-wrap: wrap;
+    gap: 6px;
+    min-width: 0;
+  }
+
+  .custom-specialty-editor[hidden] {
+    display: none;
+  }
+
+  .custom-specialty-entry {
+    display: flex;
+    flex: 0 1 500px;
+    gap: 8px;
+    min-width: 0;
+  }
+
+  .custom-specialty-entry input {
+    flex: 1 1 240px;
+    min-height: 36px;
+    padding-block: 7px;
+  }
+
+  .specialty-editor-action {
+    min-height: 36px;
+    padding: 7px 12px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-pill);
+    background: var(--surface-white);
+    color: var(--text);
+    font-size: 13px;
+    font-weight: 600;
+  }
+
+  .specialty-editor-add {
+    border-color: var(--brand);
+    background: var(--brand);
+    color: #fffdf8;
+  }
+
+  .specialty-editor-action:hover {
+    border-color: var(--brand-border);
+    background: var(--brand-soft);
+    color: var(--brand-hover);
+  }
+
+  .specialty-editor-add:hover {
+    border-color: var(--brand-hover);
+    background: var(--brand-hover);
+    color: #fffdf8;
+  }
+
+  #customSpecialtyMessage {
+    flex: 1 1 100%;
+    min-height: 18px;
+    margin: 0;
+  }
+
+  #customSpecialtyMessage.error {
+    color: var(--red);
+  }
+
+  .profile-photo-panel {
+    gap: 8px;
+    padding-top: 16px;
+    padding-bottom: 16px;
+  }
+
+  .profile-photo-panel > .panel-heading {
+    margin-bottom: 0;
+  }
+
+  .profile-photo-panel > .panel-heading h3,
+  .teaching-location-panel > .panel-heading h3,
+  .lesson-rate-panel > .panel-heading h3 {
+    margin: 0;
+  }
+
+  .teaching-location-panel > .panel-heading,
+  .lesson-rate-panel > .panel-heading {
+    margin-bottom: 0;
+  }
+
+  .profile-identity-copy strong {
+    display: block;
+    font-size: 20px;
+    line-height: 1.35;
+    overflow-wrap: anywhere;
+  }
+
+  .profile-identity-copy {
+    display: grid;
+    gap: 6px;
+    min-width: 0;
+  }
+
+  .profile-identity-meta {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px 10px;
+    color: var(--muted);
+    font-size: 12px;
+    line-height: 1.4;
+  }
+
+  .coach-role-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    min-height: 24px;
+    padding: 3px 8px;
+    border: 1px solid var(--brand-border);
+    border-radius: var(--radius-pill);
+    background: var(--brand-soft);
+    color: var(--brand-hover);
+    font-weight: 600;
+  }
+
+  .coach-role-badge svg {
+    width: 14px;
+    height: 14px;
+    fill: currentColor;
+  }
+
+  .coach-teaching-disciplines {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px 18px;
+  }
+
+  .profile-avatar-action {
+    width: max-content;
+    align-self: center;
+  }
+
+  .profile-photo-panel .profile-avatar-action .avatar-preview {
+    width: 72px;
+    height: 72px;
+    font-size: 22px;
+  }
+
+  .avatar-change-button {
+    position: relative;
+    display: block;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: transparent;
+  }
+
+  .avatar-change-button::after {
+    position: absolute;
+    right: -12px;
+    bottom: -34px;
+    z-index: 2;
+    padding: 5px 8px;
+    border-radius: 6px;
+    background: var(--text);
+    color: var(--surface);
+    content: attr(aria-label);
+    font-size: 12px;
+    font-weight: 500;
+    line-height: 1;
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(-4px);
+    transition: opacity 120ms ease, transform 120ms ease;
+    white-space: nowrap;
+  }
+
+  .avatar-change-button:hover::after,
+  .avatar-change-button:focus-visible::after {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  .avatar-change-button:focus-visible {
+    outline: 3px solid color-mix(in srgb, var(--brand) 28%, transparent);
+    outline-offset: 4px;
+  }
+
+  .avatar-camera-badge {
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    display: grid;
+    place-items: center;
+    width: 30px;
+    height: 30px;
+    border: 3px solid var(--surface);
+    border-radius: 50%;
+    background: var(--brand);
+    color: #fff;
+    pointer-events: none;
+  }
+
+  .avatar-camera-badge svg {
+    width: 15px;
+    height: 15px;
+    fill: currentColor;
+  }
+
+  .coach-photo-dialog {
+    width: min(440px, calc(100vw - 32px));
+  }
+
+  .coach-photo-dialog form {
+    gap: 16px;
+  }
+
+  .coach-photo-dialog-preview {
+    width: 148px;
+    height: 148px;
+    margin: 0 auto;
+    font-size: 36px;
+  }
+
+  .coach-photo-dialog-controls {
+    display: grid;
+    justify-items: center;
+    gap: 10px;
+  }
+
+  .coach-photo-dialog #photoMessage {
+    width: 100%;
+    text-align: center;
+  }
+
+  .teaching-location-panel,
+  .lesson-rate-panel {
+    border-color: rgba(217, 226, 239, 0.82);
+    box-shadow: 0 8px 24px rgba(23, 32, 51, 0.05);
+  }
+
+  .teaching-location-grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 12px;
+  }
+
+  .lesson-rate-layout {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 14px;
+  }
+
+  .rate-summary-card {
+    background: #f8fafc;
+  }
+
+  .profile-field-rinks .checkbox-stack {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .profile-field-travel {
+    grid-template-columns: minmax(200px, 260px) minmax(0, 1fr);
+    align-items: end;
+    gap: 12px;
+  }
+
+  .profile-field-travel > label {
+    display: grid;
+    gap: 8px;
+  }
+
+  .profile-travel-control {
+    gap: 6px;
+  }
+
+  .profile-field-conditions textarea {
+    min-height: 88px;
+    resize: vertical;
+  }
+
+  .rate-label-copy {
+    display: grid;
+    gap: 4px;
+  }
+
+  .rate-label-copy > label {
+    font-weight: 600;
+  }
+
+  .lesson-option-header,
+  .lesson-option-row {
+    grid-template-columns: minmax(220px, 1.5fr) minmax(110px, 0.55fr) minmax(110px, 0.55fr) 72px;
+  }
+
+  .method-switch,
+  .exception-method-switch {
+    display: inline-grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+    padding: 4px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: #f8fafc;
+  }
+
+  .availability-section,
+  .booking-section {
+    display: none;
+    gap: 14px;
+  }
+
+  .availability-section.active,
+  .booking-section.active {
+    display: grid;
+  }
+
+  .method-button,
+  .exception-method-button {
+    min-height: 38px;
+    border: 0;
+    border-radius: 6px;
+    padding: 8px 14px;
+    background: transparent;
+    color: var(--muted);
+    font-weight: 900;
+  }
+
+  .method-button.active,
+  .exception-method-button.active {
+    background: var(--blue);
+    color: #ffffff;
+  }
+
+  .exception-method-panel {
+    display: grid;
+    gap: 14px;
+  }
+
+  .default-note {
+    margin: 0;
+    color: var(--muted);
+    font-size: 14px;
+    line-height: 1.5;
+  }
+
+  .heading-note {
+    max-width: 680px;
+    margin: 6px 0 0;
+    color: var(--muted);
+    font-size: 13px;
+    line-height: 1.45;
+  }
+
+  .is-hidden {
+    display: none !important;
+  }
+
+  .bookings-panel {
+    padding: 20px;
+  }
+
+  .photo-layout {
+    display: grid;
+    grid-template-columns: 260px minmax(0, 1fr);
+    gap: 20px;
+    align-items: start;
+  }
+
+  .photo-preview {
+    display: grid;
+    place-items: center;
+    min-height: 260px;
+    border: 1px dashed #94a3b8;
+    border-radius: 8px;
+    background: #f8fafc;
+  }
+
+  .avatar-preview {
+    display: grid;
+    place-items: center;
+    width: 170px;
+    height: 170px;
+    border-radius: 50%;
+    background: #dbeafe center / cover no-repeat;
+    color: #1d4ed8;
+    font-size: 42px;
+    font-weight: 900;
+  }
+
+  .photo-form {
+    display: grid;
+    gap: 16px;
+  }
+
+  /* Keep the coach editor compact without stretching short fields across the page. */
+  .coach-app-shell .coach-page-nav {
+    margin-bottom: 4px;
+  }
+
+  .coach-app-shell .coach-page-nav .role-home-link {
+    min-height: 32px;
+  }
+
+  .coach-app-shell #coachView > .section-header {
+    align-items: center;
+    margin-bottom: 10px;
+  }
+
+  .coach-app-shell #coachProfileForm {
+    align-items: start;
+    gap: 14px;
+  }
+
+  .coach-app-shell .lesson-rate-panel > .panel-heading {
+    margin-bottom: 0;
+  }
+
+  .coach-app-shell .lesson-rate-layout {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 14px;
+  }
+
+  .coach-app-shell .rate-summary-card {
+    padding: 12px;
+  }
+
+  .coach-app-shell .profile-field-rate {
+    grid-template-columns: minmax(0, 1fr) 180px;
+    align-items: center;
+    gap: 4px 16px;
+  }
+
+  .coach-app-shell .profile-field-rate .money-input {
+    grid-column: 2;
+    grid-row: 1;
   }
 
   .coach-app-shell .lesson-option-header,
   .coach-app-shell .lesson-option-row,
-  .coach-app-shell .lesson-option-form {
+  .coach-app-shell .lesson-option-new-row {
     grid-template-columns: var(--lesson-option-columns);
   }
 
-  .coach-app-shell #profileMessage {
-    margin: 0;
-  }
-}
+  @media (min-width: 1101px) {
+    .coach-app-shell #coachProfileForm {
+      grid-template-columns: minmax(0, 1fr);
+    }
 
-@media (max-width: 640px) {
-  .coach-app-shell .profile-field-rate {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 8px;
-  }
+    .coach-app-shell .lesson-option-header,
+    .coach-app-shell .lesson-option-row,
+    .coach-app-shell .lesson-option-new-row {
+      grid-template-columns: var(--lesson-option-columns);
+    }
 
-  .coach-app-shell .profile-field-rate .money-input {
-    grid-column: 1;
-    grid-row: 2;
-  }
-
-  .coach-app-shell .lesson-option-header,
-  .coach-app-shell .lesson-option-row {
-    grid-template-columns: minmax(0, 1fr);
+    .coach-app-shell #profileMessage {
+      margin: 0;
+    }
   }
 
-  .coach-app-shell #coachView > .section-header {
-    align-items: start;
+  @media (max-width: 640px) {
+    .coach-app-shell .profile-field-rate {
+      grid-template-columns: minmax(0, 1fr);
+      gap: 8px;
+    }
+
+    .coach-app-shell .profile-field-rate .money-input {
+      grid-column: 1;
+      grid-row: 2;
+    }
+
+    .coach-app-shell .lesson-option-header,
+    .coach-app-shell .lesson-option-row,
+    .coach-app-shell .lesson-option-new-row {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    .coach-app-shell #coachView > .section-header {
+      align-items: start;
+    }
   }
 }

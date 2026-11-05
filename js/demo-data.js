@@ -48,8 +48,12 @@ function createDefaultProfile(coachId) {
     travelConditions: "",
     city: "",
     bio: "",
+    teachingDisciplines: [],
+    skatingStartYear: null,
+    coachingStartYear: null,
     specialties: [],
     customSpecialties: [],
+    selectedCustomSpecialties: [],
     photoUrl,
     demoPhotoVersion: 1,
     lessonOptions: createDefaultLessonOptions(rate, lessonDurationsByCoach[coachId])

@@ -15,7 +15,13 @@ import {
   unavailableSelection,
 } from "./config.js";
 import { elements } from "./elements.js";
-import { coachSpecialtyOptions, normalizeCoachSpecialties, normalizeCustomCoachSpecialties } from "./domain/coach-profile.mjs";
+import {
+  coachSpecialtyOptions,
+  coachTeachingDisciplineOptions,
+  normalizeCoachSpecialties,
+  normalizeCoachTeachingDisciplines,
+  normalizeCustomCoachSpecialties,
+} from "./domain/coach-profile.mjs";
 import {
   canFitLessonFromSlot as canFitLessonFrom,
   findSlotAt as findSlotAtIn,
@@ -173,8 +179,9 @@ function syncProfileForm() {
   const profile = getProfile(currentCoachId);
   elements.coachRate.value = profile.rate;
   elements.coachBio.value = typeof profile.bio === "string" ? profile.bio : "";
+  renderCoachTeachingDisciplines(profile.teachingDisciplines);
   renderCoachSpecialtyOptions(profile.specialties);
-  renderCoachCustomSpecialties(profile.customSpecialties);
+  renderCoachCustomSpecialties(profile.customSpecialties, profile.selectedCustomSpecialties);
   elements.servedRinkInputs.forEach((input) => {
     input.checked = profile.servedRinks.includes(input.value);
   });
@@ -184,26 +191,49 @@ function syncProfileForm() {
   renderLessonOptions();
 }
 
-export function renderCoachCustomSpecialties(selectedValues = getProfile(currentCoachId).customSpecialties) {
-  const specialties = normalizeCustomCoachSpecialties(selectedValues);
+function renderCoachTeachingDisciplines(selectedValues) {
+  const selected = new Set(normalizeCoachTeachingDisciplines(selectedValues));
+  elements.coachTeachingDisciplines.replaceChildren(...coachTeachingDisciplineOptions.map((option) => {
+    const label = document.createElement("label");
+    label.className = "coach-specialty-checkbox coach-discipline-checkbox";
+    const input = document.createElement("input");
+    input.type = "checkbox";
+    input.name = "coachTeachingDisciplines";
+    input.value = option.id;
+    input.checked = selected.has(option.id);
+    label.append(input, document.createTextNode(option.label));
+    return label;
+  }));
+}
+
+export function renderCoachCustomSpecialties(
+  values = getProfile(currentCoachId).customSpecialties,
+  selectedValues = getProfile(currentCoachId).selectedCustomSpecialties,
+) {
+  const specialties = normalizeCustomCoachSpecialties(values);
+  const selected = new Set(normalizeCustomCoachSpecialties(selectedValues));
   elements.coachCustomSpecialties.replaceChildren(...specialties.map((specialty) => {
-    const tag = document.createElement("span");
-    tag.className = "coach-specialty-tag coach-custom-specialty-tag is-selected";
-    const check = document.createElement("span");
-    check.className = "specialty-check";
-    check.setAttribute("aria-hidden", "true");
-    check.textContent = "✓";
-    const text = document.createElement("span");
-    text.textContent = specialty;
+    const item = document.createElement("span");
+    item.className = "coach-custom-specialty-item";
+    const label = document.createElement("label");
+    label.className = "coach-specialty-checkbox coach-custom-specialty";
+    const input = document.createElement("input");
+    input.type = "checkbox";
+    input.checked = selected.has(specialty);
+    input.dataset.action = "toggle-custom-specialty";
+    input.dataset.specialty = specialty;
+    input.setAttribute("aria-label", `选择专长 ${specialty}`);
+    label.append(input, document.createTextNode(specialty));
     const remove = document.createElement("button");
     remove.type = "button";
-    remove.dataset.action = "remove-custom-specialty";
+    remove.className = "custom-specialty-delete";
+    remove.dataset.action = "delete-custom-specialty";
     remove.dataset.specialty = specialty;
-    remove.setAttribute("aria-label", `移除专长 ${specialty}`);
-    remove.title = "移除";
-    remove.textContent = "×";
-    tag.append(check, text, remove);
-    return tag;
+    remove.setAttribute("aria-label", `删除自定义专长 ${specialty}`);
+    remove.title = "删除自定义专长";
+    remove.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M9 3h6l1 2h4v2h-1l-1 14H6L5 7H4V5h4l1-2Zm-1.86 4 .75 12h8.22l.75-12H7.14ZM10 9h2v7h-2V9Zm4 0h2v7h-2V9Z" /></svg>';
+    item.append(label, remove);
+    return item;
   }));
   elements.coachCustomSpecialties.hidden = !specialties.length;
 }
@@ -211,21 +241,15 @@ export function renderCoachCustomSpecialties(selectedValues = getProfile(current
 function renderCoachSpecialtyOptions(selectedValues) {
   const selected = new Set(normalizeCoachSpecialties(selectedValues));
   elements.coachSpecialtyOptions.replaceChildren(...coachSpecialtyOptions.map((option) => {
-    const button = document.createElement("button");
-    const isSelected = selected.has(option.id);
-    button.type = "button";
-    button.className = `coach-specialty-tag coach-specialty-preset${isSelected ? " is-selected" : ""}`;
-    button.dataset.action = "toggle-specialty";
-    button.dataset.specialtyId = option.id;
-    button.setAttribute("aria-pressed", String(isSelected));
-    const check = document.createElement("span");
-    check.className = "specialty-check";
-    check.setAttribute("aria-hidden", "true");
-    check.textContent = "✓";
-    const text = document.createElement("span");
-    text.textContent = option.label;
-    button.append(check, text);
-    return button;
+    const label = document.createElement("label");
+    label.className = "coach-specialty-checkbox coach-specialty-preset";
+    const input = document.createElement("input");
+    input.type = "checkbox";
+    input.name = "coachSpecialties";
+    input.value = option.id;
+    input.checked = selected.has(option.id);
+    label.append(input, document.createTextNode(option.label));
+    return label;
   }));
 }
 
@@ -249,15 +273,7 @@ function renderLessonOptions() {
       `;
     })
     .join("");
-  elements.lessonOptionsList.innerHTML = `
-    <div class="lesson-option-header" aria-hidden="true">
-      <span>课程名称</span>
-      <span>时长（分钟）</span>
-      <span>价格（美元）</span>
-      <span>操作</span>
-    </div>
-    ${rows}
-  `;
+  elements.lessonOptionsList.innerHTML = rows;
 }
 
 function setPhotoPreview(element, photoUrl) {

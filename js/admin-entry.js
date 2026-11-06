@@ -1,3 +1,3 @@
-import { initializeAdminApp } from "./app-init.js";
+import { initializeAdminApp } from "./admin/app.js";
 
 initializeAdminApp();

@@ -1,7 +1,7 @@
-import { coaches, currentCoachId, profileStorageKey, studentHasFullAccess } from "./config.js";
-import { loadProfiles } from "./data-store.js";
-import { createDefaultProfile } from "./demo-data.js";
-import { storageGetItem } from "./storage-adapter.js";
+import { coaches, currentCoachId, profileStorageKey, studentHasFullAccess } from "./core/config.js";
+import { loadProfiles } from "./core/data-store.js";
+import { createDefaultProfile } from "./core/demo-data.js";
+import { storageGetItem } from "./core/storage-adapter.js";
 import {
   getCoachSpecialtyLabels,
   getCoachTeachingDisciplineLabels,

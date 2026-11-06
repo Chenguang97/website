@@ -11,14 +11,16 @@
 
 - Use native ES Modules with explicit imports and exports. Each HTML page loads one page or role entry module.
 - Do not restore ordered classic-script lists, compatibility globals, or hidden foreign-role DOM.
-- Keep domain rules independent of DOM, browser storage, and mutable application state.
+- Keep domain rules independent of DOM, browser storage, and mutable application state. Bind pure scheduling rules to runtime state only in `js/core/scheduling-rules.js`.
 - Keep dependencies acyclic. Resolve cycles by clarifying ownership or extracting a cohesive shared module.
-- Keep demo fixtures in `js/demo-data.js`, storage access in `js/storage-adapter.js`, serialization/recovery in `js/data-store.js`, and shared application state in `js/state.js`.
+- Keep demo fixtures in `js/core/demo-data.js`, storage access in `js/core/storage-adapter.js`, serialization/recovery in `js/core/data-store.js`, and shared application state in `js/core/state.js`.
+- Keep role initialization in `js/coach/app.js`, `js/student/app.js`, and `js/admin/app.js`; keep scoped DOM references under `js/dom/`. Do not create a cross-role DOM aggregate.
+- Keep coach profile, bookings, and availability implementations under their matching `js/coach/` feature directories. Do not restore root-level catch-all render, action, navigation, or undo modules.
 - Do not expose production functions or state on `window`/`globalThis`. Test-only bridges belong exclusively to the test harness.
 
 ## State and UI
 
-- Give each state a single owner. Use named state operations for shared business data, saved profiles, and editing drafts.
+- Give each state a single owner. Use named state operations for shared business data, saved profiles, and editing drafts. Keep the applied coach-booking student filter in `js/coach/bookings/filter-state.js` and its search/open/draft UI state in `js/coach/bookings/student-picker.js`.
 - Keep transient UI state local when appropriate. Do not duplicate the same business state across modules or DOM attributes.
 - Keep rendering, event handling, business rules, and persistence responsibilities distinct. Rendering must not save data; storage adapters must not manipulate DOM.
 - Keep editing drafts separate from saved data and follow the established save/cancel behavior.

@@ -542,16 +542,15 @@ h3 {
   color: #13a36f;
 }
 
-.check-icon span::after {
-  content: "";
-  position: absolute;
-  left: 9px;
-  top: 8px;
-  width: 18px;
-  height: 10px;
-  border-left: 4px solid currentColor;
-  border-bottom: 4px solid currentColor;
-  transform: rotate(-45deg);
+.check-icon svg {
+  width: 34px;
+  height: 34px;
+  overflow: visible;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 .role-card span {

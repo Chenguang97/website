@@ -53,6 +53,49 @@ for (const file of modules) visit(file);
 
 assert(!fs.existsSync(path.join(root, "app.js")), "Legacy app.js compatibility entry still exists.");
 assert(!fs.existsSync(path.join(jsRoot, "domain", "install.mjs")), "Legacy domain installer still exists.");
+for (const legacyModule of ["app-init.js", "actions.js", "navigation.js", "booking-actions.js", "undo.js", "render.js", "elements.js"]) {
+  assert(!fs.existsSync(path.join(jsRoot, legacyModule)), `Superseded coordination module ${legacyModule} still exists.`);
+}
+
+const roleBoundaries = {
+  "coach/app.js": ["../dom/coach-elements.js", "./availability/actions.js", "./bookings/controls.js", "./profile/actions.js"],
+  "student/app.js": ["../dom/student-elements.js", "./actions.js"],
+  "admin/app.js": ["../dom/admin-elements.js", "./actions.js"],
+};
+for (const [fileName, expectedImports] of Object.entries(roleBoundaries)) {
+  const source = fs.readFileSync(path.join(jsRoot, fileName), "utf8");
+  assert(!source.includes('from "./elements.js"'), `${fileName} imports the cross-role DOM aggregate.`);
+  expectedImports.forEach((expectedImport) => assert(source.includes(expectedImport), `${fileName} does not declare its ${expectedImport} boundary.`));
+}
+
+const profileRenderSource = fs.readFileSync(path.join(jsRoot, "coach", "profile", "render.js"), "utf8");
+assert(profileRenderSource.includes("function renderCoachCustomSpecialties"), "Coach profile rendering is not owned by coach/profile.");
+const studentRenderSource = fs.readFileSync(path.join(jsRoot, "student", "render.js"), "utf8");
+assert(studentRenderSource.includes("function renderStudentSlots"), "Student rendering is not owned by student/render.js.");
+const calendarGridSource = fs.readFileSync(path.join(jsRoot, "ui", "calendar-grid.js"), "utf8");
+assert(!calendarGridSource.includes("state."), "The shared calendar grid must remain independent of application state.");
+
+const renderSource = fs.readFileSync(path.join(jsRoot, "coach", "bookings", "render.js"), "utf8");
+assert(!/state\.coachBookingStudentKeys\s*=/.test(renderSource), "Coach booking rendering must not mutate the applied student filter.");
+const pickerSource = fs.readFileSync(path.join(jsRoot, "coach", "bookings", "student-picker.js"), "utf8");
+assert(!/core\/state\.js/.test(pickerSource) && /let searchQuery =/.test(pickerSource), "Coach booking picker drafts and search must remain local to the feature.");
+const profileActionsSource = fs.readFileSync(path.join(jsRoot, "coach", "profile", "actions.js"), "utf8");
+assert(!profileActionsSource.includes("renderCoachPage"), "Coach profile actions must not refresh unrelated coach features.");
+const availabilityActionsSource = fs.readFileSync(path.join(jsRoot, "coach", "availability", "actions.js"), "utf8");
+assert(!availabilityActionsSource.includes("renderCoachPage"), "Coach availability actions must not refresh the whole coach page.");
+assert(!availabilityActionsSource.includes('action === "cancel"'), "Booking cancellation must remain owned by coach/bookings.");
+const availabilityUndoSource = fs.readFileSync(path.join(jsRoot, "coach", "availability", "undo.js"), "utf8");
+assert(!availabilityUndoSource.includes("booking-undo.js"), "Availability undo must not restore booking-owned snapshots.");
+const coachBookingUndoSource = fs.readFileSync(path.join(jsRoot, "coach", "bookings", "undo.js"), "utf8");
+assert(coachBookingUndoSource.includes('popLatestUndoSnapshot("booking")'), "Coach bookings must own restoration of booking snapshots.");
+const bookingActionsSource = fs.readFileSync(path.join(jsRoot, "coach", "bookings", "actions.js"), "utf8");
+for (const bookingAction of ["shiftScheduleWeek", "goToCurrentScheduleWeek", "openBlockTimeDialog", "addBlockException"]) {
+  assert(bookingActionsSource.includes(`function ${bookingAction}`), `Coach booking actions must own ${bookingAction}.`);
+}
+for (const fileName of ["coach/availability/actions.js", "student/booking-actions.js", "coach/availability/render.js"]) {
+  const source = fs.readFileSync(path.join(jsRoot, fileName), "utf8");
+  assert(!/as (?:canFitLessonFrom|findSlotAtIn|getCoveredSlots|overlapsBlocked)/.test(source), `${fileName} duplicates a state-bound scheduling rule adapter.`);
+}
 
 for (const htmlFile of walk(root, new Set([".html"]))) {
   const html = fs.readFileSync(htmlFile, "utf8");

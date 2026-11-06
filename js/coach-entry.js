@@ -1,3 +1,3 @@
-import { initializeCoachApp } from "./app-init.js";
+import { initializeCoachApp } from "./coach/app.js";
 
 initializeCoachApp();

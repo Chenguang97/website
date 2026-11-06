@@ -367,7 +367,7 @@ Oceanside Ice Arena → Polar Ice Rink: 40</textarea>
                 </div>
                 <div class="calendar-week-frame">
                   <button id="previousCalendarWeek" class="calendar-side-arrow" type="button" aria-label="Previous week">‹</button>
-                  <div id="dragCalendar" class="drag-calendar" aria-label="拖选可预约时间日历"></div>
+                  <div id="dragCalendar" class="drag-calendar coach-week-calendar" aria-label="拖选可预约时间日历"></div>
                   <button id="nextCalendarWeek" class="calendar-side-arrow" type="button" aria-label="Next week">›</button>
                 </div>
               </div>
@@ -384,6 +384,7 @@ Oceanside Ice Arena → Polar Ice Rink: 40</textarea>
               <div class="panel-heading">
                 <div>
                   <h3>预约管理</h3>
+                  <p class="heading-note">查看学生预约与安排不可预约时间</p>
                 </div>
                 <div class="method-switch" role="tablist" aria-label="预约管理视图">
                   <button class="method-button booking-subtab active" type="button" data-booking-section="bookingCalendarSection" aria-selected="true">日历</button>
@@ -391,46 +392,76 @@ Oceanside Ice Arena → Polar Ice Rink: 40</textarea>
                 </div>
               </div>
 
-              <div class="coach-booking-filters" aria-label="预约学生筛选">
-                <label>
-                  搜索学生
-                  <input id="coachBookingStudentSearch" type="search" placeholder="搜索姓名或邮箱" autocomplete="off" aria-describedby="coachBookingFilterHint" />
-                </label>
-                <label>
-                  学生
-                  <select id="coachBookingStudentFilter"><option value="">全部学生</option></select>
-                </label>
-                <button id="clearCoachBookingStudent" class="ghost-button" type="button" data-action="clear-coach-booking-student" disabled>清除筛选</button>
-                <p id="coachBookingFilterHint" class="coach-filter-note" role="status">默认显示全部学生。搜索后，从学生列表中选择一位。</p>
+              <div class="coach-booking-filter-row">
+                <div id="coachBookingStudentPicker" class="coach-student-picker">
+                  <label for="coachBookingStudentSearch">查看学生</label>
+                  <div class="coach-student-picker-input">
+                    <input id="coachBookingStudentSearch" type="search" role="combobox" placeholder="全部学生" autocomplete="off" aria-expanded="false" aria-autocomplete="list" aria-controls="coachBookingStudentResults" aria-describedby="coachBookingStudentStatus" />
+                    <svg class="control-chevron coach-student-picker-caret" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="m3 6 5 5 5-5" /></svg>
+                  </div>
+                  <div id="coachBookingStudentResults" class="coach-student-results" aria-label="选择学生" hidden>
+                    <div class="coach-student-panel-toolbar">
+                      <button type="button" data-student-action="select-matches">全选</button>
+                      <button type="button" data-student-action="clear-draft">清空选择</button>
+                      <button type="button" data-student-action="reset-filter">重置筛选</button>
+                    </div>
+                    <div id="coachBookingStudentOptions" class="coach-student-options" role="listbox" aria-multiselectable="true"></div>
+                    <p id="coachBookingStudentValidation" class="coach-student-validation" role="alert" hidden>请选择学生，或重置筛选查看全部</p>
+                    <div class="coach-student-panel-footer">
+                      <span id="coachBookingStudentDraftCount">已选 0 位</span>
+                      <div>
+                        <button type="button" class="ghost-button" data-student-action="cancel">取消</button>
+                        <button type="button" class="primary-button" data-student-action="apply">应用</button>
+                      </div>
+                    </div>
+                  </div>
+                  <span id="coachBookingStudentStatus" class="visually-hidden" role="status" aria-live="polite"></span>
+                </div>
+
+                <div class="coach-booking-date-filter">
+                  <span class="coach-booking-filter-label">查看日期</span>
+                  <div class="coach-booking-date-controls">
+                    <div class="coach-schedule-week-navigation" role="group" aria-label="切换预约周">
+                      <button id="previousScheduleWeek" class="calendar-side-arrow" type="button" aria-label="上一周">‹</button>
+                      <button id="coachScheduleDateTrigger" class="coach-schedule-date-picker" type="button" aria-label="选择日期" aria-haspopup="dialog" aria-expanded="false" aria-controls="coachScheduleDatePopover">
+                        <span id="coachScheduleWeekRange" class="coach-schedule-week-range" aria-live="polite" aria-atomic="true"></span>
+                        <svg class="control-chevron coach-schedule-date-caret" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="m3 6 5 5 5-5" /></svg>
+                      </button>
+                      <input id="exceptionCalendarWeekStart" type="hidden" />
+                      <div id="coachScheduleDatePopover" class="coach-schedule-date-popover" role="dialog" aria-label="选择日期" hidden>
+                        <div class="coach-date-picker-heading">
+                          <button type="button" data-date-action="previous-month" aria-label="上个月">‹</button>
+                          <div class="coach-date-picker-selects">
+                            <select id="coachScheduleMonth" aria-label="月份"></select>
+                            <select id="coachScheduleYear" aria-label="年份"></select>
+                          </div>
+                          <button type="button" data-date-action="next-month" aria-label="下个月">›</button>
+                        </div>
+                        <div class="coach-date-picker-weekdays" aria-hidden="true"><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span><span>日</span></div>
+                        <div id="coachScheduleDateGrid" class="coach-date-picker-grid" role="grid" aria-label="日期"></div>
+                      </div>
+                      <button id="nextScheduleWeek" class="calendar-side-arrow" type="button" aria-label="下一周">›</button>
+                    </div>
+                    <button id="todayScheduleWeek" class="calendar-today-button" type="button">本周</button>
+                  </div>
+                </div>
+              </div>
+
+              <div class="coach-booking-feedback-bar">
+                <div class="coach-booking-feedback-copy">
+                  <p id="coachCalendarFilterSummary" class="coach-calendar-filter-summary" role="status"></p>
+                  <p id="coachBookingActionStatus" class="coach-booking-action-status" role="status" hidden></p>
+                </div>
+                <div class="coach-booking-calendar-actions">
+                  <button id="toggleExceptionCalendarHours" class="ghost-button" type="button">显示全天</button>
+                  <button id="openBlockDialog" class="danger-button" type="button">＋ 不可预约时间</button>
+                </div>
               </div>
 
               <section id="bookingCalendarSection" class="booking-section active" data-booking-content="bookingCalendarSection">
-                <div id="exceptionCalendarPanel" class="calendar-panel exception-method-panel" data-exception-method-panel="exceptionCalendarPanel">
-                  <div class="calendar-toolbar">
-                    <button id="openBlockDialog" class="danger-button" type="button">添加不可预约时间</button>
-                    <button id="toggleExceptionCalendarHours" class="ghost-button" type="button">显示全天</button>
-                  </div>
-                  <div class="coach-schedule-navigation">
-                    <div class="coach-schedule-week-actions">
-                      <div class="coach-schedule-week-navigation" role="group" aria-label="切换预约周">
-                        <button id="previousScheduleWeek" class="calendar-side-arrow" type="button" aria-label="上一周">‹</button>
-                        <p id="coachScheduleWeekRange" class="coach-schedule-week-range" aria-live="polite" aria-atomic="true"></p>
-                        <button id="nextScheduleWeek" class="calendar-side-arrow" type="button" aria-label="下一周">›</button>
-                      </div>
-                      <button id="todayScheduleWeek" class="calendar-today-button" type="button">本周</button>
-                    </div>
-                    <div class="coach-schedule-date-control">
-                      <label for="exceptionCalendarWeekStart">选择日期</label>
-                      <input id="exceptionCalendarWeekStart" type="date" aria-describedby="coachScheduleDateHelp" />
-                      <p id="coachScheduleDateHelp" class="coach-filter-note">选择任意日期，查看所在周。</p>
-                    </div>
-                  </div>
+                <div id="exceptionCalendarPanel" class="exception-method-panel" data-exception-method-panel="exceptionCalendarPanel">
                   <div id="scheduleLegend" class="calendar-legend schedule-legend" aria-label="课表图例"></div>
-                  <div class="calendar-help">
-                    查看可预约时间、学生预约和临时不可预约时段。
-                  </div>
-                  <p id="coachCalendarFilterSummary" class="coach-calendar-filter-summary" role="status"></p>
-                  <div id="exceptionDragCalendar" class="drag-calendar" aria-label="预约周日历"></div>
+                  <div id="exceptionDragCalendar" class="drag-calendar coach-week-calendar" aria-label="预约周日历"></div>
                 </div>
               </section>
 
@@ -510,6 +541,7 @@ Oceanside Ice Arena → Polar Ice Rink: 40</textarea>
           结束时间
           <select id="blockDialogEnd" required></select>
         </label>
+        <p id="blockDialogMessage" class="dialog-field-message" role="alert" hidden></p>
         <label class="checkbox-row">
           <input id="blockRepeatWeekly" type="checkbox" />
           Repeat weekly

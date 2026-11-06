@@ -1,7 +1,7 @@
-import { initializeStudentApp } from "./app-init.js";
-import { activateStudentPanel } from "./navigation.js";
+import { initializeStudentApp } from "./student/app.js";
+import { activateStudentPanel } from "./student/navigation.js";
 import { applyPublicProfileBookingContext } from "./profile-booking-context.js";
-import { renderStudentFilterChips, renderStudentSlots, updateStudentFilterSummaries } from "./render.js";
+import { renderStudentFilterChips, renderStudentSlots, updateStudentFilterSummaries } from "./student/render.js";
 
 initializeStudentApp();
 applyPublicProfileBookingContext({

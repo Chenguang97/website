@@ -18,20 +18,27 @@ async function loadPage(fileName, options = {}) {
     const isAppEntry = /(?:admin|coach|student)-entry\.js$/.test(entryPoint);
     const testBridge = isAppEntry ? `
       import ${JSON.stringify(entryPoint)};
-      import { state, replaceBlockedExceptions, replaceSlots, getProfile, getSavedProfile, setCoachProfileDraft } from ${JSON.stringify(path.resolve("js/state.js"))};
-      import { openBookingDetails, openBookingDialog, openModifyBookingDialog, syncBookingForSelf } from ${JSON.stringify(path.resolve("js/booking-actions.js"))};
-      import { render, renderDragCalendar, renderExceptionDragCalendar, renderStudentOwnBookings } from ${JSON.stringify(path.resolve("js/render.js"))};
-      import { shiftScheduleWeek } from ${JSON.stringify(path.resolve("js/actions.js"))};
-      import { getCoachBookingStudentKey } from ${JSON.stringify(path.resolve("js/coach-bookings-render.js"))};
-      import { addDaysIso, minutesFromTime, nextWeekdayIso, startOfWeekIso, todayIso, weekdayIndex } from ${JSON.stringify(path.resolve("js/utils-data.js"))};
+      import { state, replaceBlockedExceptions, replaceSlots, getProfile, getSavedProfile, setCoachProfileDraft } from ${JSON.stringify(path.resolve("js/core/state.js"))};
+      import { openBookingDetails } from ${JSON.stringify(path.resolve("js/ui/booking-details.js"))};
+      import { openBookingDialog, openModifyBookingDialog, syncBookingForSelf } from ${JSON.stringify(path.resolve("js/student/booking-actions.js"))};
+      import { renderCoachPage } from ${JSON.stringify(path.resolve("js/coach/render.js"))};
+      import { renderDragCalendar } from ${JSON.stringify(path.resolve("js/coach/availability/render.js"))};
+      import { renderExceptionDragCalendar } from ${JSON.stringify(path.resolve("js/coach/bookings/calendar-render.js"))};
+      import { renderStudentOwnBookings, renderStudentPage } from ${JSON.stringify(path.resolve("js/student/render.js"))};
+      import { finishCalendarDrag, startCalendarDrag } from ${JSON.stringify(path.resolve("js/coach/availability/actions.js"))};
+      import { shiftScheduleWeek } from ${JSON.stringify(path.resolve("js/coach/bookings/actions.js"))};
+      import { getCoachBookingStudentKey } from ${JSON.stringify(path.resolve("js/coach/bookings/render.js"))};
+      import { addDaysIso, minutesFromTime, nextWeekdayIso, startOfWeekIso, todayIso, weekdayIndex } from ${JSON.stringify(path.resolve("js/core/utils-data.js"))};
       Object.defineProperty(globalThis, "slots", { configurable: true, get: () => state.slots, set: replaceSlots });
       Object.defineProperty(globalThis, "blockedExceptions", { configurable: true, get: () => state.blockedExceptions, set: replaceBlockedExceptions });
       Object.defineProperty(globalThis, "hasUnsavedProfileChanges", { configurable: true, get: () => state.hasUnsavedProfileChanges });
+      const render = () => document.body.dataset.page === "coach" ? renderCoachPage() : renderStudentPage();
       Object.assign(globalThis, {
         addDaysIso, getProfile, getSavedProfile, nextWeekdayIso, openBookingDetails, openBookingDialog,
         openModifyBookingDialog, render, renderDragCalendar, renderExceptionDragCalendar,
         getCoachBookingStudentKey, minutesFromTime, renderStudentOwnBookings, replaceSlots,
-        setCoachProfileDraft, shiftScheduleWeek, startOfWeekIso, syncBookingForSelf, todayIso, weekdayIndex,
+        finishCalendarDrag, setCoachProfileDraft, shiftScheduleWeek, startCalendarDrag, startOfWeekIso,
+        syncBookingForSelf, todayIso, weekdayIndex,
       });
     ` : `import ${JSON.stringify(entryPoint)};`;
     const bundled = esbuild.buildSync({
@@ -184,8 +191,64 @@ async function testCoachPage() {
     document.querySelector(".coach-panel.active")?.dataset.coachContent === "availabilityPanel",
     "Weekly availability tab did not activate.",
   );
+  assert(
+    document.querySelectorAll(".coach-panel.active").length === 1
+      && dom.window.getComputedStyle(document.querySelector('[data-coach-content="bookingsPanel"]')).display === "none",
+    "Inactive coach panels must not remain visible below the selected tab.",
+  );
   assert(document.querySelectorAll("#calendarRinkOptions .rink-option").length > 0, "Rink options did not render.");
   assert(document.querySelectorAll("#dragCalendar .calendar-cell").length > 0, "Availability calendar did not render cells.");
+}
+
+async function testBlockedTimeDialogFlow() {
+  const { dom, errors } = await loadPage("coach/index.html");
+  const { document } = dom.window;
+  document.querySelector('[data-coach-panel="bookingsPanel"]').click();
+
+  const studentSearch = document.querySelector("#coachBookingStudentSearch");
+  const studentResults = document.querySelector("#coachBookingStudentResults");
+  const openButton = document.querySelector("#openBlockDialog");
+  const dialog = document.querySelector("#blockDialog");
+  const form = document.querySelector("#blockDialogForm");
+  studentSearch.click();
+  assert(!studentResults.hidden, "Student picker did not open for the blocked-time interaction check.");
+  openButton.click();
+  assert(dialog.open && studentResults.hidden, "Blocked-time dialog must open while safely closing the student picker.");
+  document.querySelector("#cancelBlockDialog").click();
+  assert(!dialog.open, "Cancelling blocked-time setup must close without changing the draft.");
+
+  const booked = dom.window.slots.find((slot) => slot.coachId === "maya" && slot.booked);
+  openButton.click();
+  document.querySelector("#blockDialogDate").value = booked.date;
+  document.querySelector("#blockDialogStart").value = booked.start;
+  document.querySelector("#blockDialogStart").dispatchEvent(new dom.window.Event("change", { bubbles: true }));
+  document.querySelector("#blockDialogEnd").value = booked.end;
+  submit(form);
+  assert(dialog.open && !document.querySelector("#blockDialogMessage").hidden && document.querySelector("#blockDialogMessage").textContent.includes("已有预约冲突"), "Existing appointments must prevent a conflicting blocked time and show an inline reason.");
+
+  const weekStart = document.querySelector("#exceptionCalendarWeekStart").value;
+  const blockDate = dom.window.addDaysIso(weekStart, 6);
+  document.querySelector("#blockDialogDate").value = blockDate;
+  document.querySelector("#blockDialogStart").value = "14:00";
+  document.querySelector("#blockDialogStart").dispatchEvent(new dom.window.Event("change", { bubbles: true }));
+  document.querySelector("#blockDialogEnd").value = "14:30";
+  submit(form);
+  assert(!dialog.open && dom.window.blockedExceptions.some((block) => block.date === blockDate && block.start === "14:00" && block.end === "14:30"), "Valid blocked time must enter the availability draft and close the dialog.");
+  assert(document.querySelector('#exceptionDragCalendar [data-day-index="6"][data-minutes="840"]').classList.contains("is-editing"), "New blocked time must appear immediately as an unsaved calendar edit.");
+  assert(document.querySelector("#coachBookingActionStatus").textContent.includes("开放时间") && !document.querySelector("#coachBookingActionStatus").hidden, "Appointment view must explain where the blocked-time draft is saved.");
+
+  document.querySelector("#saveAvailability").click();
+  const savedStorage = dumpLocalStorage(dom.window);
+  const savedSlots = savedStorage["ice-skating-coach-booking-slots-v12"];
+  assert(document.querySelector("#availabilitySaveMessage").textContent.includes("已保存"), "Blocked-time draft must use the existing availability save action.");
+  assert(JSON.parse(savedSlots).version === 2 && savedSlots.length < 5_000_000, "Availability persistence must use the compact, backward-compatible slot format instead of exceeding browser storage quota.");
+  assertNoRuntimeErrors("Blocked-time dialog flow", errors);
+  dom.window.close();
+
+  const reloaded = await loadPage("coach/index.html", { localStorage: savedStorage });
+  assert(reloaded.dom.window.blockedExceptions.some((block) => block.date === blockDate && block.start === "14:00" && block.end === "14:30"), "Saved blocked time must survive a page reload.");
+  assertNoRuntimeErrors("Reloaded blocked-time flow", reloaded.errors);
+  reloaded.dom.window.close();
 }
 
 async function testStudentPage() {
@@ -404,7 +467,7 @@ async function testCoachProfileDraftAndSave() {
   assert(profileSections.map((section) => section.querySelector(":scope > .panel-heading h3")?.textContent.trim()).join("|") === "个人资料|授课地点|课程时长和价格", "Profile section titles must share the same heading structure.");
   const personalLayout = doc.querySelector(".profile-personal-layout");
   assert([...personalLayout.children].every((row) => row.classList.contains("profile-form-row")), "Personal details do not use one shared form-row layout.");
-  assert(personalLayout.children[0].querySelector(":scope > .profile-row-label").textContent.trim() === "头像" && personalLayout.children[0].querySelector(".profile-identity-control > .profile-avatar-action + .profile-identity-copy"), "Avatar and name are not grouped in the first form row.");
+  assert(personalLayout.children[0].classList.contains("profile-avatar-row") && personalLayout.children[0].querySelector(":scope > .profile-row-label").textContent.trim() === "头像" && personalLayout.children[0].querySelector(".profile-identity-control > .profile-avatar-action + .profile-identity-copy"), "Avatar and identity are not aligned in the right form column.");
   assert(personalLayout.children[1].querySelector("#coachTeachingDisciplines") && personalLayout.children[1].querySelector(".profile-row-label").textContent.trim() === "教学项目", "Teaching disciplines are not placed after the identity row.");
   assert(personalLayout.children[2].querySelector("label[for='coachBio']").textContent.trim() === "个人介绍" && personalLayout.children[2].querySelector(":scope > .profile-row-control > #coachBio"), "Biography is not placed in the shared form layout.");
   assert(personalLayout.children[3].classList.contains("profile-specialties-field") && personalLayout.children[3].querySelector(".profile-row-label").textContent.trim() === "教学专长" && personalLayout.children[3].querySelector(".profile-row-hint").textContent.trim() === "选填，可多选", "Teaching specialties and helper copy are not placed in the shared form layout.");
@@ -1131,29 +1194,75 @@ async function testCoachScheduleFilters() {
   win.renderExceptionDragCalendar();
   win.render();
   assertNoRuntimeErrors("Coach schedule setup", errors);
-  const select = doc.querySelector("#coachBookingStudentFilter");
   const search = doc.querySelector("#coachBookingStudentSearch");
+  const pickerTrigger = doc.querySelector(".coach-student-picker-input");
+  const pickerCaret = doc.querySelector(".coach-student-picker-caret");
+  const results = doc.querySelector("#coachBookingStudentResults");
+  const optionFor = (key) => [...results.querySelectorAll("[data-student-key]")].find((option) => option.dataset.studentKey === key);
   const rows = () => [...doc.querySelectorAll("#coachSlots .coach-booking-card")];
   const rowIds = () => rows().map((row) => row.dataset.slotId).join(",");
   const listTab = doc.querySelector('[data-booking-section="bookingListSection"]');
   const calendarTab = doc.querySelector('[data-booking-section="bookingCalendarSection"]');
   assert(listTab.textContent === "预约列表", "Coach list tab must use the appointment-list label.");
-  assert(select.value === "" && select.options[0].textContent === "全部学生", "Student filtering must default to all students.");
+  assert(!doc.querySelector("#coachBookingStudentFilter") && search.placeholder === "全部学生" && search.getAttribute("role") === "combobox", "Student filtering must use one searchable picker that defaults to all students.");
+  assert(doc.querySelector("#openBlockDialog").parentElement.classList.contains("coach-booking-calendar-actions") && doc.querySelector("#toggleExceptionCalendarHours").parentElement === doc.querySelector("#openBlockDialog").parentElement, "Calendar actions must share the feedback bar without duplicate buttons.");
+  assert(doc.querySelector(".bookings-panel").contains(doc.querySelector("#exceptionDragCalendar")) && !doc.querySelector(".bookings-panel .calendar-panel"), "Appointment heading, tools and calendar must remain in one outer card without a nested calendar card.");
+  assert(doc.querySelector(".bookings-panel .heading-note").textContent === "查看学生预约与安排不可预约时间" && doc.querySelector("#coachBookingStudentPicker > label").textContent === "查看学生" && doc.querySelector(".coach-booking-date-filter > .coach-booking-filter-label").textContent === "查看日期", "Appointment heading or aligned filter labels are missing.");
+  assert(!doc.querySelector(".bookings-panel .calendar-help") && !doc.querySelector(".coach-booking-filters"), "Removed appointment help or filter panels remain visible.");
   assert(rowIds() === "ada-near,bea-near,ada-far,other-ada", "Upcoming appointments must be chronological across weeks and limited to this coach.");
   assert(!doc.querySelector("#coachSlots .student-booking-group"), "Coach list must not group students or rinks.");
   assert(rows()[0].textContent.includes("Ada") && rows()[0].textContent.includes(future.slice(0, 4)) && rows()[0].textContent.includes("08:00–09:30"), "Appointment row must show student, full date and time.");
   assert(rows()[0].textContent.includes("90 分钟") && rows()[0].textContent.includes("$60") && rows()[0].textContent.includes("Review edges"), "Appointment row must retain course, price and note details.");
   assert(doc.querySelector('[data-slot-id="ada-far"]').textContent.includes("待确认"), "Pending status must not be shown as confirmed.");
   const snapshot = JSON.stringify(win.slots);
+  pickerTrigger.click();
+  assert(!results.hidden && search.getAttribute("aria-expanded") === "true", "Clicking blank space in the student control must open the picker once.");
+  pickerTrigger.click();
+  assert(results.hidden && search.getAttribute("aria-expanded") === "false", "Clicking the unified student control again must close the picker once.");
+  pickerCaret.dispatchEvent(new win.MouseEvent("click", { bubbles: true }));
+  assert(!results.hidden && search.getAttribute("aria-expanded") === "true", "Clicking the student caret must open the same picker.");
+  pickerCaret.dispatchEvent(new win.MouseEvent("click", { bubbles: true }));
+  assert(results.hidden && search.getAttribute("aria-expanded") === "false", "Clicking the student caret must not double-toggle the picker.");
+  search.click();
+  assert(!results.hidden && [...results.querySelectorAll('input[type="checkbox"]')].every((checkbox) => checkbox.checked), "Opening an unfiltered picker must represent the dynamic all-students state with every current student checked.");
+  search.value = "bea@example.com";
+  search.dispatchEvent(new win.Event("input", { bubbles: true }));
+  assert(!results.hidden && results.textContent.includes("Bea") && !results.textContent.includes("bea@example.com"), "Unique-name results should stay concise while email search remains supported.");
+  results.querySelector('[data-student-action="clear-draft"]').click();
+  assert(results.querySelector('[data-student-action="apply"]').disabled && !doc.querySelector("#coachBookingStudentValidation").hidden, "An empty draft must disable apply and explain how to continue.");
+  search.dispatchEvent(new win.KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true }));
+  search.dispatchEvent(new win.KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+  assert(!results.hidden && rowIds() === "ada-near,bea-near,ada-far,other-ada" && optionFor(win.getCoachBookingStudentKey(beaNear)).querySelector('input[type="checkbox"]').checked, "Keyboard selection must change only the draft and keep the menu open.");
+  results.querySelector('[data-student-action="apply"]').click();
+  assert(results.hidden && search.value === "Bea" && rowIds() === "bea-near", "Applying must update the shared filter once and close the picker.");
+  search.click();
   search.value = "ADA@EXAMPLE.COM";
   search.dispatchEvent(new win.Event("input", { bubbles: true }));
-  assert(select.options.length === 2, "Student search should match email without case sensitivity.");
-  select.value = win.getCoachBookingStudentKey(adaNear);
-  select.dispatchEvent(new win.Event("change", { bubbles: true }));
+  assert([...results.querySelectorAll(".coach-student-option")].length === 1 && results.textContent.includes("ada@example.com"), "Case-insensitive email search must work, and duplicate names must show disambiguating email only when needed.");
+  assert(rowIds() === "bea-near", "Typing a new search query must preserve existing selected students.");
+  optionFor(win.getCoachBookingStudentKey(adaNear)).querySelector('input[type="checkbox"]').click();
+  assert(!results.hidden && rowIds() === "bea-near", "Checking another student must not update appointments before apply.");
+  results.querySelector('[data-student-action="apply"]').click();
+  assert(rowIds() === "ada-near,bea-near,ada-far" && search.value === "已选2位学生", "Applying a multi-student draft must update both views and use the compact count label.");
+  assert(doc.querySelector("#coachCalendarFilterSummary").textContent.includes("正在查看2位学生的预约") && doc.querySelector("#coachCalendarFilterSummary").textContent.includes("本周 2 条"), `Applied multi-select feedback must show the combined weekly appointments: ${doc.querySelector("#coachCalendarFilterSummary").textContent}`);
+  search.click();
+  results.querySelector('[data-student-action="clear-draft"]').click();
+  results.querySelector('[data-student-action="cancel"]').click();
+  assert(rowIds() === "ada-near,bea-near,ada-far" && search.value === "已选2位学生", "Cancel must discard an un-applied draft.");
+  search.click();
+  results.querySelector('[data-student-action="clear-draft"]').click();
+  doc.body.click();
+  assert(results.hidden && rowIds() === "ada-near,bea-near,ada-far" && search.value === "已选2位学生", "Clicking outside must close the picker and discard its draft without changing the applied filter.");
+  search.click();
+  search.value = "bea@example.com";
+  search.dispatchEvent(new win.Event("input", { bubbles: true }));
+  optionFor(win.getCoachBookingStudentKey(beaNear)).querySelector('input[type="checkbox"]').click();
+  results.querySelector('[data-student-action="apply"]').click();
+  assert(rowIds() === "ada-near,ada-far", "Applying after unchecking one student must retain the remaining selection.");
   listTab.click();
   assert(rowIds() === "ada-near,ada-far", "Selected student must display continuously across rinks and weeks, without matching same-name students.");
   calendarTab.click();
-  assert(select.value === win.getCoachBookingStudentKey(adaNear), "Calendar/list switching must preserve the selected student.");
+  assert(search.value === "Ada", "Calendar/list switching must preserve and display the selected student.");
   const dayIndex = (win.weekdayIndex(future) + 6) % 7;
   const cellAt = (time) => doc.querySelector(`#exceptionDragCalendar [data-day-index="${dayIndex}"][data-minutes="${win.minutesFromTime(time)}"]`);
   assert(cellAt("08:00").dataset.slotId === "ada-near", "Selected student booking must retain calendar details actions.");
@@ -1176,22 +1285,27 @@ async function testCoachScheduleFilters() {
   assert(!doc.querySelector("#coachSlots img") && doc.querySelector("#coachSlots").textContent.includes("<img"), "Booking notes must render safely as text.");
   calendarTab.click();
   win.shiftScheduleWeek(5);
-  assert(doc.querySelector("#coachCalendarFilterSummary").textContent.includes("本周暂无该学生"), "Calendar must explain when the selected student has no bookings that week.");
+  const emptyWeekSummary = doc.querySelector("#coachCalendarFilterSummary").textContent;
+  assert(emptyWeekSummary === "正在查看Ada的预约 · 本周暂无预约", `Calendar must explain when the selected student has no bookings that week: ${emptyWeekSummary}`);
   listTab.click();
   assert(rowIds() === "ada-past,ada-older", "List dates must not be restricted by calendar week navigation.");
   assert(JSON.stringify(win.slots) === snapshot, "Filtering and changing views must not mutate booking data.");
   search.value = "not-a-student";
   search.dispatchEvent(new win.Event("input", { bubbles: true }));
-  assert(doc.querySelector("#coachBookingFilterHint").textContent.includes("找到 0 位"), "Unmatched student searches need a clear message.");
-  assert(select.value === win.getCoachBookingStudentKey(adaNear), "Unmatched searches must not silently clear an active student filter.");
-  doc.querySelector("#clearCoachBookingStudent").click();
-  assert(select.value === "" && search.value === "", "Clear must reset both student selection and search text.");
+  assert(results.textContent.includes("未找到匹配学生"), "Unmatched student searches need a clear message.");
+  assert(rowIds() === "ada-past,ada-older", "Unmatched searches must not silently clear an active student filter.");
+  results.querySelector('[data-student-action="reset-filter"]').click();
+  assert(search.value === "全部学生" && results.hidden, "The independent reset action must restore the dynamic all-students state and close the panel.");
   calendarTab.click();
   doc.querySelector("#exceptionCalendarWeekStart").value = win.startOfWeekIso(future);
   win.renderExceptionDragCalendar();
   assert(cellAt("10:00").dataset.slotId === "bea-near" && !cellAt("10:00").classList.contains("is-filtered-booking"), "Clearing must restore all students' calendar detail actions.");
-  select.value = win.getCoachBookingStudentKey(adaNear);
-  select.dispatchEvent(new win.Event("change", { bubbles: true }));
+  search.click();
+  search.value = "ada@example.com";
+  search.dispatchEvent(new win.Event("input", { bubbles: true }));
+  results.querySelector('[data-student-action="clear-draft"]').click();
+  optionFor(win.getCoachBookingStudentKey(adaNear)).querySelector('input[type="checkbox"]').click();
+  results.querySelector('[data-student-action="apply"]').click();
   listTab.click();
   doc.querySelector('[data-coach-booking-period="upcoming"]').click();
   doc.querySelector('[data-slot-id="ada-near"] [data-action="coach-booking-details"]').click();
@@ -1200,15 +1314,16 @@ async function testCoachScheduleFilters() {
   let confirmCalls = 0;
   win.confirm = () => { confirmCalls++; return false; };
   doc.querySelector('[data-slot-id="ada-near"] [data-action="coach-cancel-booking"]').click();
-  assert(confirmCalls === 1 && adaNear.booked, "Declining cancellation must preserve the booking.");
+  assert(confirmCalls === 1 && adaNear.booked, `Declining cancellation must preserve the booking: confirmCalls=${confirmCalls}, booked=${adaNear.booked}`);
   win.confirm = () => true;
   doc.querySelector('[data-slot-id="ada-near"] [data-action="coach-cancel-booking"]').click();
   assert(!win.slots.find((slot) => slot.id === "ada-near").booked && beaNear.booked, "List cancellation must use existing rules and leave other students' bookings intact.");
-  assert(select.value === win.getCoachBookingStudentKey(adaFar) && rowIds() === "ada-far", "Cancellation must refresh the list while preserving the student filter.");
+  assert(search.value === "Ada" && rowIds() === "ada-far", `Cancellation must refresh the list while preserving the student filter: value=${search.value}, rows=${rowIds()}`);
   doc.querySelector('[data-slot-id="ada-far"] [data-action="coach-cancel-booking"]').click();
-  assert(doc.querySelector("#coachSlots .empty-state") && doc.querySelector('#coachSlots [data-action="clear-coach-booking-student"]'), "Empty filtered lists must retain a clear-filter action.");
-  doc.querySelector('#coachSlots [data-action="clear-coach-booking-student"]').click();
-  assert(select.value === "" && rowIds().includes("bea-near"), "Empty-state clear must restore other students' appointments.");
+  assert(doc.querySelector("#coachSlots .empty-state") && !doc.querySelector('#coachSlots [data-action="clear-coach-booking-student"]'), "Empty filtered lists must rely on the single picker reset entry without a duplicate clear action.");
+  search.click();
+  results.querySelector('[data-student-action="reset-filter"]').click();
+  assert(search.value === "全部学生" && rowIds().includes("bea-near"), "Reset must restore other students' appointments.");
   assertNoRuntimeErrors("Coach schedule interactions", errors);
   dom.window.close();
 }
@@ -1220,11 +1335,21 @@ async function testCoachScheduleWeekNavigation() {
   doc.querySelector('[data-coach-panel="bookingsPanel"]').click();
   const input = doc.querySelector("#exceptionCalendarWeekStart");
   const range = doc.querySelector("#coachScheduleWeekRange");
+  const trigger = doc.querySelector("#coachScheduleDateTrigger");
+  const popover = doc.querySelector("#coachScheduleDatePopover");
   const bookingSnapshot = JSON.stringify(win.slots);
   assert(doc.querySelector('[data-coach-panel="bookingsPanel"]').textContent === "预约管理", "Coach navigation must use the appointment management name.");
   assert(doc.querySelector('.bookings-panel h3').textContent === "预约管理" && !doc.querySelector('.bookings-panel .panel-heading .eyebrow'), "Appointment title must omit the duplicate eyebrow.");
   assert(doc.querySelectorAll('#previousScheduleWeek').length === 1 && doc.querySelectorAll('#nextScheduleWeek').length === 1, "Week arrows must not be duplicated.");
-  assert(doc.querySelector('#previousScheduleWeek').parentElement === range.parentElement && doc.querySelector('#nextScheduleWeek').parentElement === range.parentElement, "Both arrows must stay with the range.");
+  assert(doc.querySelector('#previousScheduleWeek').parentElement === trigger.parentElement && doc.querySelector('#nextScheduleWeek').parentElement === trigger.parentElement, "Both arrows must stay immediately around the date-range control.");
+  assert(input.type === "hidden" && trigger.getAttribute("aria-haspopup") === "dialog" && popover.hidden && !doc.body.textContent.includes("跳转到日期"), "The week range must directly expose one themed date panel without an intermediate input popover.");
+  trigger.click();
+  assert(!popover.hidden && doc.querySelectorAll("#coachScheduleDateGrid [data-date]").length === 42 && doc.querySelector("#coachScheduleDateGrid .is-selected"), "Opening the range must show one accessible Monday-first calendar grid.");
+  doc.dispatchEvent(new win.KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+  assert(popover.hidden && doc.activeElement === trigger, "Escape must close the date panel and restore focus to its trigger.");
+  trigger.click();
+  doc.body.click();
+  assert(popover.hidden && doc.activeElement === trigger, "Clicking outside must close the date panel and restore focus to its trigger.");
   function assertWeek(start, end, text) {
     assert(input.value === start, "Selected date must normalize to the existing Monday week start.");
     assert(range.textContent === text, "Week range must show the correct months and years: " + text);
@@ -1233,8 +1358,16 @@ async function testCoachScheduleWeekNavigation() {
     headers.forEach((header, index) => assert(header.dataset.date === win.addDaysIso(start, index), "Calendar days must be consecutive."));
   }
   function choose(date) {
-    input.value = date;
-    input.dispatchEvent(new win.Event("change", { bubbles: true }));
+    trigger.click();
+    const [year, month] = date.split("-").map(Number);
+    const yearSelect = doc.querySelector("#coachScheduleYear");
+    const monthSelect = doc.querySelector("#coachScheduleMonth");
+    yearSelect.value = String(year);
+    yearSelect.dispatchEvent(new win.Event("change", { bubbles: true }));
+    monthSelect.value = String(month - 1);
+    monthSelect.dispatchEvent(new win.Event("change", { bubbles: true }));
+    doc.querySelector(`#coachScheduleDateGrid [data-date="${date}"]`).click();
+    assert(popover.hidden && doc.activeElement === trigger, "Choosing a date must close the panel and return focus to the range trigger.");
   }
   choose("2026-10-29");
   assertWeek("2026-10-26", "2026-11-01", "2026年10月26日—11月1日");
@@ -1263,11 +1396,90 @@ async function testCoachScheduleWeekNavigation() {
   dom.window.close();
 }
 
+async function testCoachScheduleCalendarGrid() {
+  const { dom, errors } = await loadPage("coach/index.html");
+  const win = dom.window;
+  const doc = win.document;
+  const weekStart = win.startOfWeekIso(win.nextWeekdayIso(1));
+  const designSystemCss = fs.readFileSync(path.resolve("css/design-system.css"), "utf8");
+  assert(/\.coach-week-calendar\s*\{[^}]*overscroll-behavior-y:\s*auto;[^}]*touch-action:\s*pan-x pan-y;/s.test(designSystemCss), "Coach calendars must restore native wheel and touchpad scroll chaining at their boundaries.");
+  const booking = (id, day, start, end, location, studentName) => ({
+    id,
+    coachId: "maya",
+    date: win.addDaysIso(weekStart, day),
+    start,
+    end,
+    location,
+    availabilityLocation: location,
+    booked: true,
+    lessonName: "私教课",
+    lessonDuration: win.minutesFromTime(end) - win.minutesFromTime(start),
+    lessonPrice: 60,
+    status: "Confirmed",
+    student: { name: studentName, email: `${id}@example.com`, note: "" },
+  });
+  const lesson30 = booking("lesson-30", 0, "08:00", "08:30", "Polar Ice Rink", "Thirty Student");
+  const lesson45 = booking("lesson-45", 1, "09:15", "10:00", "Arcadia Ice Arena", "Forty Five Student");
+  const lesson60 = booking("lesson-60", 2, "10:30", "11:30", "Oceanside Ice Arena", "Sixty Student");
+  const openSlot = { ...booking("open-slot", 3, "12:00", "12:30", "Polar Ice Rink", ""), booked: false, student: null };
+  win.slots = [lesson30, lesson45, lesson60, openSlot];
+  win.blockedExceptions = [{ id: "grid-block", coachId: "maya", date: win.addDaysIso(weekStart, 4), start: "13:00", end: "13:30", reason: "Unavailable" }];
+  doc.querySelector("#exceptionCalendarWeekStart").value = weekStart;
+  win.renderExceptionDragCalendar();
+  doc.querySelector("#calendarWeekStart").value = weekStart;
+  win.renderDragCalendar();
+
+  const block30 = doc.querySelector('.coach-calendar-booking[data-slot-id="lesson-30"]');
+  const block45 = doc.querySelector('.coach-calendar-booking[data-slot-id="lesson-45"]');
+  const block60 = doc.querySelector('.coach-calendar-booking[data-slot-id="lesson-60"]');
+  assert(block30 && block45 && block60, "Coach calendar must render one visible overlay for every appointment.");
+  assert(block30.style.gridRow.endsWith("span 30") && block45.style.gridRow.endsWith("span 45") && block60.style.gridRow.endsWith("span 60"), "Appointment block heights must follow their exact minute durations.");
+  const availability45 = [...doc.querySelectorAll("#dragCalendar .coach-calendar-booking")].find((block) => block.title.includes("09:15-10:00"));
+  assert(doc.querySelector("#dragCalendar").classList.contains("coach-week-calendar") && doc.querySelector("#exceptionDragCalendar").classList.contains("coach-week-calendar"), "Both coach calendars must share the common week-grid style contract.");
+  assert(availability45?.classList.contains("is-availability-booking") && availability45.style.gridRow.endsWith("span 45"), "Availability calendar bookings must use the same exact minute scale.");
+  assert(availability45.style.getPropertyValue("--booking-accent") === block45.style.getPropertyValue("--booking-accent"), "The same rink must use the same booking color in both calendars.");
+  assert(doc.querySelector("#dragCalendar .calendar-time").style.gridRow === doc.querySelector("#exceptionDragCalendar .calendar-time").style.gridRow, "Both calendars must align time-axis rows identically.");
+  assert(doc.querySelector("#dragCalendar .calendar-day").innerHTML === doc.querySelector("#exceptionDragCalendar .calendar-day").innerHTML, "Both calendars must share weekday and date header rendering.");
+  assert(block45.textContent.includes("Forty Five Student") && block45.textContent.includes("09:15–10:00") && block45.textContent.includes("Arcadia Ice Arena"), "Appointment blocks must retain student, exact time and rink details.");
+  assert(block30.style.getPropertyValue("--booking-accent") !== block45.style.getPropertyValue("--booking-accent") && block45.style.getPropertyValue("--booking-accent") !== block60.style.getPropertyValue("--booking-accent"), "Different rinks must retain distinct booking colors.");
+  assert(doc.querySelector('#exceptionDragCalendar [data-day-index="3"][data-minutes="720"]').classList.contains("has-slot"), "Available time must remain visible beneath the appointment layer.");
+  assert(doc.querySelector('#exceptionDragCalendar [data-day-index="4"][data-minutes="780"]').classList.contains("has-blocked"), "Unavailable time must retain its blocked state.");
+  assert([...doc.querySelectorAll("#exceptionDragCalendar .calendar-day")].every((header, index) => header.textContent.includes(`周${"一二三四五六日"[index]}`)), "Week headers must show clear localized weekday labels.");
+  block45.click();
+  assert(doc.querySelector("#bookingDetailsDialog").open && doc.querySelector("#bookingDetailsBody").textContent.includes("Forty Five Student"), "Clicking a calendar appointment must retain the existing details action.");
+  doc.querySelector("#closeBookingDetails").click();
+  doc.querySelector("#toggleExceptionCalendarHours").click();
+  assert(doc.querySelector('.coach-calendar-booking[data-slot-id="lesson-45"]').style.gridRow.endsWith("span 45"), "Full-day mode must preserve exact appointment duration.");
+
+  const dragDate = win.addDaysIso(weekStart, 6);
+  const dragCell = doc.querySelector(`#dragCalendar [data-day-index="6"][data-minutes="840"]`);
+  dragCell.setPointerCapture = () => {};
+  doc.querySelector("#calendarLocationType").value = "Polar Ice Rink";
+  win.startCalendarDrag({ target: dragCell, pointerId: 1 });
+  win.finishCalendarDrag();
+  assert(win.slots.some((slot) => slot.date === dragDate && slot.start === "14:00" && !slot.booked), "Availability drag must retain its existing create behavior.");
+  assert(doc.querySelector("#availabilitySaveMessage").textContent.includes("未保存"), "Calendar drag changes must remain clearly unsaved.");
+  doc.querySelector("#saveAvailability").click();
+  assert(doc.querySelector("#availabilitySaveMessage").textContent.includes("已保存"), "Dragged availability must retain the existing save behavior.");
+  const savedDragCell = doc.querySelector(`#dragCalendar [data-day-index="6"][data-minutes="840"]`);
+  savedDragCell.setPointerCapture = () => {};
+  doc.querySelector("#calendarLocationType").value = "Unavailable";
+  win.startCalendarDrag({ target: savedDragCell, pointerId: 2 });
+  win.finishCalendarDrag();
+  assert(!win.slots.some((slot) => slot.date === dragDate && slot.start === "14:00" && !slot.booked), "Availability drag must retain its existing delete behavior.");
+  assert(doc.querySelector("#availabilitySaveMessage").textContent.includes("未保存"), "Dragged deletion must remain pending until saved.");
+  doc.querySelector("#saveAvailability").click();
+  assert(doc.querySelector("#availabilitySaveMessage").textContent.includes("已保存"), "Dragged deletion must retain the existing save behavior.");
+  assertNoRuntimeErrors("Coach calendar grid", errors);
+  dom.window.close();
+}
+
 async function main() {
   await testLandingPage();
   await testLoginPages();
   await testAdminPage();
   await testCoachPage();
+  await testBlockedTimeDialogFlow();
   await testDesktopPageContracts();
   await testAvailabilityConflictActions();
   await testCoachProfileDraftAndSave();
@@ -1277,6 +1489,7 @@ async function main() {
   await testSafeDynamicRendering();
   await testCoachScheduleFilters();
   await testCoachScheduleWeekNavigation();
+  await testCoachScheduleCalendarGrid();
   await testStudentPage();
   await testPublicCoachProfile();
   await testFullStudentPage();

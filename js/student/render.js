@@ -30,7 +30,6 @@ import {
 } from "../core/utils-data.js";
 
 export function renderStudentPage() {
-  state.slots.sort(slotSort);
   renderStudentSlots();
   renderStudentOwnBookings();
 }

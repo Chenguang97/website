@@ -75,6 +75,17 @@ assert(studentRenderSource.includes("function renderStudentSlots"), "Student ren
 const calendarGridSource = fs.readFileSync(path.join(jsRoot, "ui", "calendar-grid.js"), "utf8");
 assert(!calendarGridSource.includes("state."), "The shared calendar grid must remain independent of application state.");
 
+const renderModules = modules.filter((file) => path.basename(file) === "render.js");
+for (const file of renderModules) {
+  const source = fs.readFileSync(file, "utf8");
+  const relativePath = path.relative(root, file);
+  assert(!/\bstate\.[\w$]+\s*(?:=(?!=)|\+\+|--)/.test(source), `${relativePath} assigns to shared state during rendering.`);
+  assert(!/\bstate\.[\w$]+\.(?:sort|push|pop|shift|unshift|splice|reverse|copyWithin|fill|add|delete|clear|set)\s*\(/.test(source), `${relativePath} mutates shared state during rendering.`);
+}
+
+const stateSource = fs.readFileSync(path.join(jsRoot, "core", "state.js"), "utf8");
+assert(/state\.slots\s*=\s*nextSlots\.slice\(\)\.sort\(slotSort\)/.test(stateSource), "Slot ordering must be established at the state update boundary without mutating the caller's array.");
+
 const renderSource = fs.readFileSync(path.join(jsRoot, "coach", "bookings", "render.js"), "utf8");
 assert(!/state\.coachBookingStudentKeys\s*=/.test(renderSource), "Coach booking rendering must not mutate the applied student filter.");
 const pickerSource = fs.readFileSync(path.join(jsRoot, "coach", "bookings", "student-picker.js"), "utf8");

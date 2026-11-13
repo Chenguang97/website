@@ -1,7 +1,6 @@
 import { coachElements as elements } from "../../dom/coach-elements.js";
 import {
   getAppliedCoachBookingStudentKeys,
-  resetAppliedCoachBookingStudentKeys,
   setAppliedCoachBookingStudentKeys,
 } from "./filter-state.js";
 
@@ -84,18 +83,20 @@ function renderOptions(students) {
 }
 
 function renderCoachBookingStudentPicker(students) {
-  const input = elements.coachBookingStudentSearch;
-  if (!input) return;
-  input.setAttribute("aria-expanded", String(isOpen));
+  const trigger = elements.coachBookingStudentTrigger;
+  if (!trigger) return;
+  trigger.setAttribute("aria-expanded", String(isOpen));
+  elements.coachBookingStudentSummary.textContent = closedLabel(students);
   elements.coachBookingStudentResults.hidden = !isOpen;
   if (!isOpen) {
-    input.value = closedLabel(students);
-    input.removeAttribute("aria-activedescendant");
+    elements.coachBookingStudentSearch.removeAttribute("aria-activedescendant");
     return;
   }
 
   renderOptions(students);
-  elements.coachBookingStudentDraftCount.textContent = `已选 ${draftKeys.size} 位`;
+  const clearSearch = elements.coachBookingStudentResults.querySelector('[data-student-action="clear-search"]');
+  clearSearch.hidden = !searchQuery;
+  elements.coachBookingStudentDraftCount.textContent = `已选${draftKeys.size}位`;
   const apply = elements.coachBookingStudentResults.querySelector('[data-student-action="apply"]');
   apply.disabled = draftKeys.size === 0;
   elements.coachBookingStudentValidation.hidden = draftKeys.size !== 0;
@@ -120,8 +121,9 @@ function closeCoachBookingStudentPicker(students, { restoreFocus = false } = {})
   activeIndex = -1;
   draftKeys = new Set();
   searchQuery = "";
+  elements.coachBookingStudentSearch.value = "";
   renderCoachBookingStudentPicker(students);
-  if (restoreFocus) elements.coachBookingStudentSearch.focus();
+  if (restoreFocus) elements.coachBookingStudentTrigger.focus();
 }
 
 function toggleCoachBookingStudentPicker(students) {
@@ -163,11 +165,6 @@ function applyCoachBookingStudentPicker(students) {
   return true;
 }
 
-function resetCoachBookingStudentPicker(students) {
-  resetAppliedCoachBookingStudentKeys();
-  closeCoachBookingStudentPicker(students, { restoreFocus: true });
-}
-
 function moveCoachBookingStudentHighlight(students, direction) {
   const matches = matchingStudents(students);
   if (!isOpen) {
@@ -197,7 +194,6 @@ export {
   moveCoachBookingStudentHighlight,
   openCoachBookingStudentPicker,
   renderCoachBookingStudentPicker,
-  resetCoachBookingStudentPicker,
   selectMatchingStudents,
   toggleCoachBookingStudentPicker,
   toggleDraftStudent,

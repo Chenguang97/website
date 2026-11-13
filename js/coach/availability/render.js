@@ -26,7 +26,7 @@ import {
 } from "../../core/utils-data.js";
 import { getAvailabilityLocation, slotSort } from "../../domain/scheduling.mjs";
 import { coachElements as elements } from "../../dom/coach-elements.js";
-import { renderWeekCalendarGrid } from "../../ui/calendar-grid.js";
+import { renderCalendarLocationWatermarks, renderWeekCalendarGrid, setCalendarCellLocation } from "../../ui/calendar-grid.js";
 import { formatLocationLabel } from "../../ui/display.js";
 import { escapeHtml } from "../../ui/safe-html.mjs";
 import { renderCoachBookingBlocks } from "../calendar-bookings.js";
@@ -279,6 +279,7 @@ export function renderCalendarAvailability() {
     if (slot) {
       cell.style.setProperty("--rink-color", getRinkColor(getAvailabilityLocation(slot)));
     }
+    setCalendarCellLocation(cell, slot ? getAvailabilityLocation(slot) : "");
     cell.classList.toggle("has-slot", Boolean(slot));
     cell.classList.toggle("has-booking", Boolean(slot && slot.booked));
     cell.classList.toggle("has-blocked", !slot);
@@ -289,6 +290,7 @@ export function renderCalendarAvailability() {
       : `不可预约${isPast ? " · 已过去" : ""}`;
     cell.setAttribute("aria-label", cell.title);
   });
+  renderCalendarLocationWatermarks(elements.dragCalendar);
   renderCoachBookingBlocks({
     calendar: elements.dragCalendar,
     weekStart,

@@ -3,7 +3,7 @@ import { state } from "../../core/state.js";
 import { findSlotAt } from "../../core/scheduling-rules.js";
 import { addDaysIso, minutesFromTime, startOfWeekIso, todayIso } from "../../core/utils-data.js";
 import { coachElements as elements } from "../../dom/coach-elements.js";
-import { renderWeekCalendarGrid } from "../../ui/calendar-grid.js";
+import { renderCalendarLocationWatermarks, renderWeekCalendarGrid, setCalendarCellLocation } from "../../ui/calendar-grid.js";
 import { formatLocationLabel } from "../../ui/display.js";
 import { renderCoachBookingBlocks } from "../calendar-bookings.js";
 import { getBookedRinkColor, getRinkColor } from "../calendar-colors.js";
@@ -47,6 +47,7 @@ export function renderExceptionCalendarAvailability() {
     delete cell.dataset.slotId;
     cell.style.removeProperty("--rink-color");
     cell.style.removeProperty("--booked-rink-color");
+    setCalendarCellLocation(cell, slot && !block ? slot.location : "");
     if (slot && !block) {
       cell.style.setProperty("--rink-color", getRinkColor(slot.location));
       cell.style.setProperty("--booked-rink-color", getBookedRinkColor(slot.location));
@@ -63,6 +64,7 @@ export function renderExceptionCalendarAvailability() {
     cell.title = block ? `${block.start}-${block.end} 不可预约` : isFilteredBooking ? `${slot.start}-${slot.end} 已占用（其他学生预约）` : slot ? `${slot.start}-${slot.end} ${formatLocationLabel(slot.location)}${studentName ? ` · ${studentName}` : ""}` : "不可预约";
     cell.setAttribute("aria-label", cell.title);
   });
+  renderCalendarLocationWatermarks(elements.exceptionDragCalendar);
   renderCoachBookingBlocks({
     calendar: elements.exceptionDragCalendar,
     weekStart,

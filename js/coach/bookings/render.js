@@ -52,7 +52,7 @@ function renderCoachSlots() {
   });
   if (elements.coachBookingListSummary) {
     const selectedLabel = selectedStudents.length === 1 ? selectedStudents[0].name : selectedStudents.length > 1 ? `已选 ${selectedStudents.length} 位学生` : "全部学生";
-    elements.coachBookingListSummary.textContent = `${selectedLabel} · ${visible.length} 条${isHistory ? "历史预约 · 最近在前" : "即将上课 · 时间由近到远"}`;
+    elements.coachBookingListSummary.textContent = `${selectedLabel} · ${isHistory ? "历史预约" : "即将上课"} ${visible.length} 条 · ${isHistory ? "最近在前" : "时间由近到远"}`;
   }
   if (!visible.length) {
     elements.coachSlots.innerHTML = `<div class="empty-state coach-booking-empty"><strong>${hasAppliedCoachBookingStudentFilter() ? "所选学生暂无" : "暂无"}${isHistory ? "历史预约" : "即将上课的预约"}</strong><p>可切换预约时间范围，或调整上方学生筛选。列表包含所有周的预约。</p></div>`;

@@ -2,7 +2,7 @@ import { coreDayEnd, coreDayStart, currentCoachId, fullDayEnd, fullDayStart } fr
 import { state } from "../core/state.js";
 import { addDaysIso, minutesFromTime } from "../core/utils-data.js";
 import { coachBookingMatchesStudent } from "./bookings/render.js";
-import { formatLocationLabel } from "../ui/display.js";
+import { formatLocationLabel, formatLocationShortLabel } from "../ui/display.js";
 import { getBookedRinkColor } from "./calendar-colors.js";
 
 export function renderCoachBookingBlocks({ calendar, weekStart, showsFullDay, filtersStudents = false, enablesDetails = false }) {
@@ -49,8 +49,11 @@ export function renderCoachBookingBlocks({ calendar, weekStart, showsFullDay, fi
       time.textContent = `${slot.start}–${slot.end}`;
       const rink = document.createElement("span");
       rink.className = "coach-calendar-booking-rink";
-      rink.textContent = location;
-      booking.append(name, time, rink);
+      rink.textContent = `· ${formatLocationShortLabel(slot.location)}`;
+      const meta = document.createElement("div");
+      meta.className = "coach-calendar-booking-meta";
+      meta.append(time, rink);
+      booking.append(name, meta);
       calendar.append(booking);
     });
 }

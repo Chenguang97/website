@@ -28,7 +28,7 @@ for (const file of modules) {
   const dependencies = [];
   for (const match of source.matchAll(importPattern)) {
     if (!match[1].startsWith(".")) continue;
-    const dependency = path.resolve(path.dirname(file), match[1]);
+    const dependency = path.resolve(path.dirname(file), match[1].split(/[?#]/, 1)[0]);
     assert(moduleSet.has(dependency), `${path.relative(root, file)} imports missing module ${match[1]}.`);
     dependencies.push(dependency);
   }

@@ -15,7 +15,3 @@ export function setAppliedCoachBookingStudentKeys(studentKeys, availableStudents
   return getAppliedCoachBookingStudentKeys();
 }
 
-export function resetAppliedCoachBookingStudentKeys() {
-  appliedStudentKeys = [];
-}
-

@@ -2,7 +2,7 @@ import { selectElements } from "./select-elements.js";
 
 export const coachElements = selectElements({
   coachBookingPanel: '[data-coach-content="bookingsPanel"]', coachBookingStudentPicker: "#coachBookingStudentPicker",
-  coachBookingStudentTrigger: ".coach-student-picker-input",
+  coachBookingStudentTrigger: "#coachBookingStudentTrigger", coachBookingStudentSummary: "#coachBookingStudentSummary",
   coachBookingStudentSearch: "#coachBookingStudentSearch", coachBookingStudentResults: "#coachBookingStudentResults",
   coachBookingStudentOptions: "#coachBookingStudentOptions", coachBookingStudentDraftCount: "#coachBookingStudentDraftCount",
   coachBookingStudentValidation: "#coachBookingStudentValidation", coachBookingStudentStatus: "#coachBookingStudentStatus",

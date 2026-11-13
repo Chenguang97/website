@@ -7,6 +7,14 @@ export const rinkColors = {
   Zoom: "#bae6fd",
   Unavailable: "#e2e8f0",
 };
+export const locationShortLabels = {
+  "Polar Ice Rink": "Polar",
+  "Arcadia Ice Arena": "Arcadia",
+  "Oceanside Ice Arena": "Oceanside",
+  "Any served rink": "不限冰场",
+  Zoom: "Zoom",
+  Unavailable: "不可预约",
+};
 
 export const coaches = [
   { id: "maya", name: "Maya Chen", subject: "Figure Skating Coach" },

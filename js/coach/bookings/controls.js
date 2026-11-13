@@ -6,7 +6,6 @@ import {
   getHighlightedCoachBookingStudentKey,
   isCoachBookingStudentPickerOpen,
   moveCoachBookingStudentHighlight,
-  resetCoachBookingStudentPicker,
   selectMatchingStudents,
   toggleCoachBookingStudentPicker,
   toggleDraftStudent,
@@ -62,14 +61,15 @@ export function handleCoachBookingStudentOutsideClick(event) {
 export function handleCoachBookingFilterAction(event) {
   const students = getCoachBookingStudents();
   const action = event.target.closest("[data-student-action]")?.dataset.studentAction;
-  if (action === "select-matches") selectMatchingStudents(students);
+  if (action === "clear-search") {
+    elements.coachBookingStudentSearch.value = "";
+    updateCoachBookingStudentSearch(students, "");
+    elements.coachBookingStudentSearch.focus();
+  } else if (action === "select-matches") selectMatchingStudents(students);
   else if (action === "clear-draft") clearDraftStudents(students);
   else if (action === "cancel") closeCoachBookingStudentPicker(students, { restoreFocus: true });
   else if (action === "apply") {
     if (applyCoachBookingStudentPicker(students)) renderAppliedCoachBookingStudentFilter();
-  } else if (action === "reset-filter") {
-    resetCoachBookingStudentPicker(students);
-    renderAppliedCoachBookingStudentFilter();
   }
   if (action) return;
 

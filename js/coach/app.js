@@ -1,3 +1,4 @@
+import { initializeBookingViewMotion } from "./bookings/view-motion.js?v=booking-liquid-restored-1";
 import {
   addAvailability, cancelAvailabilityConflict, clearDragSelection,
   confirmAvailabilityConflictOverride, finishCalendarDrag,
@@ -17,7 +18,7 @@ import {
   handleCoachBookingFilterAction, handleCoachBookingStudentKeydown,
   handleCoachBookingStudentOutsideClick, openCoachBookingStudentSearch,
   searchCoachBookingStudents, switchCoachBookingPeriod,
-} from "./bookings/controls.js";
+} from "./bookings/controls.js?v=booking-liquid-restored-1";
 import { initializeCoachScheduleDatePicker } from "./bookings/date-picker.js";
 import {
   addLessonOption, addCustomSpecialty, closeCoachPhotoDialog, closeCustomSpecialtyEditor,
@@ -36,7 +37,7 @@ import { coachElements } from "../dom/coach-elements.js";
 import {
   activateCoachPanel, selectCalendarRink, switchAvailabilitySection,
   switchBookingSection, switchCoachPanel, switchMethod,
-} from "./navigation.js";
+} from "./navigation.js?v=booking-liquid-restored-1";
 import {
   populateTimeSelects, renderDragCalendar, renderDropdownOpenSlots, syncEndTimeOptions,
 } from "./availability/render.js";
@@ -150,6 +151,7 @@ export function initializeCoachApp() {
   elements.blockDialogDate.value = initialDate;
   elements.calendarWeekStart.value = startOfWeekIso(initialDate);
   elements.exceptionCalendarWeekStart.value = startOfWeekIso(initialDate);
+  initializeBookingViewMotion(elements.bookingSubtabs);
   bindCoachEvents();
   initializeCoachScheduleDatePicker();
   activateCoachPanel(storageGetItem(activeCoachPanelStorageKey) || "profilePanel", false);

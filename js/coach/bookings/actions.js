@@ -18,7 +18,6 @@ import {
   cellKey,
   createId,
   minutesFromTime,
-  nextWeekdayIso,
   startOfWeekIso,
   timeFromMinutes,
   todayIso,
@@ -43,7 +42,9 @@ export function goToCurrentScheduleWeek() {
 
 export function openBlockTimeDialog() {
   try {
-    elements.blockDialogDate.value = elements.exceptionCalendarWeekStart.value || elements.slotDate.value || nextWeekdayIso();
+    const today = todayIso();
+    const viewedWeekStart = startOfWeekIso(elements.exceptionCalendarWeekStart.value || today);
+    elements.blockDialogDate.value = viewedWeekStart === startOfWeekIso(today) ? today : viewedWeekStart;
     elements.blockDialogStart.value = defaultStart;
     syncEndTimeOptions(elements.blockDialogStart, elements.blockDialogEnd, "12:00");
     elements.blockRepeatWeekly.checked = false;

@@ -1,10 +1,12 @@
 import assert from "node:assert/strict";
 import {
+  canCancelBooking,
   canFitLessonFromSlot,
   findSlotAt,
   getAvailabilityLocation,
   getAvailabilitySlotsCoveredByLesson,
   isPastBooking,
+  isCancelledBooking,
   rangesOverlap,
   slotOverlapsBlockedException,
   slotSort,
@@ -43,6 +45,10 @@ assert.equal(findSlotAt(slots, "maya", "2026-10-30", 500)?.id, "a");
 assert.equal(slotOverlapsBlockedException(slots[2], blocks), true);
 assert.deepEqual([...slots].sort(slotSort).map((slot) => slot.id), ["a", "b", "c"]);
 assert.equal(isPastBooking({ date: "2020-01-01", end: "10:00" }, new Date("2026-01-01")), true);
+assert.equal(isCancelledBooking({ status: "Cancelled" }), true);
+assert.equal(canCancelBooking({ booked: true, status: "Confirmed", date: "2026-01-02", end: "10:00" }, new Date("2026-01-01")), true);
+assert.equal(canCancelBooking({ booked: true, status: "Confirmed", date: "2020-01-01", end: "10:00" }, new Date("2026-01-01")), false);
+assert.equal(canCancelBooking({ booked: true, status: "Cancelled", date: "2026-01-02", end: "10:00" }, new Date("2026-01-01")), false);
 assert.deepEqual(getAvailabilitySlotsCoveredByLesson(slots[0], 60, slots, []), slots.slice(0, 2));
 assert.equal(canFitLessonFromSlot(slots[0], 60, slots, [], 30, "24:00"), true);
 assert.equal(canFitLessonFromSlot(slots[0], 90, slots, blocks, 30, "24:00"), false);

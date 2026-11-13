@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>预约课程条目视觉预览</title>
+    <style>
+      :root {
+        --bg: #f5f1e8;
+        --surface: #fffcf7;
+        --row: #faf7f0;
+        --text: #29271f;
+        --muted: #6e685d;
+        --subtle: #8b8478;
+        --line: #ddd6ca;
+        --brand: #526149;
+        --brand-soft: #e5eadc;
+        --danger: #965241;
+        font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+        color: var(--text);
+        background: var(--bg);
+      }
+      * { box-sizing: border-box; }
+      body { margin: 0; padding: 48px; background: radial-gradient(ellipse at 5% 0%, #e6e9dc80, transparent 48%), var(--bg); }
+      main { width: min(1180px, 100%); margin: auto; }
+      .preview-heading { margin: 0 0 8px; font-size: 20px; font-weight: 600; }
+      .preview-note { margin: 0 0 24px; color: var(--muted); font-size: 13px; }
+      .preview-stage { padding: 28px; border: 1px solid var(--line); border-radius: 24px; background: var(--surface); }
+      .date-heading { display: flex; align-items: baseline; justify-content: space-between; margin: 0 4px 9px; }
+      .date-heading strong { font-size: 14px; font-weight: 600; }
+      .date-heading span { color: var(--muted); font-size: 12px; }
+      .booking-row {
+        display: grid;
+        grid-template-columns: 92px minmax(280px, 1fr) 72px 72px 190px;
+        align-items: center;
+        gap: 20px;
+        min-height: 118px;
+        padding: 16px 18px;
+        border: 1px solid var(--line);
+        border-radius: 16px;
+        background: var(--row);
+      }
+      .time-block { align-self: start; padding-top: 3px; font-variant-numeric: tabular-nums; }
+      .start-time { display: block; font-size: 19px; font-weight: 650; line-height: 1.25; letter-spacing: -.01em; }
+      .end-time { display: block; margin-top: 5px; color: var(--subtle); font-size: 12px; font-weight: 450; line-height: 1.3; }
+      .student-block { min-width: 0; }
+      .student-name { margin: 0 0 7px; font-size: 16px; font-weight: 600; line-height: 1.3; }
+      .location, .course { display: flex; align-items: center; gap: 7px; min-width: 0; }
+      .location { color: var(--text); font-size: 13px; line-height: 1.4; }
+      .location svg { width: 14px; height: 14px; flex: 0 0 auto; color: var(--brand); }
+      .course { margin-top: 5px; color: var(--muted); font-size: 13px; line-height: 1.4; }
+      .course-label { color: var(--subtle); font-size: 11px; font-weight: 500; letter-spacing: .03em; }
+      .student-note { overflow: hidden; margin: 7px 0 0; color: var(--subtle); font-size: 12px; line-height: 1.4; text-overflow: ellipsis; white-space: nowrap; }
+      .price { justify-self: end; font-size: 14px; font-weight: 500; font-variant-numeric: tabular-nums; }
+      .status { justify-self: center; padding: 4px 9px; border-radius: 999px; background: var(--brand-soft); color: #3b4934; font-size: 11px; font-weight: 600; line-height: 1.3; white-space: nowrap; }
+      .actions { display: flex; justify-content: flex-end; gap: 8px; }
+      .actions button { min-height: 36px; padding: 7px 12px; border: 1px solid var(--line); border-radius: 999px; background: #fffefa; color: var(--text); font: 500 12px/1.4 inherit; white-space: nowrap; }
+      .actions .details:hover { border-color: #bac4ac; background: var(--brand-soft); color: #3b4934; }
+      .actions .cancel { border-color: #d8b9ae; background: transparent; color: var(--danger); }
+      .actions .cancel:hover { background: #f5e9e4; }
+      @media (max-width: 900px) {
+        body { padding: 24px; }
+        .booking-row { grid-template-columns: 80px minmax(0, 1fr) 64px 64px; }
+        .actions { grid-column: 2 / -1; }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1 class="preview-heading">单条预约视觉预览</h1>
+      <p class="preview-note">仅用于确认信息层级；尚未接入「即将上课 / 历史预约」正式列表。</p>
+      <section class="preview-stage" aria-label="预约条目设计预览">
+        <div class="date-heading"><strong>2026/11/16 周一</strong><span>1 节</span></div>
+        <article class="booking-row">
+          <div class="time-block">
+            <time class="start-time" datetime="2026-11-16T12:30">12:30</time>
+            <span class="end-time">至 13:00</span>
+          </div>
+          <div class="student-block">
+            <h2 class="student-name">Noah Kim</h2>
+            <div class="location">
+              <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 21s6-5.1 6-11a6 6 0 1 0-12 0c0 5.9 6 11 6 11Z" stroke="currentColor" stroke-width="1.8"/><circle cx="12" cy="10" r="2.2" stroke="currentColor" stroke-width="1.8"/></svg>
+              <span>Oceanside Ice Arena</span>
+            </div>
+            <div class="course"><span class="course-label">课程</span><span>花样滑冰私教课 · 30 分钟</span></div>
+            <p class="student-note">学生备注：准备自由滑测试，希望重点检查节目衔接与用刃。</p>
+          </div>
+          <div class="price">$60</div>
+          <div class="status">已确认</div>
+          <div class="actions">
+            <button class="details" type="button">查看详情</button>
+            <button class="cancel" type="button">取消预约</button>
+          </div>
+        </article>
+      </section>
+    </main>
+  </body>
+</html>

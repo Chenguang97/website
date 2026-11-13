@@ -2,14 +2,16 @@ import { setAvailabilityDirty } from "../availability/status.js";
 import { pushBookingUndoSnapshot } from "../../core/booking-undo.js";
 import { restoreConsumedAvailabilitySlots } from "../../core/bookings.js";
 import { state } from "../../core/state.js";
+import { currentCoachId } from "../../core/config.js";
+import { canCancelBooking } from "../../domain/scheduling.mjs";
 import { formatDate } from "../../core/utils-data.js";
 import { bookingDialogElements } from "../../dom/booking-dialog-elements.js";
-import { closeBookingDetails, getBookingDetailsSlotId, openBookingDetails } from "../../ui/booking-details.js";
-import { renderCoachBookingChanges } from "./refresh.js";
+import { closeBookingDetails, getBookingDetailsSlotId, openBookingDetails } from "../../ui/booking-details.js?v=coach-booking-list-1";
+import { renderCoachBookingChanges } from "./refresh.js?v=coach-booking-card-1";
 
 export function removeCoachBookingFromDetails() {
-  const slot = state.slots.find((item) => item.id === getBookingDetailsSlotId());
-  if (!slot || !slot.booked) return;
+  const slot = state.slots.find((item) => item.id === getBookingDetailsSlotId() && item.coachId === currentCoachId);
+  if (!canCancelBooking(slot)) return;
   const studentName = slot.student?.name || "这位学生";
   if (!window.confirm(`确定要取消 ${studentName} 在 ${formatDate(slot.date)} ${slot.start}-${slot.end} 的预约吗？`)) return;
   pushBookingUndoSnapshot();

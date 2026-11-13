@@ -29,6 +29,12 @@ export function slotSort(slotA, slotB) {
 export function isPastBooking(slot, now = new Date()) {
   return /* @__PURE__ */ new Date(`${slot.date}T${slot.end}`) < now;
 }
+export function isCancelledBooking(slot) {
+  return String(slot?.status || "").trim().toLocaleLowerCase() === "cancelled";
+}
+export function canCancelBooking(slot, now = new Date()) {
+  return Boolean(slot?.booked) && !isCancelledBooking(slot) && !isPastBooking(slot, now);
+}
 export function getAvailabilitySlotsCoveredByLesson(startSlot, duration, slots, blockedExceptions) {
   const startMinutes = minutesFromTimeValue(startSlot.start);
   const endMinutes = startMinutes + Number(duration);

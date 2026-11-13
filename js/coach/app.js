@@ -13,15 +13,15 @@ import {
   addBlockException, closeBlockTimeDialog, goToCurrentScheduleWeek,
   handleCoachBookingAction, openBlockTimeDialog, shiftScheduleWeek,
   toggleScheduleCalendarHours,
-} from "./bookings/actions.js";
+} from "./bookings/actions.js?v=coach-booking-card-1";
 import { handleAvailabilityUndoKeydown } from "./availability/undo.js";
-import { handleScheduleCalendarClick, removeCoachBookingFromDetails } from "./bookings/details-actions.js";
+import { handleScheduleCalendarClick, removeCoachBookingFromDetails } from "./bookings/details-actions.js?v=coach-booking-card-1";
 import { handleCoachBookingUndoKeydown } from "./bookings/undo.js";
 import {
   handleCoachBookingFilterAction, handleCoachBookingStudentKeydown,
   handleCoachBookingStudentOutsideClick, openCoachBookingStudentSearch,
   searchCoachBookingStudents, switchCoachBookingPeriod,
-} from "./bookings/controls.js?v=booking-liquid-restored-1";
+} from "./bookings/controls.js?v=coach-booking-card-1";
 import { initializeCoachScheduleDatePicker } from "./bookings/date-picker.js";
 import {
   addLessonOption, addCustomSpecialty, closeCoachPhotoDialog, closeCustomSpecialtyEditor,
@@ -45,7 +45,7 @@ import {
   populateTimeSelects, renderDragCalendar, renderDropdownOpenSlots, syncEndTimeOptions,
 } from "./availability/render.js";
 import { renderExceptionDragCalendar } from "./bookings/calendar-render.js";
-import { renderCoachPage } from "./render.js";
+import { renderCoachPage } from "./render.js?v=coach-booking-card-1";
 import { state } from "../core/state.js";
 import { storageGetItem } from "../core/storage-adapter.js";
 import { nextWeekdayIso, startOfWeekIso } from "../core/utils-data.js";

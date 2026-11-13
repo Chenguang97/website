@@ -1,5 +1,5 @@
-import { openBookingDetails } from "../../ui/booking-details.js";
-import { prepareCoachBookingCancellation } from "./details-actions.js";
+import { openBookingDetails } from "../../ui/booking-details.js?v=coach-booking-list-1";
+import { prepareCoachBookingCancellation } from "./details-actions.js?v=coach-booking-card-1";
 import { refreshAvailabilityDirty, showFormMessage } from "../availability/status.js";
 import { calendarStep, currentCoachId, defaultStart } from "../../core/config.js";
 import { rangesOverlap } from "../../domain/scheduling.mjs";

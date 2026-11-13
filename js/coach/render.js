@@ -6,7 +6,7 @@ import {
   syncLocationOptions,
 } from "./availability/render.js";
 import { renderExceptionCalendarAvailability } from "./bookings/calendar-render.js";
-import { renderCoachSlots } from "./bookings/render.js";
+import { renderCoachSlots } from "./bookings/render.js?v=coach-booking-card-1";
 import { renderCoachProfile } from "./profile/render.js";
 
 export function renderCoachPage() {

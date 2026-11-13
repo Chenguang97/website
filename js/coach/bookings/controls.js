@@ -1,4 +1,4 @@
-import { getCoachBookingStudents, renderCoachSlots } from "./render.js";
+import { getCoachBookingStudents, renderCoachSlots } from "./render.js?v=coach-booking-card-1";
 import {
   applyCoachBookingStudentPicker,
   clearDraftStudents,

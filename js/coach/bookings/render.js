@@ -1,12 +1,13 @@
 import { currentCoachId } from "../../core/config.js";
 import { getAppliedCoachBookingStudentKeys, hasAppliedCoachBookingStudentFilter } from "./filter-state.js";
 import { renderCoachBookingStudentPicker } from "./student-picker.js";
-import { isPastBooking, slotSort } from "../../domain/scheduling.mjs";
+import { canCancelBooking, isPastBooking, slotSort } from "../../domain/scheduling.mjs";
 import { coachElements as elements } from "../../dom/coach-elements.js";
 import { state } from "../../core/state.js";
 import { formatLocationLabel } from "../../ui/display.js";
 import { escapeHtml } from "../../ui/safe-html.mjs";
 import { addDaysIso, minutesFromTime } from "../../core/utils-data.js";
+import { getBookingStatusLabel } from "../../ui/booking-status.js";
 function getCoachBookingStudentKey(slot) {
   const studentId = String(slot.student?.id || "").trim();
   if (studentId) return `id:${studentId}`;
@@ -58,33 +59,62 @@ function renderCoachSlots() {
     elements.coachSlots.innerHTML = `<div class="empty-state coach-booking-empty"><strong>${hasAppliedCoachBookingStudentFilter() ? "所选学生暂无" : "暂无"}${isHistory ? "历史预约" : "即将上课的预约"}</strong><p>可切换预约时间范围，或调整上方学生筛选。列表包含所有周的预约。</p></div>`;
     return;
   }
-  elements.coachSlots.innerHTML = visible.map(renderCoachBookingCard).join("");
+  const groups = visible.reduce((result, slot) => {
+    const current = result.at(-1);
+    if (current?.date === slot.date) current.slots.push(slot);
+    else result.push({ date: slot.date, slots: [slot] });
+    return result;
+  }, []);
+  elements.coachSlots.innerHTML = groups.map(renderCoachBookingDateGroup).join("");
+}
+function renderCoachBookingDateGroup(group) {
+  const text = escapeHtml;
+  const date = new Intl.DateTimeFormat("zh-CN", { year: "numeric", month: "2-digit", day: "2-digit", weekday: "short" }).format(/* @__PURE__ */ new Date(`${group.date}T00:00:00`));
+  return `
+    <section class="coach-booking-date-group" data-booking-date="${text(group.date)}">
+      <div class="coach-booking-date-heading"><time datetime="${text(group.date)}">${text(date)}</time><span>${group.slots.length} 节</span></div>
+      <div class="coach-booking-date-list">${group.slots.map(renderCoachBookingCard).join("")}</div>
+    </section>`;
+}
+function renderBookingLocationIcon(location) {
+  if (String(location).trim().toLocaleLowerCase() === "zoom") {
+    return `<svg class="coach-booking-location-icon coach-booking-location-icon--video" viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="3.5" y="6" width="11.5" height="12" rx="2.5" stroke="currentColor" stroke-width="1.8"/><path d="m15 10 5-2.5v9L15 14" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>`;
+  }
+  return `<svg class="coach-booking-location-icon coach-booking-location-icon--pin" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 21s6-5.1 6-11a6 6 0 1 0-12 0c0 5.9 6 11 6 11Z" stroke="currentColor" stroke-width="1.8"/><circle cx="12" cy="10" r="2.2" stroke="currentColor" stroke-width="1.8"/></svg>`;
+}
+function formatCoachBookingLesson(slot, duration) {
+  const lessonName = String(slot.lessonName || "私教课").trim();
+  const normalizedName = lessonName.toLocaleLowerCase();
+  const includesDuration = normalizedName.includes(`${duration} min`)
+    || normalizedName.includes(`${duration}分钟`)
+    || normalizedName.includes(`${duration} 分钟`);
+  return includesDuration ? lessonName : `${lessonName} · ${duration} 分钟`;
 }
 function renderCoachBookingCard(slot) {
   const text = escapeHtml;
   const student = slot.student || {};
-  const date = new Intl.DateTimeFormat("zh-CN", { year: "numeric", month: "2-digit", day: "2-digit", weekday: "short" }).format(/* @__PURE__ */ new Date(`${slot.date}T00:00:00`));
   const duration = Number(slot.lessonDuration) || minutesFromTime(slot.end) - minutesFromTime(slot.start);
   const hasPrice = slot.lessonPrice !== null && slot.lessonPrice !== void 0 && slot.lessonPrice !== "" && Number.isFinite(Number(slot.lessonPrice));
   const price = hasPrice ? `$${Number(slot.lessonPrice).toLocaleString("en-US", { maximumFractionDigits: 2 })}` : "价格暂未提供";
-  const statuses = { Confirmed: "已确认", confirmed: "已确认", Pending: "待确认", pending: "待确认", Cancelled: "已取消", cancelled: "已取消" };
-  const status = slot.status ? statuses[slot.status] || slot.status : "已确认";
-  const ended = isPastBooking(slot);
-  const inProgress = !ended && /* @__PURE__ */ new Date(`${slot.date}T${slot.start}`) <= /* @__PURE__ */ new Date();
+  const status = getBookingStatusLabel(slot);
+  const lesson = formatCoachBookingLesson(slot, duration);
   return `
     <article class="coach-booking-card" data-slot-id="${text(slot.id)}">
-      <div class="coach-booking-time"><time datetime="${text(slot.date)}">${text(date)}</time><strong>${text(slot.start)}–${text(slot.end)}</strong></div>
+      <div class="coach-booking-time-block">
+        <time class="coach-booking-start-time" datetime="${text(`${slot.date}T${slot.start}`)}">${text(slot.start)}</time>
+        <span class="coach-booking-end-time">至 <time datetime="${text(`${slot.date}T${slot.end}`)}">${text(slot.end)}</time></span>
+      </div>
       <div class="coach-booking-info">
         <h4>${text(student.name || "学生（未填写姓名）")}</h4>
-        ${student.email ? `<p class="coach-booking-contact">${text(student.email)}</p>` : ""}
-        <p>${text(formatLocationLabel(slot.location))} · ${text(slot.lessonName || "私教课")} · ${text(duration)} 分钟</p>
+        <p class="coach-booking-location">${renderBookingLocationIcon(slot.location)}<span>${text(formatLocationLabel(slot.location))}</span></p>
+        <p class="coach-booking-course coach-booking-meta"><span>课程</span>${text(lesson)}</p>
         ${student.note ? `<p class="coach-booking-note"><span>学生备注：</span>${text(student.note)}</p>` : ""}
-        ${slot.note && slot.note !== student.note ? `<p class="coach-booking-note"><span>课时备注：</span>${text(slot.note)}</p>` : ""}
       </div>
-      <div class="coach-booking-status"><strong>${text(price)}</strong><span class="pill">${text(status)}</span>${ended || inProgress ? `<small>${ended ? "已结束" : "进行中"}</small>` : ""}</div>
+      <strong class="coach-booking-price">${text(price)}</strong>
+      <span class="pill coach-booking-status">${text(status)}</span>
       <div class="coach-booking-actions">
         <button class="ghost-button" type="button" data-action="coach-booking-details" data-id="${text(slot.id)}">查看详情</button>
-        <button class="danger-button" type="button" data-action="coach-cancel-booking" data-id="${text(slot.id)}">取消预约</button>
+        ${canCancelBooking(slot) ? `<button class="danger-button" type="button" data-action="coach-cancel-booking" data-id="${text(slot.id)}">取消预约</button>` : ""}
       </div>
     </article>`;
 }

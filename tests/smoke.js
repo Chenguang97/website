@@ -27,6 +27,7 @@ async function loadPage(fileName, options = {}) {
       import { renderStudentOwnBookings, renderStudentPage } from ${JSON.stringify(path.resolve("js/student/render.js"))};
       import { finishCalendarDrag, startCalendarDrag } from ${JSON.stringify(path.resolve("js/coach/availability/actions.js"))};
       import { shiftScheduleWeek } from ${JSON.stringify(path.resolve("js/coach/bookings/actions.js"))};
+      import { prepareCoachBookingCancellation } from ${JSON.stringify(path.resolve("js/coach/bookings/details-actions.js"))};
       import { getCoachBookingStudentKey } from ${JSON.stringify(path.resolve("js/coach/bookings/render.js"))};
       import { addDaysIso, minutesFromTime, nextWeekdayIso, startOfWeekIso, todayIso, weekdayIndex } from ${JSON.stringify(path.resolve("js/core/utils-data.js"))};
       Object.defineProperty(globalThis, "slots", { configurable: true, get: () => state.slots, set: replaceSlots });
@@ -37,7 +38,7 @@ async function loadPage(fileName, options = {}) {
         addDaysIso, getProfile, getSavedProfile, nextWeekdayIso, openBookingDetails, openBookingDialog,
         openModifyBookingDialog, render, renderDragCalendar, renderExceptionDragCalendar,
         getCoachBookingStudentKey, minutesFromTime, renderStudentOwnBookings, replaceSlots,
-        finishCalendarDrag, setCoachProfileDraft, shiftScheduleWeek, startCalendarDrag, startOfWeekIso,
+        finishCalendarDrag, prepareCoachBookingCancellation, setCoachProfileDraft, shiftScheduleWeek, startCalendarDrag, startOfWeekIso,
         syncBookingForSelf, todayIso, weekdayIndex,
       });
     ` : `import ${JSON.stringify(entryPoint)};`;
@@ -1074,8 +1075,12 @@ async function testTicketAcceptanceCoverage() {
   if (!coachBookingsText.includes("QA Student") || !coachBookingsText.includes(bookedSlot.location) || !coachBookingsText.includes(String(bookedSlot.lessonDuration))) {
     addFinding("教练端查看已确认预约", "Coach bookings list does not show confirmed booking student, rink, and duration.");
   }
-  if (!/已确认|Confirmed/.test(coachBookingsText)) {
-    addFinding("教练端查看已确认预约", "Coach bookings list does not display a confirmed status.");
+  const bookingStatusNow = new Date();
+  const expectedCoachBookingStatus = new Date(`${bookedSlot.date}T${bookedSlot.end}`) < bookingStatusNow
+    ? "已结束"
+    : new Date(`${bookedSlot.date}T${bookedSlot.start}`) <= bookingStatusNow ? "进行中" : "已确认";
+  if (!coachBookingsText.includes(expectedCoachBookingStatus)) {
+    addFinding("教练端查看已确认预约", `Coach bookings list does not display the current ${expectedCoachBookingStatus} status.`);
   }
 
   const profile = coachPage.dom.window.getProfile("maya");
@@ -1216,11 +1221,11 @@ async function testCoachScheduleFilters() {
     status: "Confirmed", student: { name, email, note: "Review edges" }, ...extra,
   });
   const adaNear = booking("ada-near", future, "08:00", "09:30", "Ada", "ada@example.com");
-  const beaNear = booking("bea-near", future, "10:00", "11:30", "Bea", "bea@example.com");
+  const beaNear = booking("bea-near", future, "10:00", "11:30", "Bea", "bea@example.com", { lessonName: "90 min private lesson" });
   const adaFar = booking("ada-far", win.addDaysIso(future, 7), "09:00", "10:00", "Ada", "ada@example.com", { location: "Arcadia Ice Arena", status: "Pending" });
-  const sameName = booking("other-ada", win.addDaysIso(future, 14), "14:00", "14:30", "Ada", "another@example.com");
-  const adaPast = booking("ada-past", past, "14:00", "14:30", "Ada", "ada@example.com", { student: { name: "Ada", email: "ada@example.com", note: "<img src=x onerror=alert(1)>" } });
-  const adaOlder = booking("ada-older", win.addDaysIso(past, -14), "14:00", "14:30", "Ada", "ada@example.com");
+  const sameName = booking("other-ada", win.addDaysIso(future, 14), "14:00", "14:30", "Ada", "another@example.com", { location: "Zoom" });
+  const adaPast = booking("ada-past", past, "14:00", "14:30", "Ada", "ada@example.com", { note: "每周开放时间生成", student: { name: "Ada", email: "ada@example.com", note: "<img src=x onerror=alert(1)>" } });
+  const adaOlder = booking("ada-older", win.addDaysIso(past, -14), "14:00", "14:30", "Ada", "ada@example.com", { status: "Cancelled" });
   const openSlot = { ...booking("open", future, "12:00", "12:30", "", ""), booked: false, student: null };
   const blockedSlot = { ...openSlot, id: "blocked-open", start: "13:00", end: "13:30" };
   const otherCoach = { ...adaNear, id: "other-coach", coachId: "alex" };
@@ -1253,8 +1258,12 @@ async function testCoachScheduleFilters() {
   assert(doc.querySelector(".bookings-panel").dataset.bookingView === "calendar" && win.getComputedStyle(doc.querySelector(".coach-booking-date-filter")).display !== "none" && win.getComputedStyle(doc.querySelector("#toggleExceptionCalendarHours")).display !== "none", "Calendar view must retain its week navigation and display settings.");
   assert(rowIds() === "ada-near,bea-near,ada-far,other-ada", "Upcoming appointments must be chronological across weeks and limited to this coach.");
   assert(!doc.querySelector("#coachSlots .student-booking-group"), "Coach list must not group students or rinks.");
-  assert(rows()[0].textContent.includes("Ada") && rows()[0].textContent.includes(future.slice(0, 4)) && rows()[0].textContent.includes("08:00–09:30"), "Appointment row must show student, full date and time.");
+  assert(doc.querySelectorAll("#coachSlots .coach-booking-date-group").length === 3 && doc.querySelector('[data-booking-date="' + future + '"] .coach-booking-date-list').children.length === 2, "Coach appointments on the same day must share one date heading.");
+  assert(rows()[0].querySelector(".coach-booking-start-time").textContent === "08:00" && rows()[0].querySelector(".coach-booking-end-time").textContent.includes("09:30") && rows()[0].querySelector(".coach-booking-info h4").textContent === "Ada" && doc.querySelector("#coachSlots .coach-booking-date-heading").textContent.includes(future.slice(0, 4)), "Appointment groups must show the date once while separating start time, end time and student name hierarchy.");
   assert(rows()[0].textContent.includes("90 分钟") && rows()[0].textContent.includes("$60") && rows()[0].textContent.includes("Review edges"), "Appointment row must retain course, price and note details.");
+  assert(!rows()[0].textContent.includes("ada@example.com") && rows()[0].querySelectorAll(".coach-booking-meta").length === 1 && rows()[0].querySelector(".coach-booking-location-icon--pin"), "List rows must move email to details and render in-person locations with a pin icon.");
+  assert(doc.querySelector('[data-slot-id="bea-near"] .coach-booking-course').textContent.includes("90 min private lesson") && !doc.querySelector('[data-slot-id="bea-near"] .coach-booking-course').textContent.includes("90 分钟"), "Course names that already contain duration must not repeat duration metadata.");
+  assert(doc.querySelector('[data-slot-id="other-ada"] .coach-booking-location-icon--video'), "Zoom appointments must use the video location icon.");
   assert(doc.querySelector('[data-slot-id="ada-far"]').textContent.includes("待确认"), "Pending status must not be shown as confirmed.");
   const snapshot = JSON.stringify(win.slots);
   pickerTrigger.click();
@@ -1355,6 +1364,17 @@ async function testCoachScheduleFilters() {
   assert(rowIds() === "ada-past,ada-older", "History must be newest first across all weeks.");
   assert(doc.querySelector("#coachBookingListSummary").textContent === "Ada · 历史预约 2 条 · 最近在前" && !doc.querySelector("#coachBookingListSummary").textContent.includes("本周"), `List summary must match the history range: ${doc.querySelector("#coachBookingListSummary").textContent}`);
   assert(!doc.querySelector("#coachSlots img") && doc.querySelector("#coachSlots").textContent.includes("<img"), "Booking notes must render safely as text.");
+  assert(!doc.querySelector('#coachSlots [data-action="coach-cancel-booking"]'), "Ended or cancelled history rows must not show cancellation actions.");
+  assert(doc.querySelector('[data-slot-id="ada-past"] .pill').textContent === "已结束" && !doc.querySelector('[data-slot-id="ada-past"]').textContent.includes("已确认"), "Ended history must show one current ended status instead of confirmed plus ended.");
+  assert(doc.querySelector('[data-slot-id="ada-older"] .pill').textContent === "已取消", "Cancelled history must keep its cancelled status.");
+  assert(!doc.querySelector('[data-slot-id="ada-past"]').textContent.includes("ada@example.com") && !doc.querySelector('[data-slot-id="ada-past"]').textContent.includes("每周开放时间生成"), "Email and scheduling notes must stay out of compact list rows.");
+  doc.querySelector('[data-slot-id="ada-past"] [data-action="coach-booking-details"]').click();
+  assert(doc.querySelector("#bookingDetailsDialog").open && doc.querySelector("#removeBookingDetails").hidden && doc.querySelector("#bookingDetailsBody").textContent.includes("ada@example.com") && doc.querySelector("#bookingDetailsBody").textContent.includes("每周开放时间生成"), "Ended details must contain full contact and scheduling notes without offering cancellation.");
+  doc.querySelector("#closeBookingDetails").click();
+  let historyCancelConfirmCalls = 0;
+  win.confirm = () => { historyCancelConfirmCalls++; return true; };
+  win.prepareCoachBookingCancellation("ada-past");
+  assert(historyCancelConfirmCalls === 0 && adaPast.booked, "Cancellation execution must reject ended appointments even when invoked outside the visible list action.");
   calendarTab.click();
   win.shiftScheduleWeek(5);
   const emptyWeekSummary = doc.querySelector("#coachCalendarFilterSummary").textContent;
@@ -1384,7 +1404,7 @@ async function testCoachScheduleFilters() {
   listTab.click();
   doc.querySelector('[data-coach-booking-period="upcoming"]').click();
   doc.querySelector('[data-slot-id="ada-near"] [data-action="coach-booking-details"]').click();
-  assert(doc.querySelector("#bookingDetailsDialog").open, "List details action must retain the existing booking details dialog.");
+  assert(doc.querySelector("#bookingDetailsDialog").open && !doc.querySelector("#removeBookingDetails").hidden && !doc.querySelector("#removeBookingDetails").disabled, "Future booking details must retain the existing eligible cancellation action.");
   doc.querySelector("#closeBookingDetails").click();
   let confirmCalls = 0;
   win.confirm = () => { confirmCalls++; return false; };

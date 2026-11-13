@@ -1,4 +1,6 @@
 import { animateBookingView } from "./bookings/view-motion.js?v=booking-liquid-restored-1";
+import { animateAvailabilityMethod } from "./availability/method-motion.js?v=confirmed-liquid-switch-1";
+import { animateCoachTab } from "./tab-motion.js?v=coach-top-liquid-2";
 import { closeCoachBookingFilter } from "./bookings/controls.js?v=booking-liquid-restored-1";
 import { confirmDiscardProfileChanges } from "./profile/actions.js";
 import { activeCoachPanelStorageKey } from "../core/config.js";
@@ -16,6 +18,7 @@ export function selectCalendarRink(event) {
 export function switchMethod(event) {
   const button = event.currentTarget;
   const method = button.dataset.method;
+  animateAvailabilityMethod(button);
   elements.methodButtons.forEach((item) => {
     const isActive = item === button;
     item.classList.toggle("active", isActive);
@@ -61,6 +64,8 @@ export function activateCoachPanel(panelId, shouldPersist = true) {
     item.setAttribute("aria-selected", String(isActive));
   });
   elements.coachPanels.forEach((panel) => panel.classList.toggle("active", panel.dataset.coachContent === targetPanelId));
+  const activeButton = [...elements.coachTabs].find((button) => button.dataset.coachPanel === targetPanelId);
+  if (activeButton) animateCoachTab(activeButton, { animate: shouldPersist });
   if (shouldPersist) storageSetItem(activeCoachPanelStorageKey, targetPanelId);
 }
 

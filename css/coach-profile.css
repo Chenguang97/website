@@ -1073,7 +1073,7 @@
     grid-template-columns: minmax(220px, 1.5fr) minmax(110px, 0.55fr) minmax(110px, 0.55fr) 72px;
   }
 
-  .method-switch,
+  .method-switch:not(.liquid-switch),
   .exception-method-switch {
     display: inline-grid;
     grid-template-columns: 1fr 1fr;
@@ -1095,7 +1095,7 @@
     display: grid;
   }
 
-  .method-button,
+  .method-switch:not(.liquid-switch) > .method-button,
   .exception-method-button {
     min-height: 38px;
     border: 0;
@@ -1106,7 +1106,7 @@
     font-weight: 900;
   }
 
-  .method-button.active,
+  .method-switch:not(.liquid-switch) > .method-button.active,
   .exception-method-button.active {
     background: var(--blue);
     color: #ffffff;

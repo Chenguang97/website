@@ -40,7 +40,7 @@ function duplicateNames(students) {
 function renderOptions(students) {
   const matches = matchingStudents(students);
   const duplicates = duplicateNames(students);
-  activeIndex = matches.length ? Math.min(Math.max(activeIndex, 0), matches.length - 1) : -1;
+  activeIndex = matches.length && activeIndex >= 0 ? Math.min(activeIndex, matches.length - 1) : -1;
   const nodes = matches.map((student, index) => {
     const label = document.createElement("label");
     label.id = `coachStudentOption${index}`;
@@ -110,7 +110,7 @@ function openCoachBookingStudentPicker(students) {
   searchQuery = "";
   const appliedKeys = getAppliedCoachBookingStudentKeys();
   draftKeys = new Set(appliedKeys.length ? appliedKeys : students.map((student) => student.key));
-  activeIndex = students.length ? 0 : -1;
+  activeIndex = -1;
   elements.coachBookingStudentSearch.value = "";
   renderCoachBookingStudentPicker(students);
 }
@@ -134,7 +134,7 @@ function toggleCoachBookingStudentPicker(students) {
 function updateCoachBookingStudentSearch(students, query) {
   if (!isOpen) openCoachBookingStudentPicker(students);
   searchQuery = query;
-  activeIndex = matchingStudents(students).length ? 0 : -1;
+  activeIndex = -1;
   renderCoachBookingStudentPicker(students);
 }
 
@@ -152,6 +152,7 @@ function selectMatchingStudents(students) {
 
 function clearDraftStudents(students) {
   draftKeys.clear();
+  activeIndex = -1;
   renderCoachBookingStudentPicker(students);
 }
 
@@ -172,7 +173,9 @@ function moveCoachBookingStudentHighlight(students, direction) {
     return;
   }
   if (!matches.length) return;
-  activeIndex = (activeIndex + direction + matches.length) % matches.length;
+  activeIndex = activeIndex < 0
+    ? (direction > 0 ? 0 : matches.length - 1)
+    : (activeIndex + direction + matches.length) % matches.length;
   renderCoachBookingStudentPicker(students);
   elements.coachBookingStudentOptions.querySelector(".is-active")?.scrollIntoView?.({ block: "nearest" });
 }

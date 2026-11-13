@@ -87,6 +87,25 @@ h4 { font-size: 15px; line-height: 1.5; }
 [aria-busy="true"] { cursor: progress; }
 :where(.primary-button, .button-primary)[aria-busy="true"] { background-image: linear-gradient(110deg, transparent 30%, #ffffff22 50%, transparent 70%); }
 
+/* Coach header actions share geometry while their semantic classes retain hierarchy. */
+.coach-header-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 42px;
+  min-height: 42px;
+  padding: 0 18px;
+  border-radius: var(--radius-pill);
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1;
+  text-align: center;
+  white-space: nowrap;
+  transition: color 120ms ease, background-color 120ms ease, border-color 120ms ease, transform 90ms ease;
+  transform: scale(1);
+}
+.coach-header-action:active:not(:disabled) { transform: scale(.97); }
+
 /* Forms retain all input types, IDs, validation and event targets. */
 label, :where(.student-filter-group legend, .rink-picker-label, .student-view-mode-control > span) { color: var(--text); font-size: 13px; font-weight: 600; line-height: 1.5; }
 :where(input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]), select, textarea) { width: 100%; max-width: 100%; min-width: 0; min-height: 44px; padding: 10px 12px; border: 1px solid #ccc5b7; border-radius: var(--radius-control); background-color: var(--surface-white); color: var(--text); font-weight: 400; line-height: 1.4; }
@@ -405,9 +424,26 @@ svg [stroke="#fbbf24"], svg [fill="#f6c453"] { stroke: #a17d4f; }
 .bookings-panel { display: grid; gap: 20px; }
 .coach-layout > [data-coach-content] { display: none; }
 .coach-layout > [data-coach-content].active { display: grid; }
-.bookings-panel > .panel-heading { margin: 0; }
-.bookings-panel > .panel-heading h3 { margin-bottom: 0; }
-.bookings-panel > .panel-heading .heading-note { margin-top: 5px; }
+.coach-panel-heading {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas: "title switch" "note .";
+  align-items: center;
+  gap: 5px 16px;
+  margin: 0;
+}
+.coach-panel-heading > h3 { grid-area: title; margin: 0; }
+.coach-panel-heading > .liquid-switch { grid-area: switch; justify-self: end; }
+.coach-panel-heading > .heading-note { grid-area: note; margin: 0; }
+@media (max-width: 640px) {
+  .coach-panel-heading {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: "title" "note" "switch";
+    align-items: start;
+    gap: 5px;
+  }
+  .coach-panel-heading > .liquid-switch { justify-self: start; margin-top: 7px; }
+}
 .coach-booking-filter-row { display: grid; grid-template-columns: minmax(300px, 1fr) auto; align-items: start; gap: 24px 32px; }
 .coach-student-picker { position: relative; display: grid; gap: 8px; min-width: 0; }
 .coach-student-picker-input { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 8px; width: 100%; height: 44px; padding: 0 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface-white); color: var(--text); font: inherit; font-weight: 600; text-align: left; cursor: pointer; }
@@ -434,8 +470,9 @@ svg [stroke="#fbbf24"], svg [fill="#f6c453"] { stroke: #a17d4f; }
 .coach-student-option-copy { display: grid; justify-items: start; gap: 2px; min-width: 0; }
 .coach-student-option strong { font-size: 13px; font-weight: 600; }
 .coach-student-option-copy > span { max-width: 100%; overflow: hidden; color: var(--muted); font-size: 12px; font-weight: 400; text-overflow: ellipsis; white-space: nowrap; }
-.coach-student-option:hover, .coach-student-option.is-active { background: var(--brand-soft); }
+.coach-student-option:hover { background: #f8f5ee; }
 .coach-student-option[aria-selected="true"] { background: #f3f7ec; color: var(--brand-hover); }
+.coach-student-option.is-active { box-shadow: inset 0 0 0 2px #7a7469; }
 .coach-student-empty { padding: 12px 10px; color: var(--muted); font-size: 13px; }
 .coach-student-panel-footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 12px; border-top: 1px solid var(--line); background: #faf7f0; color: var(--muted); font-size: 12px; }
 .coach-student-selection-meta { display: grid; gap: 2px; }
@@ -611,8 +648,8 @@ svg [stroke="#fbbf24"], svg [fill="#f6c453"] { stroke: #a17d4f; }
 #dragCalendar .calendar-cell.is-past:active { outline: none; box-shadow: none; }
 .coach-schedule-week-range span { display: inline-block; white-space: nowrap; }
 
-/* Booking view liquid: fixed text above a single, locally animated SVG surface. */
-.booking-view-switch.method-switch {
+/* Confirmed two-option liquid switch: fixed text above one animated SVG surface. */
+.liquid-switch.method-switch {
   position: relative;
   isolation: isolate;
   display: flex;
@@ -626,7 +663,7 @@ svg [stroke="#fbbf24"], svg [fill="#f6c453"] { stroke: #a17d4f; }
   border-radius: var(--radius-pill);
   background: #eae5da;
 }
-.booking-view-liquid {
+:where(.booking-view-liquid, .booking-period-liquid, .availability-method-liquid) {
   position: absolute;
   inset: 0;
   width: 100%;
@@ -635,7 +672,8 @@ svg [stroke="#fbbf24"], svg [fill="#f6c453"] { stroke: #a17d4f; }
   pointer-events: none;
   z-index: -1;
 }
-.booking-view-switch .booking-subtab {
+.liquid-switch > .method-button {
+  position: relative;
   flex: 1;
   min-width: 0;
   padding: 9px 8px;
@@ -643,10 +681,57 @@ svg [stroke="#fbbf24"], svg [fill="#f6c453"] { stroke: #a17d4f; }
   background: transparent;
   transition: color .18s;
 }
-.booking-view-switch .booking-subtab.active,
-.booking-view-switch .booking-subtab:hover { background: transparent; box-shadow: none; }
-.booking-view-switch .booking-subtab.active { color: #fffdf5; }
-.booking-view-switch .booking-subtab:focus-visible { outline: 2px solid #526147; outline-offset: 3px; }
+.liquid-switch > .method-button.active,
+.liquid-switch > .method-button:hover { background: transparent; box-shadow: none; }
+.liquid-switch > .method-button.active { color: #fffdf5; }
+.liquid-switch > .method-button:focus-visible { outline: 2px solid #526147; outline-offset: 3px; }
 @media (prefers-reduced-motion: reduce) {
-  .booking-view-switch .booking-subtab { transition: none; }
+  .liquid-switch > .method-button { transition: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .coach-header-action { transition: none; }
+  .coach-header-action:active:not(:disabled) { transform: none; }
+}
+
+/* Coach top tabs: the confirmed liquid surface replaces only their legacy active background. */
+.coach-tab-liquid { display: none; }
+@media (min-width: 1101px) {
+  .coach-tabs.has-liquid-tabs {
+    position: relative;
+    isolation: isolate;
+    display: inline-grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 4px;
+    padding: 8px;
+    border: 0;
+    border-radius: var(--radius-pill);
+    background: #eae5da;
+    box-shadow: none;
+  }
+  .coach-tabs.has-liquid-tabs > .coach-tab-liquid {
+    position: absolute;
+    inset: 0;
+    display: block;
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+    pointer-events: none;
+    z-index: -1;
+  }
+  .coach-tabs.has-liquid-tabs > .coach-tab {
+    position: relative;
+    border: 0;
+    border-radius: var(--radius-pill);
+    outline: none;
+    background: transparent;
+    box-shadow: none;
+    transition: color .18s;
+  }
+  .coach-tabs.has-liquid-tabs > .coach-tab.active,
+  .coach-tabs.has-liquid-tabs > .coach-tab.active:hover { color: #fffdf5; background: transparent; border-color: transparent; }
+  .coach-tabs.has-liquid-tabs > .coach-tab:hover { color: var(--text); background: transparent; box-shadow: none; }
+  .coach-tabs.has-liquid-tabs > .coach-tab:focus-visible { outline: 2px solid #526147; outline-offset: 2px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .coach-tabs.has-liquid-tabs > .coach-tab { transition: none; }
 }

@@ -1,3 +1,3 @@
-import { initializeCoachApp } from "./coach/app.js?v=booking-liquid-restored-1";
+import { initializeCoachApp } from "./coach/app.js?v=confirmed-liquid-switch-1";
 
 initializeCoachApp();

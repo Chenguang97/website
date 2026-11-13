@@ -1,0 +1,61 @@
+<div id="liquid-tab-preview" class="viz-dotted-background">
+  <div class="motion-stage">
+    <div class="liquid-tabs" aria-label="预约视图切换">
+      <svg viewBox="0 0 360 88" aria-hidden="true">
+        <defs><linearGradient id="liquid-olive" x1="0" y1="0" x2="0.25" y2="1"><stop offset="0%" stop-color="var(--liquid-top)"/><stop offset="100%" stop-color="var(--liquid-bottom)"/></linearGradient><filter id="tab-goo" x="-30%" y="-80%" width="160%" height="260%"><feGaussianBlur in="SourceGraphic" stdDeviation="7" result="blur"/><feColorMatrix in="blur" mode="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 22 -10"/></filter></defs>
+        <defs><filter id="tab-small-goo" x="-60%" y="-100%" width="220%" height="300%"><feGaussianBlur in="SourceGraphic" stdDeviation="2"/><feColorMatrix mode="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 20 -9"/></filter></defs>
+        <g filter="url(#tab-small-goo)" fill="url(#liquid-olive)"><path class="liquid-tail"/><ellipse class="bead"/><ellipse class="bead"/><ellipse class="bead"/></g>
+        <g filter="url(#tab-goo)" fill="url(#liquid-olive)"><rect class="drop-a"/><rect class="drop-b"/></g>
+      </svg>
+      <button type="button" aria-pressed="true">日历</button><button type="button" aria-pressed="false">预约列表</button>
+    </div>
+  </div>
+  <div class="motion-settings"><label>回弹力度 <input aria-label="回弹力度" type="range" min="0.5" max="1.6" step="0.1" value="1.2"></label><button class="replay" type="button">再弹一次 ↔</button></div>
+</div>
+<style>
+#liquid-tab-preview{--olive:light-dark(#526147,#93a981);--liquid-top:light-dark(#829174,#a3b593);--liquid-bottom:light-dark(#68795c,#829771);--paper:light-dark(#f7f3eb,#262a24);--track:light-dark(#eae5da,#393e34);--ink:light-dark(#292d24,#eeeede);--selected:light-dark(#fffdf5,#182014);font:16px/1.5 system-ui,sans-serif;color:var(--ink)}
+#liquid-tab-preview .motion-stage{display:flex;align-items:center;justify-content:center;min-height:240px;background:var(--paper);border-radius:22px}
+#liquid-tab-preview .liquid-tabs{position:relative;width:min(360px,94%);height:88px;background:var(--track);border-radius:48px;display:flex;isolation:isolate}
+#liquid-tab-preview svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible;pointer-events:none;z-index:-1}
+#liquid-tab-preview .liquid-tabs button{width:50%;border:0;background:transparent;color:var(--ink);font:500 19px/1.4 system-ui,sans-serif;border-radius:44px;cursor:pointer;transition:color .18s}
+#liquid-tab-preview .liquid-tabs button[aria-pressed=true]{color:var(--selected)}
+#liquid-tab-preview .motion-settings{display:flex;justify-content:center;align-items:center;gap:24px;flex-wrap:wrap;padding:20px 0}
+#liquid-tab-preview label{display:flex;gap:12px;align-items:center}#liquid-tab-preview input{width:115px;accent-color:var(--olive)}
+#liquid-tab-preview .replay{font:inherit;color:var(--ink);background:var(--track);border:0;padding:9px 16px;border-radius:24px;cursor:pointer}
+</style>
+<script>
+(()=>{
+const root=document.getElementById('liquid-tab-preview'),drops=[root.querySelector('.drop-a'),root.querySelector('.drop-b')],buttons=[...root.querySelectorAll('.liquid-tabs button')],range=root.querySelector('input');
+let selected=0,frame=0,force=1.2,currentCenter=90;
+const beads=[...root.querySelectorAll('.bead')];
+const tail=root.querySelector('.liquid-tail');
+const clamp=x=>Math.max(0,Math.min(1,x));
+const smooth=x=>{x=clamp(x);return x*x*(3-2*x)};
+function shape(el,c,w,h){el.setAttribute('x',c-w/2);el.setAttribute('y',44-h/2);el.setAttribute('width',w);el.setAttribute('height',h);el.setAttribute('rx',h/2)}
+function settled(){drops.forEach(el=>shape(el,selected?270:90,164,68));beads.forEach(el=>el.setAttribute('rx',0));tail.setAttribute('d','')}
+function move(next){cancelAnimationFrame(frame);const from=currentCenter,to=next?270:90,dir=Math.sign(to-from)||1;selected=next;buttons.forEach((b,i)=>b.setAttribute('aria-pressed',String(i===selected)));const start=performance.now();
+function tick(now){const t=(now-start)/1000;if(t>=1.85){currentCenter=to;settled();return}
+// One spring drives travel and settling; there is no separately triggered bounce.
+const omega=8.1,zeta=.59,decay=zeta*omega,frequency=omega*Math.sqrt(1-zeta*zeta);
+const envelope=Math.exp(-decay*t),lead=1-envelope*(Math.cos(frequency*t)+decay/frequency*Math.sin(frequency*t));
+const velocity=envelope*omega*omega/frequency*Math.sin(frequency*t);
+const bounce=velocity/4.1*force,pinch=Math.sin(Math.PI*clamp(t/.58));
+const main=from+(to-from)*lead;
+currentCenter=main;
+const bodyWidth=164-22*Math.max(0,pinch)+bounce*15,bodyHeight=68-bounce*8;
+shape(drops[1],main,0,0);
+const melt=1-smooth((t-.16)/.24);
+shape(drops[0],main,0,0);
+const tailSpring=velocity*2.0*force;
+const length=Math.max(0,68*smooth(t/.15)*Math.exp(-Math.max(0,t-.15)*2.5)+tailSpring)*(1-smooth((t-1.55)/.30));
+const h=bodyHeight/2,w=bodyWidth/2,r=h,k=.55228475;
+const shoulder=-w+r,tip=-w-length,tipRadius= h*(1-smooth(length/35))+13*smooth(length/35);
+const pt=(x,y)=>`${main+dir*x} ${44+y}`;
+// One continuous outline: flat capsule shoulders curve into a stretched rounded rear.
+tail.setAttribute('d',`M ${pt(shoulder,-h)} L ${pt(w-r,-h)} C ${pt(w-r+k*r,-h)} ${pt(w,-k*r)} ${pt(w,0)} C ${pt(w,k*r)} ${pt(w-r+k*r,h)} ${pt(w-r,h)} L ${pt(shoulder,h)} C ${pt(shoulder-r*.45-length*.08,h)} ${pt(tip+tipRadius+length*.22,h*.78)} ${pt(tip+tipRadius,tipRadius)} C ${pt(tip+tipRadius*(1-k),tipRadius)} ${pt(tip,k*tipRadius)} ${pt(tip,0)} C ${pt(tip,-k*tipRadius)} ${pt(tip+tipRadius*(1-k),-tipRadius)} ${pt(tip+tipRadius,-tipRadius)} C ${pt(tip+tipRadius+length*.22,-h*.78)} ${pt(shoulder-r*.45-length*.08,-h)} ${pt(shoulder,-h)} Z`);
+beads.forEach((el,i)=>{const birth=.34+i*.065,u=clamp((t-birth)/(.82+i*.075)),p=1-Math.pow(1-u,2),appear=smooth((t-birth)/.09),r=(7.5-i*1.5)*appear*(1-smooth((p-.88)/.12));const origin=to-dir*(145+i*13);el.setAttribute('cx',origin+(to-dir*70-origin)*p);el.setAttribute('cy',44+Math.sin(p*Math.PI)*(i===1?-2:2));el.setAttribute('rx',r*(1+.45*Math.sin(p*Math.PI)));el.setAttribute('ry',r*(1-.15*Math.sin(p*Math.PI)))});
+frame=requestAnimationFrame(tick)}
+if(matchMedia('(prefers-reduced-motion: reduce)').matches){settled();return}frame=requestAnimationFrame(tick)}
+buttons.forEach((b,i)=>b.addEventListener('click',()=>{if(i!==selected)move(i)}));root.querySelector('.replay').addEventListener('click',()=>move(1-selected));range.addEventListener('input',()=>{force=Number(range.value)});settled();
+})();
+</script>

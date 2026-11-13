@@ -22,7 +22,7 @@
     <link rel="stylesheet" href="../css/forms-dialogs.css?v=warm-ui-1" />
     <link rel="stylesheet" href="../css/student-bookings.css?v=warm-ui-1" />
     <link rel="stylesheet" href="../css/responsive.css?v=warm-ui-1" />
-    <link rel="stylesheet" href="../css/design-system.css?v=booking-liquid-restored-1" />
+    <link rel="stylesheet" href="../css/design-system.css?v=coach-header-actions-1" />
   </head>
   <body data-page="coach">
     <main class="app-shell coach-app-shell">
@@ -40,8 +40,8 @@
                   <span id="profileSaveStatus" class="profile-save-status" data-tone="saved">已保存</span>
                   <span id="profilePreviewNote" class="profile-preview-note" hidden>预览显示已保存内容</span>
                 </div>
-                <a id="previewCoachProfile" class="ghost-button" href="profile.html?coach=maya" target="_blank" rel="noopener" aria-describedby="profilePreviewNote">预览主页</a>
-                <button id="saveProfileChanges" class="primary-button" type="submit" form="coachProfileForm">保存更改</button>
+                <a id="previewCoachProfile" class="ghost-button coach-header-action" href="profile.html?coach=maya" target="_blank" rel="noopener" aria-describedby="profilePreviewNote">预览主页</a>
+                <button id="saveProfileChanges" class="primary-button coach-header-action" type="submit" form="coachProfileForm">保存更改</button>
               </div>
             </div>
 
@@ -211,16 +211,13 @@
             </form>
 
             <section class="availability-panel coach-panel" data-coach-content="availabilityPanel">
-              <div class="panel-heading">
-                <div>
-                  <p class="eyebrow">可预约时间</p>
-                  <h3>设置每周固定开放时间</h3>
-                  <p class="heading-note">老师每周重复开放给学生预约的时间。默认周一到周五 6:00-16:00 对不限冰场开放。</p>
-                </div>
-                <div class="method-switch" role="tablist" aria-label="选择可预约时间设置方式">
+              <div class="panel-heading coach-panel-heading">
+                <h3>设置每周固定开放时间</h3>
+                <div class="method-switch liquid-switch availability-method-switch" role="tablist" aria-label="选择可预约时间设置方式">
                   <button class="method-button active" type="button" data-method="calendarPanel" aria-selected="true">日历</button>
                   <button class="method-button" type="button" data-method="dropdownPanel" aria-selected="false">下拉选择</button>
                 </div>
+                <p class="heading-note">老师每周重复开放给学生预约的时间。默认周一到周五 6:00-16:00 对不限冰场开放。</p>
               </div>
 
               <section id="regularAvailabilitySection" class="availability-section active" data-availability-content="regularAvailabilitySection">
@@ -381,15 +378,13 @@ Oceanside Ice Arena → Polar Ice Rink: 40</textarea>
             </section>
 
             <section class="bookings-panel coach-panel" data-coach-content="bookingsPanel" data-booking-view="calendar">
-              <div class="panel-heading">
-                <div>
-                  <h3>预约管理</h3>
-                  <p class="heading-note">查看学生预约与安排不可预约时间</p>
-                </div>
-                <div class="method-switch booking-view-switch" role="tablist" aria-label="预约管理视图">
+              <div class="panel-heading coach-panel-heading">
+                <h3>预约管理</h3>
+                <div class="method-switch liquid-switch booking-view-switch" role="tablist" aria-label="预约管理视图">
                   <button class="method-button booking-subtab active" type="button" data-booking-section="bookingCalendarSection" aria-selected="true">日历</button>
                   <button class="method-button booking-subtab" type="button" data-booking-section="bookingListSection" aria-selected="false">预约列表</button>
                 </div>
+                <p class="heading-note">查看学生预约与安排不可预约时间</p>
               </div>
 
               <div class="coach-booking-filter-row">
@@ -473,7 +468,7 @@ Oceanside Ice Arena → Polar Ice Rink: 40</textarea>
 
               <section id="bookingListSection" class="booking-section" data-booking-content="bookingListSection">
                 <div class="coach-booking-list-toolbar">
-                  <div class="method-switch" role="group" aria-label="预约时间范围">
+                  <div class="method-switch liquid-switch booking-period-switch" role="group" aria-label="预约时间范围">
                     <button class="method-button coach-booking-period active" type="button" data-coach-booking-period="upcoming" aria-pressed="true">即将上课</button>
                     <button class="method-button coach-booking-period" type="button" data-coach-booking-period="past" aria-pressed="false">历史预约</button>
                   </div>
@@ -575,6 +570,6 @@ Oceanside Ice Arena → Polar Ice Rink: 40</textarea>
       </form>
     </dialog>
 
-    <script type="module" src="../js/coach-entry.js?v=booking-liquid-restored-1"></script>
+    <script type="module" src="../js/coach-entry.js?v=confirmed-liquid-switch-1"></script>
   </body>
 </html>

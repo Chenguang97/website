@@ -14,6 +14,7 @@ import {
 import { coachElements as elements } from "../../dom/coach-elements.js";
 import { renderExceptionCalendarAvailability } from "./calendar-render.js";
 import { state } from "../../core/state.js";
+import { animateBookingPeriod } from "./period-motion.js?v=booking-period-liquid-1";
 
 function renderAppliedCoachBookingStudentFilter() {
   renderCoachSlots();
@@ -78,6 +79,7 @@ export function handleCoachBookingFilterAction(event) {
 }
 
 export function switchCoachBookingPeriod(event) {
+  animateBookingPeriod(event.currentTarget);
   state.coachBookingListPeriod = event.currentTarget.dataset.coachBookingPeriod === "past" ? "past" : "upcoming";
   renderCoachSlots();
 }

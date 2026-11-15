@@ -443,7 +443,7 @@ function handleLessonOptionChange(event) {
 }
 function hasFutureBookingsForLesson(lesson) {
   return state.slots.some((slot) => {
-    return slot.coachId === currentCoachId && slot.booked && slot.date >= todayIso() && slot.lessonName === lesson.name && Number(slot.lessonDuration) === Number(lesson.duration);
+    return slot.coachId === currentCoachId && slot.booked && String(slot.status || "").toLocaleLowerCase() !== "cancelled" && slot.date >= todayIso() && slot.lessonName === lesson.name && Number(slot.lessonDuration) === Number(lesson.duration);
   });
 }
 function handleLessonOptionClick(event) {

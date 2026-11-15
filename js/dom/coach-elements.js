@@ -1,6 +1,21 @@
 import { selectElements } from "./select-elements.js";
 
 export const coachElements = selectElements({
+  coachPendingTrigger: "#coachPendingTrigger", coachPendingBadge: "#coachPendingBadge", coachRequestFilterBadge: "#coachRequestFilterBadge",
+  coachRequestSectionTrigger: "#coachRequestSectionTrigger", coachRequestNavBadge: "#coachRequestNavBadge",
+  coachRequestWorkspace: "#coachRequestWorkspace", coachScheduleStudentFilterMount: "#coachScheduleStudentFilterMount",
+  coachRequestStudentFilterMount: "#coachRequestStudentFilterMount",
+  coachAppointmentsListContent: "#coachAppointmentsListContent", coachAppointmentRecordsHeading: "#coachAppointmentRecordsHeading",
+  coachHistoricalRequests: "#coachHistoricalRequests", coachHistoricalRequestList: "#coachHistoricalRequestList", coachRequestRecords: "#coachRequestRecords",
+  coachRequestForm: "#coachRequestForm", coachRequestId: "#coachRequestId", coachRequestEmpty: "#coachRequestEmpty",
+  coachRequestDetailContent: "#coachRequestDetailContent", coachRequestDialogTitle: "#coachRequestDialogTitle",
+  coachRequestStatus: "#coachRequestStatus", coachRequestActionLabel: "#coachRequestActionLabel", coachRequestExpiry: "#coachRequestExpiry",
+  coachRequestSummary: "#coachRequestSummary", coachRequestConflict: "#coachRequestConflict", coachRequestProposalFields: "#coachRequestProposalFields",
+  coachRequestDate: "#coachRequestDate", coachRequestStart: "#coachRequestStart", coachRequestEnd: "#coachRequestEnd",
+  coachRequestLocation: "#coachRequestLocation", coachRequestPrice: "#coachRequestPrice", coachRequestMessage: "#coachRequestMessage",
+  coachRequestConversation: "#coachRequestConversation", coachRequestReply: "#coachRequestReply", sendCoachRequestReply: "#sendCoachRequestReply",
+  openCoachRequestProposal: "#openCoachRequestProposal", cancelCoachRequestProposal: "#cancelCoachRequestProposal",
+  endCoachRequest: "#endCoachRequest", extendCoachRequest: "#extendCoachRequest", counterCoachRequest: "#counterCoachRequest", acceptCoachRequest: "#acceptCoachRequest",
   coachBookingPanel: '[data-coach-content="bookingsPanel"]', coachBookingStudentPicker: "#coachBookingStudentPicker",
   coachBookingStudentTrigger: "#coachBookingStudentTrigger", coachBookingStudentSummary: "#coachBookingStudentSummary",
   coachBookingStudentSearch: "#coachBookingStudentSearch", coachBookingStudentResults: "#coachBookingStudentResults",
@@ -41,5 +56,6 @@ export const coachElements = selectElements({
 }, {
   coachTabs: ".coach-tab", coachPanels: "[data-coach-content]", methodButtons: "[data-method]", methodPanels: "[data-method-panel]",
   availabilitySubtabs: ".availability-subtab", availabilitySections: "[data-availability-content]", bookingSubtabs: ".booking-subtab",
-  bookingSections: "[data-booking-content]", coachBookingPeriods: "[data-coach-booking-period]", servedRinkInputs: "input[name='servedRinks']",
+  bookingSections: "[data-booking-content]", coachBookingPeriods: "[data-coach-booking-period]", coachRequestFilters: "[data-request-filter]",
+  servedRinkInputs: "input[name='servedRinks']",
 });

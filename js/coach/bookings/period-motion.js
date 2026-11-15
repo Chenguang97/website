@@ -8,6 +8,7 @@ export function initializeBookingPeriodMotion(buttonList) {
     id: "booking-period-liquid",
     className: "booking-period-liquid",
     selectedAttribute: "aria-pressed",
+    dynamicLayout: true,
   });
 }
 

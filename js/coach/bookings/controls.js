@@ -1,4 +1,4 @@
-import { getCoachBookingStudents, renderCoachSlots } from "./render.js?v=coach-booking-card-1";
+import { getCoachBookingStudents, renderCoachSlots } from "./render.js?v=coach-booking-row-effect-1";
 import {
   applyCoachBookingStudentPicker,
   clearDraftStudents,
@@ -15,9 +15,12 @@ import { coachElements as elements } from "../../dom/coach-elements.js";
 import { renderExceptionCalendarAvailability } from "./calendar-render.js";
 import { state } from "../../core/state.js";
 import { animateBookingPeriod } from "./period-motion.js?v=booking-period-liquid-1";
+import { renderCoachBookingRequests } from "./request-render.js?v=coach-booking-row-effect-1";
+import { clearAppliedCoachBookingStudentKeys } from "./filter-state.js";
 
 function renderAppliedCoachBookingStudentFilter() {
   renderCoachSlots();
+  renderCoachBookingRequests();
   renderExceptionCalendarAvailability();
 }
 
@@ -79,9 +82,22 @@ export function handleCoachBookingFilterAction(event) {
 }
 
 export function switchCoachBookingPeriod(event) {
-  animateBookingPeriod(event.currentTarget);
-  state.coachBookingListPeriod = event.currentTarget.dataset.coachBookingPeriod === "past" ? "past" : "upcoming";
+  selectCoachBookingListCategory(event.currentTarget.dataset.coachBookingPeriod, { animate: true });
+}
+
+export function selectCoachBookingListCategory(category, { animate = false } = {}) {
+  const nextCategory = ["upcoming", "past"].includes(category) ? category : "upcoming";
+  const button = [...elements.coachBookingPeriods].find((item) => item.dataset.coachBookingPeriod === nextCategory);
+  if (animate && button) animateBookingPeriod(button);
+  state.coachBookingListPeriod = nextCategory;
   renderCoachSlots();
+  renderCoachBookingRequests();
+}
+
+export function clearCoachBookingStudentFilter() {
+  clearAppliedCoachBookingStudentKeys();
+  closeCoachBookingStudentPicker(getCoachBookingStudents());
+  renderAppliedCoachBookingStudentFilter();
 }
 
 export function closeCoachBookingFilter() {

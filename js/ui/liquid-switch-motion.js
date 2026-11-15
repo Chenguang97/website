@@ -12,7 +12,10 @@ export function createLiquidSwitchMotion(buttonList, {
   selectedAttribute = "aria-selected",
 } = {}) {
   const buttons = [...buttonList];
-  if (buttons.length !== 2) return null;
+  if (buttons.length < 2) return null;
+  const fallbackCenters = restingCenters.length >= buttons.length
+    ? restingCenters
+    : buttons.map((_, index) => 90 + index * 180);
   const root = buttons[0].parentElement;
   if (root.querySelector(`.${className}`)) return null;
   const { svg, path, beads } = createLiquidSurface({ id, className });
@@ -22,8 +25,8 @@ export function createLiquidSwitchMotion(buttonList, {
   const motion = {
     buttons, root, svg, path, beads, frame: 0, target: selected, velocity: 0,
     media: window.matchMedia?.("(prefers-reduced-motion: reduce)"),
-    layout: buttons.map((_, index) => ({ center: restingCenters[index], width: restingWidth, height: restingHeight })),
-    shape: { center: restingCenters[selected], width: restingWidth, height: restingHeight, tail: 0 },
+    layout: buttons.map((_, index) => ({ center: fallbackCenters[index], width: restingWidth, height: restingHeight })),
+    shape: { center: fallbackCenters[selected], width: restingWidth, height: restingHeight, tail: 0 },
     droplets: beads.map(() => ({ x: 0, y: 44, rx: 0, ry: 0 })),
   };
 

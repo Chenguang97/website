@@ -39,17 +39,27 @@ export function switchAvailabilitySection(event) {
 }
 
 export function switchBookingSection(event) {
-  const button = event.currentTarget;
-  const sectionId = button.dataset.bookingSection;
-  animateBookingView(button);
+  activateBookingSection(event.currentTarget.dataset.bookingSection, { animate: true });
+}
+
+export function activateBookingSection(sectionId, { animate = false } = {}) {
+  const showsRequests = sectionId === "coachRequestWorkspace";
+  const button = [...elements.bookingSubtabs].find((item) => item.dataset.bookingSection === sectionId) || null;
+  const targetSectionId = showsRequests ? "coachRequestWorkspace" : (button?.dataset.bookingSection || "bookingCalendarSection");
+  if (animate && button) animateBookingView(button);
   closeCoachBookingFilter();
-  elements.coachBookingPanel.dataset.bookingView = sectionId === "bookingListSection" ? "list" : "calendar";
+  elements.coachBookingPanel.dataset.bookingView = showsRequests ? "requests" : targetSectionId === "bookingListSection" ? "list" : "calendar";
+  elements.coachRequestSectionTrigger.classList.toggle("active", showsRequests);
+  elements.coachRequestSectionTrigger.setAttribute("aria-selected", String(showsRequests));
   elements.bookingSubtabs.forEach((item) => {
-    const isActive = item === button;
+    const isActive = !showsRequests && item === button;
     item.classList.toggle("active", isActive);
     item.setAttribute("aria-selected", String(isActive));
   });
-  elements.bookingSections.forEach((section) => section.classList.toggle("active", section.dataset.bookingContent === sectionId));
+  elements.bookingSections.forEach((section) => section.classList.toggle("active", !showsRequests && section.dataset.bookingContent === targetSectionId));
+  elements.coachRequestWorkspace.hidden = !showsRequests;
+  const studentFilterMount = showsRequests ? elements.coachRequestStudentFilterMount : elements.coachScheduleStudentFilterMount;
+  if (elements.coachBookingStudentPicker.parentElement !== studentFilterMount) studentFilterMount.append(elements.coachBookingStudentPicker);
 }
 
 export function activateCoachPanel(panelId, shouldPersist = true) {
@@ -70,6 +80,7 @@ export function activateCoachPanel(panelId, shouldPersist = true) {
 }
 
 export function switchCoachPanel(event) {
-  if (confirmDiscardProfileChanges()) activateCoachPanel(event.currentTarget.dataset.coachPanel);
+  if (!confirmDiscardProfileChanges()) return;
+  activateCoachPanel(event.currentTarget.dataset.coachPanel);
 }
 

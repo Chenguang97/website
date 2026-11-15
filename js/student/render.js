@@ -9,15 +9,17 @@ import {
   studentHasFullAccess,
 } from "../core/config.js";
 import { createDefaultLessonOptions } from "../core/demo-data.js";
-import { slotSort } from "../domain/scheduling.mjs";
+import { isCancelledBooking, slotSort } from "../domain/scheduling.mjs";
 import { studentElements as elements } from "../dom/student-elements.js";
 import { getProfile, state } from "../core/state.js";
 import {
   canFitLessonFromSlot,
+  canCancelBooking,
   isPastStudentBooking,
   slotOverlapsBlockedException,
 } from "../core/scheduling-rules.js";
 import { formatLocationLabel } from "../ui/display.js";
+import { getBookingStatusLabel } from "../ui/booking-status.js";
 import { escapeAttribute, escapeHtml } from "../ui/safe-html.mjs";
 import {
   addDaysIso,
@@ -326,11 +328,12 @@ export function renderStudentOwnBookings() {
     .sort(slotSort);
 
   const upcoming = bookings.filter((slot) => !isPastStudentBooking(slot));
-  const completed = bookings.filter(isPastStudentBooking).sort((a, b) => slotSort(b, a));
+  const completed = bookings.filter((slot) => isPastStudentBooking(slot) || isCancelledBooking(slot)).sort((a, b) => slotSort(b, a));
+  const activeUpcoming = upcoming.filter((slot) => !isCancelledBooking(slot));
 
   elements.studentOwnBookings.innerHTML = bookings.length
     ? `
-      ${renderStudentBookingSection("还没有进行的课", upcoming, "暂无未进行的预约。")}
+      ${renderStudentBookingSection("还没有进行的课", activeUpcoming, "暂无未进行的预约。")}
       ${renderStudentBookingSection("已经上完的课", completed, "暂无已完成课程。")}
     `
     : `<p class="empty-state">还没有预约记录。</p>`;
@@ -356,12 +359,12 @@ function renderStudentBookingSection(title, bookingSlots, emptyText) {
 
 function renderStudentMiniBooking(slot) {
   const coach = getCoach(slot.coachId);
-  const isCompleted = isPastStudentBooking(slot);
+  const isCompleted = isPastStudentBooking(slot) || isCancelledBooking(slot);
   return `
     <article class="student-mini-booking ${isCompleted ? "is-completed" : ""}">
       <div>
         <strong>${escapeHtml(formatDate(slot.date))} · ${escapeHtml(slot.start)}-${escapeHtml(slot.end)}</strong>
-        <span>${escapeHtml(slot.student?.name || "本人")} · ${escapeHtml(coach.name)} · ${escapeHtml(formatLocationLabel(slot.location))} · ${escapeHtml(slot.status || "Confirmed")}</span>
+        <span>${escapeHtml(slot.student?.name || "本人")} · ${escapeHtml(coach.name)} · ${escapeHtml(formatLocationLabel(slot.location))} · ${escapeHtml(getBookingStatusLabel(slot))}</span>
       </div>
       <div class="student-mini-booking-actions">
         <small>$${slot.lessonPrice}</small>
@@ -370,7 +373,7 @@ function renderStudentMiniBooking(slot) {
             ? ""
             : `
               <button class="ghost-button" type="button" data-action="modify-student-booking" data-id="${escapeAttribute(slot.id)}">修改</button>
-              <button class="danger-button" type="button" data-action="cancel-student-booking" data-id="${escapeAttribute(slot.id)}">取消</button>
+              ${canCancelBooking(slot) ? `<button class="danger-button" type="button" data-action="cancel-student-booking" data-id="${escapeAttribute(slot.id)}">取消</button>` : ""}
             `
         }
       </div>

@@ -1,4 +1,4 @@
-import { restoreConsumedAvailabilitySlots } from "../core/bookings.js";
+import { cancelBooking } from "../core/bookings.js";
 import { pushBookingUndoSnapshot } from "../core/booking-undo.js";
 import { rinks } from "../core/config.js";
 import { bookingDialogElements } from "../dom/booking-dialog-elements.js";
@@ -13,6 +13,7 @@ import {
 import { getProfile, replaceSlots, saveSlots, state } from "../core/state.js";
 import {
   canFitLessonFromSlot,
+  canCancelBooking,
   getAvailabilitySlotsCoveredByLesson,
   isPastStudentBooking,
   slotOverlapsBlockedException,
@@ -116,25 +117,21 @@ function openStudentSlotOptions(slotIds) {
 }
 function cancelStudentBooking(slotId) {
   const slot = state.slots.find((item) => item.id === slotId);
-  if (!slot || !slot.booked || isPastStudentBooking(slot)) return;
+  if (!slot || !canCancelBooking(slot)) return;
   const confirmed = window.confirm(`确定要取消 ${formatDate(slot.date)} ${slot.start}-${slot.end} 的预约吗？`);
   if (!confirmed) return;
   pushBookingUndoSnapshot();
-  restoreConsumedAvailabilitySlots(slot);
-  slot.booked = false;
-  slot.student = null;
+  cancelBooking(slot, { role: "student", name: slot.student?.name || "学生" });
   if (!saveSlots()) return;
   renderStudentPage();
 }
 
 export function removeStudentBookingFromDetails() {
   const slot = state.slots.find((item) => item.id === getBookingDetailsSlotId());
-  if (!slot || !slot.booked || isPastStudentBooking(slot)) return;
+  if (!slot || !canCancelBooking(slot)) return;
   if (!window.confirm(`确定要取消 ${formatDate(slot.date)} ${slot.start}-${slot.end} 的预约吗？`)) return;
   pushBookingUndoSnapshot();
-  restoreConsumedAvailabilitySlots(slot);
-  slot.booked = false;
-  slot.student = null;
+  cancelBooking(slot, { role: "student", name: slot.student?.name || "学生" });
   if (!saveSlots()) return;
   closeBookingDetails();
   renderStudentPage();
@@ -165,12 +162,12 @@ function confirmBooking(event) {
   } else {
     applyLessonToBookingSlot(slot, lesson);
     slot.booked = true;
-    slot.status = "Confirmed";
+    slot.status = "Booked";
     slot.version = (slot.version || 0) + 1;
-    slot.transactionState = "atomic-confirmed";
+    slot.transactionState = "atomic-booked";
     slot.student = student;
     slot.notifications = [
-      { type: "coach-booking-created", channel: "in-app notification", message: "通知教练：新预约已确认" }
+      { type: "coach-booking-created", channel: "demo-event", message: "Demo 提示：预约成功，未发送真实通知。" }
     ];
     if (slot.location === "Any served rink") {
       slot.location = elements.bookingLocation.value;

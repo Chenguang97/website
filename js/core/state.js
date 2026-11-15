@@ -2,18 +2,23 @@ import { calendarStep, currentCoachId } from "./config.js";
 import {
   getLastStorageRecoveryMessage,
   loadBlockedExceptions,
+  loadBookingRequests,
   loadProfiles,
   loadSlots,
   saveProfilesData,
+  saveBookingRequestsData,
   saveSlotsData,
 } from "./data-store.js";
 import { createDefaultLessonOptions, createDefaultProfile } from "./demo-data.js";
 import { slotSort } from "../domain/scheduling.mjs";
 
+const initialSlots = loadSlots().slice().sort(slotSort);
+
 export const state = {
   coachProfiles: loadProfiles(),
   coachProfileDraft: null,
-  slots: loadSlots().slice().sort(slotSort),
+  slots: initialSlots,
+  bookingRequests: loadBookingRequests(initialSlots),
   blockedExceptions: loadBlockedExceptions(),
   dragState: null,
   hasUnsavedAvailabilityChanges: false,
@@ -48,6 +53,11 @@ export function replaceSlots(nextSlots) {
 export function replaceBlockedExceptions(nextBlocks) {
   state.blockedExceptions = nextBlocks;
   return state.blockedExceptions;
+}
+
+export function replaceBookingRequests(nextRequests) {
+  state.bookingRequests = nextRequests.slice();
+  return state.bookingRequests;
 }
 
 export function addBlockedException(block) {
@@ -101,6 +111,10 @@ export function saveProfiles() {
 
 export function saveSlots() {
   return saveSlotsData(state.slots, state.blockedExceptions, state.coachProfiles);
+}
+
+export function saveBookingRequests() {
+  return saveBookingRequestsData(state.bookingRequests);
 }
 
 export { getLastStorageRecoveryMessage };

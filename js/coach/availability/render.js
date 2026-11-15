@@ -24,7 +24,7 @@ import {
   timeFromMinutes,
   todayIso,
 } from "../../core/utils-data.js";
-import { getAvailabilityLocation, slotSort } from "../../domain/scheduling.mjs";
+import { getAvailabilityLocation, isActiveBooking, slotSort } from "../../domain/scheduling.mjs";
 import { coachElements as elements } from "../../dom/coach-elements.js";
 import { renderCalendarLocationWatermarks, renderWeekCalendarGrid, setCalendarCellLocation } from "../../ui/calendar-grid.js";
 import { formatLocationLabel } from "../../ui/display.js";
@@ -50,7 +50,7 @@ export function renderAvailabilityStats() {
     .filter((slot) => !slot.booked && !slotOverlapsBlockedException(slot))
     .reduce((total, slot) => total + (minutesFromTime(slot.end) - minutesFromTime(slot.start)) / 60, 0);
   if (elements.availableCount) elements.availableCount.textContent = Number.isInteger(availableHours) ? String(availableHours) : availableHours.toFixed(1);
-  if (elements.bookedCount) elements.bookedCount.textContent = weeklySlots.filter((slot) => slot.booked).length;
+  if (elements.bookedCount) elements.bookedCount.textContent = weeklySlots.filter(isActiveBooking).length;
 }
 
 export function populateTimeSelects() {
@@ -142,6 +142,7 @@ function renderScheduleLegend() {
       `;
     }),
     `<div class="schedule-legend-row compact"><strong>不可预约</strong><div class="schedule-legend-states"><span><i class="legend-dot blocked"></i>不可预约</span></div></div>`,
+    `<p class="schedule-request-note">商议中的特殊请求不会在日历中占用或锁定时段。</p>`,
   ].join("");
 }
 

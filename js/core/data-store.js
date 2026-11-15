@@ -2,11 +2,12 @@ import {
   activeCoachPanelStorageKey,
   activeStudentPanelStorageKey,
   blockedStorageKey,
+  bookingRequestsStorageKey,
   profileStorageKey,
   rinks,
   slotsStorageKey
 } from "./config.js";
-import { createDefaultLessonOptions, createDefaultProfile, createDefaultProfiles, createDefaultSlots } from "./demo-data.js";
+import { createDefaultBookingRequests, createDefaultLessonOptions, createDefaultProfile, createDefaultProfiles, createDefaultSlots, ensureLocationChangeDemoBookings } from "./demo-data.js";
 import { migrateLegacyProfilePricing } from "../domain/pricing.mjs";
 import {
   normalizeCoachSpecialties,
@@ -65,7 +66,7 @@ function getLastStorageRecoveryMessage() {
   return lastStorageRecoveryMessage;
 }
 function cleanupLegacyAppStorage() {
-  const keepKeys = /* @__PURE__ */ new Set([slotsStorageKey, profileStorageKey, blockedStorageKey, activeCoachPanelStorageKey, activeStudentPanelStorageKey]);
+  const keepKeys = /* @__PURE__ */ new Set([slotsStorageKey, profileStorageKey, blockedStorageKey, bookingRequestsStorageKey, activeCoachPanelStorageKey, activeStudentPanelStorageKey]);
   const prefixes = [
     "ice-skating-coach-booking-slots-",
     "ice-skating-coach-profiles-",
@@ -155,11 +156,23 @@ function loadProfiles() {
 }
 function loadSlots() {
   const stored = storageGetItem(slotsStorageKey);
-  if (!stored) return createDefaultSlots();
+  if (!stored) {
+    const defaultSlots = createDefaultSlots();
+    storageSetItem(slotsStorageKey, serializeSlots(defaultSlots));
+    return defaultSlots;
+  }
   try {
     const parsed = JSON.parse(stored);
     const slots = deserializeSlots(parsed);
-    return slots ? slots.map((slot) => ({ ...slot, availabilityLocation: slot.availabilityLocation || slot.location })) : createDefaultSlots();
+    const normalizedSlots = slots ? slots.map((slot) => ({
+      ...slot,
+      status: String(slot.status || "").toLocaleLowerCase() === "confirmed" ? "Booked" : slot.status,
+      availabilityLocation: slot.availabilityLocation || slot.location,
+    })) : createDefaultSlots();
+    if (slots && ensureLocationChangeDemoBookings(normalizedSlots)) {
+      storageSetItem(slotsStorageKey, serializeSlots(normalizedSlots));
+    }
+    return normalizedSlots;
   } catch {
     return createDefaultSlots();
   }
@@ -172,6 +185,16 @@ function loadBlockedExceptions() {
     return Array.isArray(parsed) ? parsed : [];
   } catch {
     return [];
+  }
+}
+function loadBookingRequests(slots) {
+  const stored = storageGetItem(bookingRequestsStorageKey);
+  if (!stored) return createDefaultBookingRequests(slots);
+  try {
+    const parsed = JSON.parse(stored);
+    return Array.isArray(parsed) ? parsed : createDefaultBookingRequests(slots);
+  } catch {
+    return createDefaultBookingRequests(slots);
   }
 }
 function saveProfilesData(coachProfiles) {
@@ -210,12 +233,22 @@ function saveSlotsData(slots, blockedExceptions, coachProfiles) {
     return false;
   }
 }
+function saveBookingRequestsData(requests) {
+  try {
+    return storageSetItem(bookingRequestsStorageKey, JSON.stringify(requests));
+  } catch (error) {
+    console.error("Failed to save booking requests.", error);
+    return false;
+  }
+}
 export {
   getLastStorageRecoveryMessage,
   loadBlockedExceptions,
+  loadBookingRequests,
   loadProfiles,
   loadSlots,
   saveProfilesData,
+  saveBookingRequestsData,
   saveSlotsData
 };
 

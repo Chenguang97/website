@@ -22,7 +22,7 @@
     <link rel="stylesheet" href="../css/forms-dialogs.css?v=warm-ui-1" />
     <link rel="stylesheet" href="../css/student-bookings.css?v=warm-ui-1" />
     <link rel="stylesheet" href="../css/responsive.css?v=warm-ui-1" />
-    <link rel="stylesheet" href="../css/design-system.css?v=coach-booking-card-1" />
+    <link rel="stylesheet" href="../css/design-system.css?v=coach-compact-view-switch-3" />
   </head>
   <body data-page="coach">
     <main class="app-shell coach-app-shell">
@@ -39,6 +39,11 @@
                 <div class="profile-save-state" aria-live="polite">
                   <span id="profileSaveStatus" class="profile-save-status" data-tone="saved">已保存</span>
                   <span id="profilePreviewNote" class="profile-preview-note" hidden>预览显示已保存内容</span>
+                </div>
+                <div class="coach-pending-menu">
+                  <button id="coachPendingTrigger" class="ghost-button coach-header-action coach-pending-trigger" type="button" aria-controls="coachRequestWorkspace">
+                    待处理<span id="coachPendingBadge" class="coach-pending-badge" hidden></span>
+                  </button>
                 </div>
                 <a id="previewCoachProfile" class="ghost-button coach-header-action" href="profile.html?coach=maya" target="_blank" rel="noopener" aria-describedby="profilePreviewNote">预览主页</a>
                 <button id="saveProfileChanges" class="primary-button coach-header-action" type="submit" form="coachProfileForm">保存更改</button>
@@ -378,16 +383,24 @@ Oceanside Ice Arena → Polar Ice Rink: 40</textarea>
             </section>
 
             <section class="bookings-panel coach-panel" data-coach-content="bookingsPanel" data-booking-view="calendar">
+              <div id="coachBookingScheduleWorkspace" class="coach-booking-schedule-workspace">
               <div class="panel-heading coach-panel-heading">
                 <h3>预约管理</h3>
+                <p class="heading-note">查看特殊请求、学生预约与安排不可预约时间</p>
+              </div>
+              <div class="coach-booking-content-nav" aria-label="预约管理内容">
+                <button id="coachRequestSectionTrigger" class="ghost-button coach-request-section-trigger" type="button" aria-selected="false">
+                  <svg class="coach-request-section-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false"><path d="M20.5 11.2c0 4.1-3.8 7.4-8.5 7.4-1.2 0-2.4-.2-3.4-.6L4 20l1.3-3.7c-1.1-1.3-1.8-3.1-1.8-5.1 0-4.1 3.8-7.4 8.5-7.4s8.5 3.3 8.5 7.4Z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                  <span>特殊请求</span><span id="coachRequestNavBadge" class="coach-pending-badge" hidden></span>
+                </button>
                 <div class="method-switch liquid-switch booking-view-switch" role="tablist" aria-label="预约管理视图">
-                  <button class="method-button booking-subtab active" type="button" data-booking-section="bookingCalendarSection" aria-selected="true">日历</button>
-                  <button class="method-button booking-subtab" type="button" data-booking-section="bookingListSection" aria-selected="false">预约列表</button>
+                  <button class="method-button booking-subtab active" type="button" data-booking-section="bookingCalendarSection" aria-selected="true"><svg class="booking-view-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false"><rect x="3.5" y="5.5" width="17" height="15" rx="2.5" stroke="currentColor" stroke-width="1.8"/><path d="M8 3.5v4M16 3.5v4M3.5 9.5h17" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg><span>日历</span></button>
+                  <button class="method-button booking-subtab" type="button" data-booking-section="bookingListSection" aria-selected="false"><svg class="booking-view-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false"><circle cx="5" cy="6.5" r="1.2" fill="currentColor"/><circle cx="5" cy="12" r="1.2" fill="currentColor"/><circle cx="5" cy="17.5" r="1.2" fill="currentColor"/><path d="M9 6.5h11M9 12h11M9 17.5h11" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg><span>预约列表</span></button>
                 </div>
-                <p class="heading-note">查看学生预约与安排不可预约时间</p>
               </div>
 
               <div class="coach-booking-filter-row">
+                <div id="coachScheduleStudentFilterMount">
                 <div id="coachBookingStudentPicker" class="coach-student-picker">
                   <span id="coachBookingStudentLabel" class="coach-booking-filter-label">查看学生</span>
                   <button id="coachBookingStudentTrigger" class="coach-student-picker-input" type="button" aria-labelledby="coachBookingStudentLabel coachBookingStudentSummary" aria-haspopup="listbox" aria-expanded="false" aria-controls="coachBookingStudentResults">
@@ -417,6 +430,7 @@ Oceanside Ice Arena → Polar Ice Rink: 40</textarea>
                     </div>
                   </div>
                   <span id="coachBookingStudentStatus" class="visually-hidden" role="status" aria-live="polite"></span>
+                </div>
                 </div>
 
                 <div class="coach-booking-date-filter">
@@ -468,14 +482,93 @@ Oceanside Ice Arena → Polar Ice Rink: 40</textarea>
 
               <section id="bookingListSection" class="booking-section" data-booking-content="bookingListSection">
                 <div class="coach-booking-list-toolbar">
-                  <div class="method-switch liquid-switch booking-period-switch" role="group" aria-label="预约时间范围">
+                  <div class="method-switch liquid-switch booking-period-switch" role="group" aria-label="预约列表分类">
                     <button class="method-button coach-booking-period active" type="button" data-coach-booking-period="upcoming" aria-pressed="true">即将上课</button>
-                    <button class="method-button coach-booking-period" type="button" data-coach-booking-period="past" aria-pressed="false">历史预约</button>
+                    <button class="method-button coach-booking-period" type="button" data-coach-booking-period="past" aria-pressed="false">历史记录</button>
                   </div>
                   <p id="coachBookingListSummary" class="coach-filter-note" role="status"></p>
                 </div>
-                <div id="coachSlots" class="slot-list" aria-live="polite"></div>
+                <div id="coachAppointmentsListContent" class="coach-appointments-list-content">
+                  <section id="coachAppointmentRecords" class="coach-history-group" aria-labelledby="coachAppointmentRecordsHeading">
+                    <h4 id="coachAppointmentRecordsHeading" hidden>课程记录</h4>
+                    <div id="coachSlots" class="slot-list" aria-live="polite"></div>
+                  </section>
+                  <section id="coachHistoricalRequests" class="coach-history-group" aria-labelledby="coachHistoricalRequestsHeading" hidden>
+                    <h4 id="coachHistoricalRequestsHeading">特殊请求记录</h4>
+                    <div id="coachHistoricalRequestList" class="coach-historical-request-list"></div>
+                  </section>
+                </div>
               </section>
+
+              <section id="coachRequestWorkspace" class="coach-request-workspace" aria-label="特殊请求" hidden>
+                <div class="coach-request-workspace-body">
+                  <aside class="coach-request-master" aria-label="商议记录">
+                    <div id="coachRequestStudentFilterMount" class="coach-request-student-filter-mount"></div>
+                    <div class="coach-request-filters" role="group" aria-label="筛选商议记录">
+                      <button class="coach-request-filter active" type="button" data-request-filter="all" aria-pressed="true">全部</button>
+                      <button class="coach-request-filter" type="button" data-request-filter="coach" aria-pressed="false">等我回应 <span id="coachRequestFilterBadge" class="coach-pending-badge" hidden></span></button>
+                      <button class="coach-request-filter" type="button" data-request-filter="student" aria-pressed="false">等待对方</button>
+                    </div>
+                    <div id="coachRequestRecords" class="coach-request-record-list" aria-live="polite"></div>
+                  </aside>
+
+                  <form id="coachRequestForm" class="coach-request-detail" aria-labelledby="coachRequestDialogTitle">
+                    <input id="coachRequestId" type="hidden" />
+                    <div id="coachRequestEmpty" class="empty-state coach-request-empty">
+                      <strong>暂无商议记录</strong>
+                      <p>新的特殊约课或预约修改请求会显示在这里。</p>
+                    </div>
+                    <div id="coachRequestDetailContent" class="coach-request-detail-content" hidden>
+                      <div class="coach-request-detail-heading">
+                        <div class="coach-request-title-line">
+                          <h4 id="coachRequestDialogTitle">商议详情</h4>
+                          <span id="coachRequestStatus" class="coach-request-status-pill"></span>
+                        </div>
+                        <span id="coachRequestActionLabel" class="coach-request-action-label"></span>
+                      </div>
+                      <div id="coachRequestSummary" class="coach-request-summary"></div>
+                      <p id="coachRequestConflict" class="coach-request-conflict" hidden></p>
+
+                      <section class="coach-request-conversation" aria-labelledby="coachRequestConversationTitle">
+                        <h5 id="coachRequestConversationTitle">交流记录</h5>
+                        <div id="coachRequestConversation" class="coach-request-conversation-list"></div>
+                        <div class="coach-request-reply-row">
+                          <label class="visually-hidden" for="coachRequestReply">输入回复</label>
+                          <input id="coachRequestReply" type="text" placeholder="输入回复…" />
+                          <button id="sendCoachRequestReply" class="ghost-button" type="button">发送回复</button>
+                        </div>
+                      </section>
+
+                      <fieldset id="coachRequestProposalFields" class="coach-request-fields" hidden>
+                        <legend>提出具体方案</legend>
+                        <label>日期<input id="coachRequestDate" type="date" required /></label>
+                        <label>开始时间<input id="coachRequestStart" type="time" required /></label>
+                        <label>结束时间<input id="coachRequestEnd" type="time" required /></label>
+                        <label>地点<input id="coachRequestLocation" type="text" required /></label>
+                        <label>价格<input id="coachRequestPrice" type="number" min="0" step="1" required /></label>
+                        <div class="coach-request-proposal-actions">
+                          <button id="cancelCoachRequestProposal" class="ghost-button" type="button">取消</button>
+                          <button id="counterCoachRequest" class="primary-button" type="button">提交新方案</button>
+                        </div>
+                      </fieldset>
+
+                      <p id="coachRequestMessage" class="form-message" role="status"></p>
+                      <div class="coach-request-actions">
+                        <button id="endCoachRequest" class="coach-request-text-action is-danger" type="button">结束商议</button>
+                        <div class="coach-request-expiry-actions">
+                          <span id="coachRequestExpiry"></span>
+                          <button id="extendCoachRequest" class="coach-request-text-action" type="button">延长商议</button>
+                        </div>
+                        <div class="coach-request-primary-actions">
+                          <button id="acceptCoachRequest" class="ghost-button" type="button">接受当前方案</button>
+                          <button id="openCoachRequestProposal" class="primary-button" type="button">提出具体方案</button>
+                        </div>
+                      </div>
+                    </div>
+                  </form>
+                </div>
+              </section>
+              </div>
             </section>
           </div>
         </section>
@@ -570,6 +663,6 @@ Oceanside Ice Arena → Polar Ice Rink: 40</textarea>
       </form>
     </dialog>
 
-    <script type="module" src="../js/coach-entry.js?v=coach-booking-card-1"></script>
+    <script type="module" src="../js/coach-entry.js?v=coach-request-focus-2"></script>
   </body>
 </html>

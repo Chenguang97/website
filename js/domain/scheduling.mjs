@@ -1,3 +1,5 @@
+import { defaultCancellationLeadMinutes, getCancellationEligibility } from "./booking-policy.mjs";
+
 function minutesFromTimeValue(time) {
   const [hours, minutes] = String(time).split(":").map(Number);
   return hours * 60 + minutes;
@@ -8,10 +10,18 @@ export function rangesOverlap(startA, endA, startB, endB) {
 export function getAvailabilityLocation(slot, unavailableValue = "Unavailable") {
   return slot?.availabilityLocation || slot?.location || unavailableValue;
 }
+export function hasBookingLocationChange(slot, concreteLocations = []) {
+  const availabilityLocation = getAvailabilityLocation(slot);
+  return Boolean(slot?.booked)
+    && concreteLocations.includes(availabilityLocation)
+    && Boolean(slot?.location)
+    && slot.location !== availabilityLocation;
+}
 export function findSlotAt(slots, coachId, date, minutes) {
-  return slots.find((slot) => {
+  const matches = slots.filter((slot) => {
     return slot.coachId === coachId && slot.date === date && minutes >= minutesFromTimeValue(slot.start) && minutes < minutesFromTimeValue(slot.end);
   });
+  return matches.find((slot) => !isCancelledBooking(slot));
 }
 export function slotOverlapsBlockedException(slot, blockedExceptions) {
   return blockedExceptions.some((block) => {
@@ -32,8 +42,11 @@ export function isPastBooking(slot, now = new Date()) {
 export function isCancelledBooking(slot) {
   return String(slot?.status || "").trim().toLocaleLowerCase() === "cancelled";
 }
-export function canCancelBooking(slot, now = new Date()) {
-  return Boolean(slot?.booked) && !isCancelledBooking(slot) && !isPastBooking(slot, now);
+export function isActiveBooking(slot) {
+  return Boolean(slot?.booked) && !isCancelledBooking(slot);
+}
+export function canCancelBooking(slot, now = new Date(), leadMinutes = defaultCancellationLeadMinutes) {
+  return getCancellationEligibility(slot, now, leadMinutes).allowed;
 }
 export function getAvailabilitySlotsCoveredByLesson(startSlot, duration, slots, blockedExceptions) {
   const startMinutes = minutesFromTimeValue(startSlot.start);

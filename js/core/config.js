@@ -8,7 +8,7 @@ export const rinkColors = {
   Unavailable: "#e2e8f0",
 };
 export const locationShortLabels = {
-  "Polar Ice Rink": "Polar",
+  "Polar Ice Rink": "Polar Ice",
   "Arcadia Ice Arena": "Arcadia",
   "Oceanside Ice Arena": "Oceanside",
   "Any served rink": "不限冰场",
@@ -26,6 +26,7 @@ export const currentCoachId = "maya";
 export const slotsStorageKey = "ice-skating-coach-booking-slots-v12";
 export const profileStorageKey = "ice-skating-coach-profiles-v2";
 export const blockedStorageKey = "ice-skating-coach-blocked-exceptions-v1";
+export const bookingRequestsStorageKey = "ice-skating-booking-requests-v1";
 export const activeCoachPanelStorageKey = "ice-skating-coach-active-panel-v1";
 export const activeStudentPanelStorageKey = "ice-skating-student-active-panel-v1";
 export const dayLabels = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];

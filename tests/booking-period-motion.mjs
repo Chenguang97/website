@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { JSDOM } from "jsdom";
 
-const dom = new JSDOM('<div><button aria-pressed="false">即将上课</button><button aria-pressed="true">历史预约</button></div>');
+const dom = new JSDOM('<div><button aria-pressed="true">即将上课</button><button aria-pressed="false">历史记录</button></div>');
 globalThis.document = dom.window.document;
 globalThis.window = dom.window;
 let now = 0;
@@ -28,17 +28,17 @@ const step = (milliseconds) => {
 };
 
 initializeBookingPeriodMotion(buttons);
-assert.equal(center(), 270, "the liquid must respect the existing aria-pressed selection");
+assert.equal(center(), 90, "the liquid must respect the existing aria-pressed selection");
 assert.equal(document.querySelectorAll("svg").length, 1, "the shared liquid surface mounts once");
-animateBookingPeriod(buttons[0]);
-step(16);
-assert(center() < 270, "the history-to-upcoming direction must start moving left");
-step(1834);
-assert.equal(center(), 90, "the liquid must settle on upcoming");
 animateBookingPeriod(buttons[1]);
 step(16);
 assert(center() > 90, "the upcoming-to-history direction must start moving right");
 step(1834);
 assert.equal(center(), 270, "the liquid must settle on history");
-assert.equal(buttons[1].getAttribute("aria-pressed"), "true", "motion must leave period state ownership to booking rendering");
+animateBookingPeriod(buttons[0]);
+step(16);
+assert(center() < 270, "the history-to-upcoming direction must start moving left");
+step(1834);
+assert.equal(center(), 90, "the liquid must settle on upcoming");
+assert.equal(buttons[0].getAttribute("aria-pressed"), "true", "motion must leave period state ownership to booking rendering");
 console.log("Booking period liquid motion tests passed (pressed state and both directions).");

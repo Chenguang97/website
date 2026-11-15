@@ -13,16 +13,21 @@ import {
   addBlockException, closeBlockTimeDialog, goToCurrentScheduleWeek,
   handleCoachBookingAction, openBlockTimeDialog, shiftScheduleWeek,
   toggleScheduleCalendarHours,
-} from "./bookings/actions.js?v=coach-booking-card-1";
+} from "./bookings/actions.js?v=coach-booking-row-effect-1";
 import { handleAvailabilityUndoKeydown } from "./availability/undo.js";
-import { handleScheduleCalendarClick, removeCoachBookingFromDetails } from "./bookings/details-actions.js?v=coach-booking-card-1";
+import { handleScheduleCalendarClick, removeCoachBookingFromDetails } from "./bookings/details-actions.js?v=coach-booking-row-effect-1";
 import { handleCoachBookingUndoKeydown } from "./bookings/undo.js";
 import {
   handleCoachBookingFilterAction, handleCoachBookingStudentKeydown,
   handleCoachBookingStudentOutsideClick, openCoachBookingStudentSearch,
   searchCoachBookingStudents, switchCoachBookingPeriod,
-} from "./bookings/controls.js?v=coach-booking-card-1";
+} from "./bookings/controls.js?v=coach-booking-row-effect-1";
 import { initializeCoachScheduleDatePicker } from "./bookings/date-picker.js";
+import {
+  acceptCurrentCoachRequest, cancelCoachRequestProposal,
+  counterCurrentCoachRequest, endCurrentCoachRequest, extendCurrentCoachRequest, filterCoachRequests,
+  handleCoachRequestRecordClick, openCoachRequestProposal, openCoachRequestSection, openCoachRequestWorkspace, sendCoachRequestReply,
+} from "./bookings/request-actions.js?v=coach-booking-row-effect-1";
 import {
   addLessonOption, addCustomSpecialty, closeCoachPhotoDialog, closeCustomSpecialtyEditor,
   closeLessonOptionEditor, confirmCoachPhoto, handleCoachPhotoDialogCancel,
@@ -45,10 +50,13 @@ import {
   populateTimeSelects, renderDragCalendar, renderDropdownOpenSlots, syncEndTimeOptions,
 } from "./availability/render.js";
 import { renderExceptionDragCalendar } from "./bookings/calendar-render.js";
-import { renderCoachPage } from "./render.js?v=coach-booking-card-1";
+import { renderCoachPage } from "./render.js?v=coach-booking-row-effect-1";
 import { state } from "../core/state.js";
+import { synchronizeBookingRequestConflicts, synchronizeExpiredBookingRequests } from "../core/booking-requests.js";
+import { refreshOpenCoachBookingRequest, renderCoachBookingRequests } from "./bookings/request-render.js?v=coach-booking-row-effect-1";
 import { storageGetItem } from "../core/storage-adapter.js";
 import { nextWeekdayIso, startOfWeekIso } from "../core/utils-data.js";
+import { initializeInputModality } from "../ui/input-modality.js";
 
 const elements = { ...coachElements, ...bookingDialogElements };
 
@@ -57,12 +65,30 @@ function bindCoachEvents() {
   elements.methodButtons.forEach((button) => button.addEventListener("click", switchMethod));
   elements.availabilitySubtabs.forEach((button) => button.addEventListener("click", switchAvailabilitySection));
   elements.bookingSubtabs.forEach((button) => button.addEventListener("click", switchBookingSection));
+  elements.coachRequestSectionTrigger.addEventListener("click", openCoachRequestSection);
   elements.coachBookingStudentTrigger.addEventListener("click", openCoachBookingStudentSearch);
   elements.coachBookingStudentSearch.addEventListener("input", searchCoachBookingStudents);
   elements.coachBookingPanel.addEventListener("click", handleCoachBookingFilterAction);
   document.addEventListener("keydown", handleCoachBookingStudentKeydown);
   document.addEventListener("click", handleCoachBookingStudentOutsideClick);
   elements.coachBookingPeriods.forEach((button) => button.addEventListener("click", switchCoachBookingPeriod));
+  elements.coachPendingTrigger.addEventListener("click", () => openCoachRequestWorkspace());
+  elements.coachRequestFilters.forEach((button) => button.addEventListener("click", filterCoachRequests));
+  elements.coachRequestRecords.addEventListener("click", handleCoachRequestRecordClick);
+  elements.bookingDetailsBody.addEventListener("click", handleCoachRequestRecordClick);
+  elements.openCoachRequestProposal.addEventListener("click", openCoachRequestProposal);
+  elements.cancelCoachRequestProposal.addEventListener("click", cancelCoachRequestProposal);
+  elements.sendCoachRequestReply.addEventListener("click", sendCoachRequestReply);
+  elements.coachRequestReply.addEventListener("keydown", (event) => {
+    if (event.key !== "Enter") return;
+    event.preventDefault();
+    sendCoachRequestReply();
+  });
+  elements.extendCoachRequest.addEventListener("click", extendCurrentCoachRequest);
+  elements.endCoachRequest.addEventListener("click", endCurrentCoachRequest);
+  elements.counterCoachRequest.addEventListener("click", counterCurrentCoachRequest);
+  elements.acceptCoachRequest.addEventListener("click", acceptCurrentCoachRequest);
+  elements.coachRequestForm.addEventListener("submit", (event) => event.preventDefault());
   elements.coachProfileForm.addEventListener("submit", saveCoachProfile);
   elements.coachBio.addEventListener("input", handleCoachBioInput);
   elements.coachTeachingDisciplines.addEventListener("change", handleCoachTeachingDisciplinesChange);
@@ -139,6 +165,17 @@ function bindCoachEvents() {
     event.preventDefault();
     event.returnValue = "";
   });
+  window.addEventListener("focus", refreshCoachRequestState);
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") refreshCoachRequestState();
+  });
+}
+
+function refreshCoachRequestState() {
+  synchronizeExpiredBookingRequests();
+  synchronizeBookingRequestConflicts();
+  renderCoachBookingRequests();
+  refreshOpenCoachBookingRequest();
 }
 
 function handleCoachUndoKeydown(event) {
@@ -148,6 +185,9 @@ function handleCoachUndoKeydown(event) {
 }
 
 export function initializeCoachApp() {
+  initializeInputModality();
+  synchronizeExpiredBookingRequests();
+  synchronizeBookingRequestConflicts();
   populateTimeSelects();
   const initialDate = nextWeekdayIso();
   elements.slotDate.value = initialDate;

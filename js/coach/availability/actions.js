@@ -7,7 +7,7 @@ import {
   recurringPastWeeks,
   unavailableSelection,
 } from "../../core/config.js";
-import { rangesOverlap } from "../../domain/scheduling.mjs";
+import { isActiveBooking, rangesOverlap } from "../../domain/scheduling.mjs";
 import { coachElements } from "../../dom/coach-elements.js";
 import {
   getAvailabilityLesson,
@@ -235,7 +235,7 @@ function replaceAvailabilityRange(coachId, date, startMinutes, endMinutes, lesso
     return (
       slot.coachId === coachId &&
       slot.date === date &&
-      slot.booked &&
+      isActiveBooking(slot) &&
       rangesOverlap(minutesFromTime(slot.start), minutesFromTime(slot.end), startMinutes, endMinutes)
     );
   });
@@ -341,7 +341,7 @@ function removeAvailabilityRange(coachId, date, startMinutes, endMinutes) {
     return (
       slot.coachId === coachId &&
       slot.date === date &&
-      slot.booked &&
+      isActiveBooking(slot) &&
       rangesOverlap(minutesFromTime(slot.start), minutesFromTime(slot.end), startMinutes, endMinutes)
     );
   });

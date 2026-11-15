@@ -5,7 +5,8 @@ import { addDaysIso, minutesFromTime, startOfWeekIso, todayIso } from "../../cor
 import { coachElements as elements } from "../../dom/coach-elements.js";
 import { renderCalendarLocationWatermarks, renderWeekCalendarGrid, setCalendarCellLocation } from "../../ui/calendar-grid.js";
 import { formatLocationLabel } from "../../ui/display.js";
-import { renderCoachBookingBlocks } from "../calendar-bookings.js";
+import { getAvailabilityLocation } from "../../domain/scheduling.mjs";
+import { getCoachCalendarBookingLabel, renderCoachBookingBlocks } from "../calendar-bookings.js";
 import { getBookedRinkColor, getRinkColor } from "../calendar-colors.js";
 import { coachBookingMatchesStudent, renderCoachCalendarFilterSummary } from "./render.js";
 
@@ -42,14 +43,15 @@ export function renderExceptionCalendarAvailability() {
     const block = findBlockAt(date, minutes);
     const isUnsavedBlock = Boolean(block && state.unsavedBlockExceptionIds.has(block.id));
     const isFilteredBooking = Boolean(slot && slot.booked && !coachBookingMatchesStudent(slot));
+    const availabilityLocation = slot ? getAvailabilityLocation(slot) : "";
 
     cell.textContent = "";
     delete cell.dataset.slotId;
     cell.style.removeProperty("--rink-color");
     cell.style.removeProperty("--booked-rink-color");
-    setCalendarCellLocation(cell, slot && !block ? slot.location : "");
+    setCalendarCellLocation(cell, slot && !block ? availabilityLocation : "");
     if (slot && !block) {
-      cell.style.setProperty("--rink-color", getRinkColor(slot.location));
+      cell.style.setProperty("--rink-color", getRinkColor(availabilityLocation));
       cell.style.setProperty("--booked-rink-color", getBookedRinkColor(slot.location));
     }
     cell.classList.toggle("has-slot", Boolean(slot && !block));
@@ -61,7 +63,15 @@ export function renderExceptionCalendarAvailability() {
     cell.classList.toggle("has-blocked", !slot || Boolean(block));
     cell.classList.toggle("is-editing", isUnsavedBlock);
     const studentName = slot?.student?.name || "";
-    cell.title = block ? `${block.start}-${block.end} 不可预约` : isFilteredBooking ? `${slot.start}-${slot.end} 已占用（其他学生预约）` : slot ? `${slot.start}-${slot.end} ${formatLocationLabel(slot.location)}${studentName ? ` · ${studentName}` : ""}` : "不可预约";
+    cell.title = block
+      ? `${block.start}–${block.end} 不可预约`
+      : isFilteredBooking
+        ? `${slot.start}–${slot.end} 已占用（其他学生预约）`
+        : slot?.booked
+          ? getCoachCalendarBookingLabel(slot, studentName || "学生")
+          : slot
+            ? `${slot.start}–${slot.end} ${formatLocationLabel(availabilityLocation)}`
+            : "不可预约";
     cell.setAttribute("aria-label", cell.title);
   });
   renderCalendarLocationWatermarks(elements.exceptionDragCalendar);

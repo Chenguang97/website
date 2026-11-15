@@ -1,8 +1,8 @@
 import { openBookingDetails } from "../../ui/booking-details.js?v=coach-booking-list-1";
-import { prepareCoachBookingCancellation } from "./details-actions.js?v=coach-booking-card-1";
+import { prepareCoachBookingCancellation } from "./details-actions.js?v=coach-booking-row-effect-1";
 import { refreshAvailabilityDirty, showFormMessage } from "../availability/status.js";
 import { calendarStep, currentCoachId, defaultStart } from "../../core/config.js";
-import { rangesOverlap } from "../../domain/scheduling.mjs";
+import { isActiveBooking, rangesOverlap } from "../../domain/scheduling.mjs";
 import { coachElements as elements } from "../../dom/coach-elements.js";
 import {
   addBlockedException,
@@ -73,7 +73,7 @@ export function addBlockException(event) {
 
   const dates = Array.from({ length: elements.blockRepeatWeekly.checked ? 12 : 1 }, (_, index) => addDaysIso(date, index * 7));
   const bookingConflict = state.slots.find((slot) => slot.coachId === currentCoachId
-    && slot.booked
+    && isActiveBooking(slot)
     && dates.includes(slot.date)
     && rangesOverlap(minutesFromTime(start), minutesFromTime(end), minutesFromTime(slot.start), minutesFromTime(slot.end)));
   if (bookingConflict) {

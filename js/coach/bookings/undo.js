@@ -2,6 +2,7 @@ import { restoreBookingUndoSnapshot } from "../../core/booking-undo.js";
 import { isUndoShortcut, popLatestUndoSnapshot } from "../../core/undo-history.js";
 import { showFormMessage } from "../availability/status.js";
 import { renderCoachBookingChanges } from "./refresh.js";
+import { saveSlots } from "../../core/state.js";
 
 export function undoCoachBookingChange() {
   const snapshot = popLatestUndoSnapshot("booking");
@@ -10,6 +11,7 @@ export function undoCoachBookingChange() {
     return;
   }
   restoreBookingUndoSnapshot(snapshot);
+  saveSlots();
   renderCoachBookingChanges();
   showFormMessage("已撤销上一步预约更改。");
 }

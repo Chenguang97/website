@@ -1,7 +1,16 @@
 let appliedStudentKeys = [];
+let activeScope = "records";
+const scopeSelections = { records: [], requests: [] };
 
-export function getAppliedCoachBookingStudentKeys() {
-  return appliedStudentKeys.slice();
+export function selectCoachBookingFilterScope(scope) {
+  if (scope === activeScope) return;
+  scopeSelections[activeScope] = appliedStudentKeys.slice();
+  activeScope = scope;
+  appliedStudentKeys = scopeSelections[scope].slice();
+}
+
+export function getAppliedCoachBookingStudentKeys(scope = activeScope) {
+  return (scope === activeScope ? appliedStudentKeys : scopeSelections[scope]).slice();
 }
 
 export function hasAppliedCoachBookingStudentFilter() {

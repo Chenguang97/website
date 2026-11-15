@@ -3,10 +3,11 @@ import { selectElements } from "./select-elements.js";
 export const coachElements = selectElements({
   coachPendingTrigger: "#coachPendingTrigger", coachPendingBadge: "#coachPendingBadge", coachRequestFilterBadge: "#coachRequestFilterBadge",
   coachRequestSectionTrigger: "#coachRequestSectionTrigger", coachRequestNavBadge: "#coachRequestNavBadge",
+  coachBookingRecordsTrigger: "#coachBookingRecordsTrigger", coachBookingContentTitle: "#coachBookingContentTitle", coachBookingContentNote: "#coachBookingContentNote",
   coachRequestWorkspace: "#coachRequestWorkspace", coachScheduleStudentFilterMount: "#coachScheduleStudentFilterMount",
   coachRequestStudentFilterMount: "#coachRequestStudentFilterMount",
   coachAppointmentsListContent: "#coachAppointmentsListContent", coachAppointmentRecordsHeading: "#coachAppointmentRecordsHeading",
-  coachHistoricalRequests: "#coachHistoricalRequests", coachHistoricalRequestList: "#coachHistoricalRequestList", coachRequestRecords: "#coachRequestRecords",
+  coachRequestRecords: "#coachRequestRecords",
   coachRequestForm: "#coachRequestForm", coachRequestId: "#coachRequestId", coachRequestEmpty: "#coachRequestEmpty",
   coachRequestDetailContent: "#coachRequestDetailContent", coachRequestDialogTitle: "#coachRequestDialogTitle",
   coachRequestStatus: "#coachRequestStatus", coachRequestActionLabel: "#coachRequestActionLabel", coachRequestExpiry: "#coachRequestExpiry",

@@ -1,12 +1,22 @@
 import { animateBookingView } from "./bookings/view-motion.js?v=booking-liquid-restored-1";
 import { animateAvailabilityMethod } from "./availability/method-motion.js?v=confirmed-liquid-switch-1";
 import { animateCoachTab } from "./tab-motion.js?v=coach-top-liquid-2";
-import { closeCoachBookingFilter } from "./bookings/controls.js?v=booking-liquid-restored-1";
+import { closeCoachBookingFilter, renderAppliedCoachBookingStudentFilter } from "./bookings/controls.js?v=booking-liquid-restored-1";
+import { selectCoachBookingFilterScope } from "./bookings/filter-state.js";
 import { confirmDiscardProfileChanges } from "./profile/actions.js";
 import { activeCoachPanelStorageKey } from "../core/config.js";
 import { coachElements as elements } from "../dom/coach-elements.js";
 import { renderCalendarRinkOptions } from "./availability/render.js";
 import { storageSetItem } from "../core/storage-adapter.js";
+
+let recordSection = "bookingCalendarSection";
+const scrollPositions = { records: 0, requests: 0 };
+const innerScrollPositions = new Map();
+const scrollSelectors = ["#exceptionDragCalendar", "#coachRequestRecords", "#coachRequestConversation"];
+
+export function openCoachBookingRecords() {
+  activateBookingSection(recordSection);
+}
 
 export function selectCalendarRink(event) {
   const button = event.target.closest("button[data-rink]");
@@ -44,13 +54,28 @@ export function switchBookingSection(event) {
 
 export function activateBookingSection(sectionId, { animate = false } = {}) {
   const showsRequests = sectionId === "coachRequestWorkspace";
+  const previousScope = elements.coachBookingPanel.dataset.bookingView === "requests" ? "requests" : "records";
+  const scope = showsRequests ? "requests" : "records";
+  if (scope !== previousScope) {
+    scrollPositions[previousScope] = window.scrollY;
+    scrollSelectors.forEach((selector) => {
+      const node = document.querySelector(selector);
+      if (node) innerScrollPositions.set(selector, { top: node.scrollTop, left: node.scrollLeft });
+    });
+  }
   const button = [...elements.bookingSubtabs].find((item) => item.dataset.bookingSection === sectionId) || null;
   const targetSectionId = showsRequests ? "coachRequestWorkspace" : (button?.dataset.bookingSection || "bookingCalendarSection");
   if (animate && button) animateBookingView(button);
   closeCoachBookingFilter();
+  selectCoachBookingFilterScope(scope);
+  if (!showsRequests) recordSection = targetSectionId;
   elements.coachBookingPanel.dataset.bookingView = showsRequests ? "requests" : targetSectionId === "bookingListSection" ? "list" : "calendar";
+  elements.coachBookingContentTitle.textContent = showsRequests ? "特殊请求" : "预约记录";
+  elements.coachBookingContentNote.textContent = showsRequests ? "处理需要双方商议的例外安排" : "查看已成立的预约与安排不可预约时间";
+  elements.coachBookingRecordsTrigger.classList.toggle("active", !showsRequests);
+  elements.coachBookingRecordsTrigger.setAttribute("aria-pressed", String(!showsRequests));
   elements.coachRequestSectionTrigger.classList.toggle("active", showsRequests);
-  elements.coachRequestSectionTrigger.setAttribute("aria-selected", String(showsRequests));
+  elements.coachRequestSectionTrigger.setAttribute("aria-pressed", String(showsRequests));
   elements.bookingSubtabs.forEach((item) => {
     const isActive = !showsRequests && item === button;
     item.classList.toggle("active", isActive);
@@ -60,6 +85,15 @@ export function activateBookingSection(sectionId, { animate = false } = {}) {
   elements.coachRequestWorkspace.hidden = !showsRequests;
   const studentFilterMount = showsRequests ? elements.coachRequestStudentFilterMount : elements.coachScheduleStudentFilterMount;
   if (elements.coachBookingStudentPicker.parentElement !== studentFilterMount) studentFilterMount.append(elements.coachBookingStudentPicker);
+  if (scope !== previousScope) {
+    renderAppliedCoachBookingStudentFilter();
+    scrollSelectors.forEach((selector) => {
+      const node = document.querySelector(selector);
+      const position = innerScrollPositions.get(selector);
+      if (node && position) { node.scrollTop = position.top; node.scrollLeft = position.left; }
+    });
+    if (window.scrollY !== scrollPositions[scope]) window.scrollTo({ top: scrollPositions[scope], behavior: "instant" });
+  }
 }
 
 export function activateCoachPanel(panelId, shouldPersist = true) {
@@ -81,6 +115,7 @@ export function activateCoachPanel(panelId, shouldPersist = true) {
 
 export function switchCoachPanel(event) {
   if (!confirmDiscardProfileChanges()) return;
+  if (event.currentTarget.dataset.coachPanel === "bookingsPanel") openCoachBookingRecords();
   activateCoachPanel(event.currentTarget.dataset.coachPanel);
 }
 

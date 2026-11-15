@@ -18,7 +18,7 @@ import { animateBookingPeriod } from "./period-motion.js?v=booking-period-liquid
 import { renderCoachBookingRequests } from "./request-render.js?v=coach-booking-row-effect-1";
 import { clearAppliedCoachBookingStudentKeys } from "./filter-state.js";
 
-function renderAppliedCoachBookingStudentFilter() {
+export function renderAppliedCoachBookingStudentFilter() {
   renderCoachSlots();
   renderCoachBookingRequests();
   renderExceptionCalendarAvailability();

@@ -26,7 +26,7 @@ import { initializeCoachScheduleDatePicker } from "./bookings/date-picker.js";
 import {
   acceptCurrentCoachRequest, cancelCoachRequestProposal,
   counterCurrentCoachRequest, endCurrentCoachRequest, extendCurrentCoachRequest, filterCoachRequests,
-  handleCoachRequestRecordClick, openCoachRequestProposal, openCoachRequestSection, openCoachRequestWorkspace, sendCoachRequestReply,
+  handleCoachRequestRecordClick, openCoachRequestOriginalBooking, openCoachRequestProposal, openCoachRequestSection, openCoachRequestWorkspace, sendCoachRequestReply,
 } from "./bookings/request-actions.js?v=coach-booking-row-effect-1";
 import {
   addLessonOption, addCustomSpecialty, closeCoachPhotoDialog, closeCustomSpecialtyEditor,
@@ -43,7 +43,7 @@ import { activeCoachPanelStorageKey } from "../core/config.js";
 import { bookingDialogElements } from "../dom/booking-dialog-elements.js";
 import { coachElements } from "../dom/coach-elements.js";
 import {
-  activateCoachPanel, selectCalendarRink, switchAvailabilitySection,
+  activateCoachPanel, openCoachBookingRecords, selectCalendarRink, switchAvailabilitySection,
   switchBookingSection, switchCoachPanel, switchMethod,
 } from "./navigation.js?v=confirmed-liquid-switch-1";
 import {
@@ -66,6 +66,7 @@ function bindCoachEvents() {
   elements.availabilitySubtabs.forEach((button) => button.addEventListener("click", switchAvailabilitySection));
   elements.bookingSubtabs.forEach((button) => button.addEventListener("click", switchBookingSection));
   elements.coachRequestSectionTrigger.addEventListener("click", openCoachRequestSection);
+  elements.coachBookingRecordsTrigger.addEventListener("click", openCoachBookingRecords);
   elements.coachBookingStudentTrigger.addEventListener("click", openCoachBookingStudentSearch);
   elements.coachBookingStudentSearch.addEventListener("input", searchCoachBookingStudents);
   elements.coachBookingPanel.addEventListener("click", handleCoachBookingFilterAction);
@@ -75,6 +76,7 @@ function bindCoachEvents() {
   elements.coachPendingTrigger.addEventListener("click", () => openCoachRequestWorkspace());
   elements.coachRequestFilters.forEach((button) => button.addEventListener("click", filterCoachRequests));
   elements.coachRequestRecords.addEventListener("click", handleCoachRequestRecordClick);
+  elements.coachRequestSummary.addEventListener("click", openCoachRequestOriginalBooking);
   elements.bookingDetailsBody.addEventListener("click", handleCoachRequestRecordClick);
   elements.openCoachRequestProposal.addEventListener("click", openCoachRequestProposal);
   elements.cancelCoachRequestProposal.addEventListener("click", cancelCoachRequestProposal);

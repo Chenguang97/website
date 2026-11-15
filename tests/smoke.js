@@ -231,7 +231,7 @@ async function testBlockedTimeDialogFlow() {
   const form = document.querySelector("#blockDialogForm");
   const currentWeek = dom.window.startOfWeekIso(dom.window.todayIso());
   document.querySelector("#exceptionCalendarWeekStart").value = currentWeek;
-  assert(dom.window.getComputedStyle(document.querySelector("#saveProfileChanges")).display === "none" && dom.window.getComputedStyle(document.querySelector("#profileSaveStatus").parentElement).display === "none", "Appointment management must hide the profile-only save action and its status.");
+  assert(dom.window.getComputedStyle(document.querySelector("#saveProfileChanges")).visibility === "hidden" && dom.window.getComputedStyle(document.querySelector("#profileSaveStatus").parentElement).visibility === "hidden", "Appointment management must hide profile-only actions while preserving their header space.");
   assert(document.querySelector("#blockRepeatWeekly").parentElement.textContent.includes("每周重复") && document.querySelector("#cancelBlockDialog").textContent === "取消" && form.querySelector('button[type="submit"]').textContent === "确认添加", "Blocked-time dialog actions must use consistent Chinese labels.");
   openButton.click();
   assert(document.querySelector("#blockDialogDate").value === dom.window.todayIso(), "Opening blocked-time setup for the current week must default to today.");
@@ -1289,7 +1289,7 @@ async function testCoachScheduleFilters() {
   assert(!doc.querySelector("#coachBookingStudentFilter") && pickerTrigger.tagName === "BUTTON" && pickerSummary.textContent === "全部学生" && search.placeholder === "搜索姓名或邮箱", "Student filtering must keep a read-only summary trigger separate from the panel search field.");
   assert(doc.querySelector("#openBlockDialog").parentElement.classList.contains("coach-booking-calendar-actions") && doc.querySelector("#toggleExceptionCalendarHours").parentElement === doc.querySelector("#openBlockDialog").parentElement, "Calendar actions must share the feedback bar without duplicate buttons.");
   assert(doc.querySelector(".bookings-panel").contains(doc.querySelector("#exceptionDragCalendar")) && !doc.querySelector(".bookings-panel .calendar-panel"), "Appointment heading, tools and calendar must remain in one outer card without a nested calendar card.");
-  assert(doc.querySelector(".bookings-panel .heading-note").textContent === "查看特殊请求、学生预约与安排不可预约时间" && doc.querySelector("#coachBookingStudentLabel").textContent === "查看学生" && doc.querySelector(".coach-booking-date-filter > .coach-booking-filter-label").textContent === "查看日期", "Appointment heading or aligned filter labels are missing.");
+  assert(doc.querySelector(".bookings-panel .heading-note").textContent === "查看已成立的预约与安排不可预约时间" && doc.querySelector("#coachBookingStudentLabel").textContent === "查看学生" && doc.querySelector(".coach-booking-date-filter > .coach-booking-filter-label").textContent === "查看日期", "Appointment heading or aligned filter labels are missing.");
   const bookingPanelHeading = doc.querySelector(".coach-booking-schedule-workspace > .coach-panel-heading");
   const availabilityPanelHeading = doc.querySelector(".availability-panel > .coach-panel-heading");
   assert(bookingPanelHeading && availabilityPanelHeading && !availabilityPanelHeading.querySelector(".eyebrow"), "Coach schedule cards must share one header structure without the repeated availability eyebrow.");
@@ -1386,7 +1386,7 @@ async function testCoachScheduleFilters() {
   assert(doc.querySelector(".bookings-panel").dataset.bookingView === "list" && win.getComputedStyle(doc.querySelector(".coach-booking-date-filter")).display === "none" && win.getComputedStyle(doc.querySelector("#toggleExceptionCalendarHours")).display === "none", "List view must hide week navigation and calendar-only display settings.");
   assert(!doc.querySelector("#bookingCalendarSection").classList.contains("active") && doc.querySelector("#bookingListSection").classList.contains("active") && doc.querySelector("#scheduleLegend").closest(".booking-section") === doc.querySelector("#bookingCalendarSection"), "List view must hide the calendar and its dedicated legend while keeping the list active.");
   assert(doc.querySelector("#coachBookingListSummary").textContent === "Ada · 即将上课 2 条 · 时间由近到远" && !doc.querySelector("#coachBookingListSummary").textContent.includes("本周"), `List summary must match the upcoming cross-week range: ${doc.querySelector("#coachBookingListSummary").textContent}`);
-  assert(win.getComputedStyle(pickerTrigger).display !== "none" && win.getComputedStyle(doc.querySelector("#saveProfileChanges")).display === "none", "List view must retain student filtering without exposing the profile save action.");
+  assert(win.getComputedStyle(pickerTrigger).display !== "none" && win.getComputedStyle(doc.querySelector("#saveProfileChanges")).visibility === "hidden", "List view must retain student filtering without exposing the profile save action or shifting header actions.");
   calendarTab.click();
   assert(pickerSummary.textContent === "Ada" && doc.querySelector(".bookings-panel").dataset.bookingView === "calendar" && win.getComputedStyle(doc.querySelector(".coach-booking-date-filter")).display !== "none", "Calendar/list switching must preserve the selected student and restore calendar controls.");
   const dayIndex = (win.weekdayIndex(future) + 6) % 7;
@@ -1408,7 +1408,7 @@ async function testCoachScheduleFilters() {
   listTab.click();
   doc.querySelector('[data-coach-booking-period="past"]').click();
   assert(rowIds() === "ada-past,ada-older", "History must be newest first across all weeks.");
-  assert(doc.querySelector("#coachBookingListSummary").textContent === "Ada · 历史记录 · 课程 2 条 · 最近在前 · 特殊请求 0 条" && !doc.querySelector("#coachBookingListSummary").textContent.includes("本周"), `List summary must match the history range: ${doc.querySelector("#coachBookingListSummary").textContent}`);
+  assert(doc.querySelector("#coachBookingListSummary").textContent === "Ada · 历史记录 · 课程 2 条 · 最近在前" && !doc.querySelector("#coachBookingListSummary").textContent.includes("特殊请求"), "Appointment history must contain appointment records only.");
   assert(!doc.querySelector("#coachSlots img") && doc.querySelector("#coachSlots").textContent.includes("<img"), "Booking notes must render safely as text.");
   assert(!doc.querySelector('#coachSlots [data-action="coach-cancel-booking"]'), "Ended or cancelled history rows must not show cancellation actions.");
   assert(doc.querySelector('[data-slot-id="ada-past"] .coach-booking-student-line .coach-booking-status').textContent === "已结束" && !doc.querySelector('[data-slot-id="ada-past"]').textContent.includes("已确认"), "Ended history must show one current ended status beside the student name.");
@@ -1483,7 +1483,7 @@ async function testCoachScheduleWeekNavigation() {
   const popover = doc.querySelector("#coachScheduleDatePopover");
   const bookingSnapshot = JSON.stringify(win.slots);
   assert(doc.querySelector('[data-coach-panel="bookingsPanel"]').textContent === "预约管理", "Coach navigation must use the appointment management name.");
-  assert(doc.querySelector('.bookings-panel h3').textContent === "预约管理" && !doc.querySelector('.bookings-panel .panel-heading .eyebrow'), "Appointment title must omit the duplicate eyebrow.");
+  assert(doc.querySelector('.bookings-panel h3').textContent === "预约记录" && !doc.querySelector('.bookings-panel .panel-heading .eyebrow'), "Appointment title must describe established booking records.");
   assert(doc.querySelectorAll('#previousScheduleWeek').length === 1 && doc.querySelectorAll('#nextScheduleWeek').length === 1, "Week arrows must not be duplicated.");
   assert(doc.querySelector('#previousScheduleWeek').parentElement === trigger.parentElement && doc.querySelector('#nextScheduleWeek').parentElement === trigger.parentElement, "Both arrows must stay immediately around the date-range control.");
   assert(input.type === "hidden" && trigger.getAttribute("aria-haspopup") === "dialog" && popover.hidden && !doc.body.textContent.includes("跳转到日期"), "The week range must directly expose one themed date panel without an intermediate input popover.");
@@ -1574,18 +1574,22 @@ async function testCoachPendingRequestFlow() {
   doc.querySelector('[data-coach-panel="bookingsPanel"]').click();
   doc.querySelector("#coachRequestSectionTrigger").click();
   assert(!doc.querySelector("#coachRequestWorkspace").hidden && !doc.querySelector("#bookingCalendarSection").classList.contains("active") && !doc.querySelector("#bookingListSection").classList.contains("active"), "The top-level special-request entry must show only the shared request workspace.");
-  assert(doc.querySelector('.bookings-panel h3').textContent === "预约管理" && doc.querySelector("#coachRequestSectionTrigger").classList.contains("active") && !doc.querySelector('[data-booking-section="bookingCalendarSection"]').classList.contains("active") && !doc.querySelector('[data-booking-section="bookingListSection"]').classList.contains("active") && win.getComputedStyle(doc.querySelector(".booking-view-liquid")).opacity === "0" && doc.querySelector('[data-request-filter="all"]').classList.contains("active"), "Normal navigation must keep every visible selection state aligned with the special-request content.");
+  assert(doc.querySelector('.bookings-panel h3').textContent === "特殊请求" && doc.querySelector("#coachRequestSectionTrigger").classList.contains("active") && !doc.querySelector("#coachBookingRecordsTrigger").classList.contains("active") && win.getComputedStyle(doc.querySelector(".coach-booking-content-nav")).display === "none" && doc.querySelector('[data-request-filter="all"]').classList.contains("active"), "Special requests must select the side entry, name the content, and hide record view controls.");
   assert(doc.querySelector("#coachBookingStudentPicker").parentElement.id === "coachRequestStudentFilterMount", "Special requests must move the single student filter into the request master column.");
   assert(doc.querySelector(".bookings-panel").dataset.bookingView === "requests", "Special requests must be a peer booking view rather than a list category.");
   const requestEntryStyle = win.getComputedStyle(doc.querySelector("#coachRequestSectionTrigger"));
-  assert(requestEntryStyle.minHeight === "50px" && requestEntryStyle.fontSize === "14px" && requestEntryStyle.borderTopWidth === "0px" && doc.querySelector("#coachRequestSectionTrigger .coach-request-section-icon path"), "The special-request entry must match the calendar/list control scale, include its line icon, and avoid a permanent outer ring.");
+  assert(doc.querySelectorAll(".coach-booking-side-nav > button").length === 2 && requestEntryStyle.borderTopWidth === "0px", "Two independent side entries must replace the former top-level view row.");
   const requestControlCss = fs.readFileSync(path.resolve("css/design-system.css"), "utf8");
-  assert(/\.coach-request-section-trigger\.active\s*\{[^}]*background:\s*var\(--brand\)/s.test(requestControlCss) && /\.coach-request-filter\.active\s*\{[^}]*background:\s*var\(--brand-soft\)/s.test(requestControlCss), "The active secondary request filter must remain visually quieter than the primary special-request entry.");
+  assert(/\.coach-request-section-trigger\.active\s*\{[^}]*background:\s*linear-gradient/s.test(requestControlCss) && /\.coach-request-filter\.active\s*\{[^}]*background:\s*var\(--brand-soft\)/s.test(requestControlCss), "The primary request entry must use its soft sage gradient while active secondary filters remain quieter.");
   assert(doc.querySelectorAll('#coachRequestRecords [data-request-id]').length === 4 && !doc.querySelector('#coachRequestRecords [data-request-id="request-expired"]'), "The special-request workspace must contain only active negotiations.");
   doc.querySelector('[data-booking-section="bookingListSection"]').click();
   doc.querySelector('[data-coach-booking-period="past"]').click();
-  assert(!doc.querySelector("#coachHistoricalRequests").hidden && doc.querySelector('#coachHistoricalRequestList [data-request-id="request-expired"]') && doc.querySelector("#coachAppointmentRecordsHeading").textContent === "课程记录", "Terminal requests must move into a distinct special-request group under history.");
+  assert(!doc.querySelector("#coachHistoricalRequests") && doc.querySelector("#coachAppointmentRecordsHeading").textContent === "课程记录", "Appointment history must not include a duplicate special-request history group.");
   doc.querySelector("#coachRequestSectionTrigger").click();
+  doc.querySelector('[data-request-filter="history"]').click();
+  doc.querySelector('#coachRequestRecords [data-request-id="request-expired"]').click();
+  assert(doc.querySelector("#coachRequestStatus").textContent === "商议已到期" && !doc.querySelector(".coach-request-rule-note"), "Request history must open terminal details in the same workspace without active hold rules.");
+  doc.querySelector('[data-request-filter="all"]').click();
 
   doc.querySelector("#coachBookingStudentTrigger").click();
   const studentResults = doc.querySelector("#coachBookingStudentResults");
@@ -1594,6 +1598,17 @@ async function testCoachPendingRequestFlow() {
   existingStudentOption.querySelector('input[type="checkbox"]').click();
   studentResults.querySelector('[data-student-action="apply"]').click();
   assert(doc.querySelector("#coachBookingStudentSummary").textContent === "Existing Student", "The setup must apply a student filter before testing the shortcut reset.");
+  const preservedRequestId = doc.querySelector("#coachRequestId").value;
+  const preservedWeek = doc.querySelector("#exceptionCalendarWeekStart").value;
+  let pageScroll = 430;
+  Object.defineProperty(win, "scrollY", { configurable: true, get: () => pageScroll });
+  win.scrollTo = ({ top }) => { pageScroll = top; };
+  doc.querySelector("#coachRequestConversation").scrollTop = 71;
+  doc.querySelector("#coachBookingRecordsTrigger").click();
+  assert(doc.querySelector("#coachBookingStudentSummary").textContent === "全部学生" && doc.querySelector(".bookings-panel").dataset.bookingView === "list" && doc.querySelector('[data-coach-booking-period="past"]').classList.contains("active"), "Returning to booking records must restore its own student filter, view and history selection.");
+  pageScroll = 200;
+  doc.querySelector("#coachRequestSectionTrigger").click();
+  assert(doc.querySelector("#coachBookingStudentSummary").textContent === "Existing Student" && doc.querySelector("#coachRequestId").value === preservedRequestId && pageScroll === 430 && doc.querySelector("#coachRequestConversation").scrollTop === 71 && doc.querySelector("#exceptionCalendarWeekStart").value === preservedWeek, "Switching workspaces must preserve their independent filters, selected request, week and scroll positions.");
   assert(doc.querySelector("#coachRequestFilterBadge").hidden && doc.querySelector("#coachPendingBadge").textContent === "2" && doc.querySelector("#coachRequestNavBadge").textContent === "2", "The local waiting-for-me badge must follow the student filter while global entry badges retain the global actionable count.");
   doc.querySelector("#coachPendingTrigger").click();
   assert(!doc.querySelector("#coachRequestWorkspace").hidden && !doc.querySelector("#coachBookingScheduleWorkspace").hidden, "The header entry must reuse the embedded request workspace without replacing appointment management.");
@@ -1656,6 +1671,9 @@ async function testCoachPendingRequestFlow() {
   const originalSchedule = `${booked.date}|${booked.start}|${booked.end}|${booked.location}|${booked.lessonPrice}`;
   doc.querySelector('#coachRequestRecords [data-request-id="request-change"]').click();
   assert(doc.querySelector(".coach-request-rule-note").textContent === "原预约继续保留；新方案尚未生效，拟调整的时段不保留。" && !doc.querySelector("#coachRequestSummary").textContent.includes("尚未形成预约"), "Unagreed modification requests must distinguish the retained original booking from the unheld proposed time.");
+  doc.querySelector("[data-request-booking-id]").click();
+  assert(doc.querySelector("#bookingDetailsDialog").open && doc.querySelector('#bookingDetailsBody [data-request-id="request-change"]'), "A modification request must link back to the original booking and its related request.");
+  doc.querySelector("#closeBookingDetails").click();
   doc.querySelector("#extendCoachRequest").click();
   assert(`${booked.date}|${booked.start}|${booked.end}|${booked.location}|${booked.lessonPrice}` === originalSchedule, "Reading or extending an unagreed change request must not mutate the original booking.");
   const changeRequest = win.bookingRequests.find((request) => request.id === "request-change");
@@ -1672,9 +1690,15 @@ async function testCoachPendingRequestFlow() {
 
   doc.querySelector('[data-booking-section="bookingListSection"]').click();
   doc.querySelector('[data-coach-booking-period="upcoming"]').click();
-  assert(doc.querySelector("#coachRequestWorkspace").hidden && !doc.querySelector("#coachAppointmentsListContent").hidden && doc.querySelector(".bookings-panel").dataset.bookingView === "list" && doc.querySelector("#bookingListSection").classList.contains("active") && doc.querySelector("#coachBookingStudentPicker").parentElement.id === "coachScheduleStudentFilterMount" && doc.querySelector('.bookings-panel h3').textContent === "预约管理", "List navigation must restore its tools and shared student filter while preserving appointment management.");
+  assert(doc.querySelector("#coachRequestWorkspace").hidden && !doc.querySelector("#coachAppointmentsListContent").hidden && doc.querySelector(".bookings-panel").dataset.bookingView === "list" && doc.querySelector("#bookingListSection").classList.contains("active") && doc.querySelector("#coachBookingStudentPicker").parentElement.id === "coachScheduleStudentFilterMount" && doc.querySelector('.bookings-panel h3').textContent === "预约记录", "List navigation must restore established booking records and its student filter.");
   doc.querySelector('[data-coach-booking-period="past"]').click();
-  assert(doc.querySelectorAll("#coachHistoricalRequestList .coach-historical-request").length === 3 && doc.querySelector("#coachHistoricalRequestList").textContent.includes("已达成") && doc.querySelector("#coachHistoricalRequestList").textContent.includes("商议已结束"), "History must clearly retain agreed, expired, and actively ended request records separately from course cards.");
+  doc.querySelector("#coachRequestSectionTrigger").click();
+  doc.querySelector('[data-request-filter="history"]').click();
+  assert(doc.querySelectorAll("#coachRequestRecords [data-request-id]").length === 3 && doc.querySelector("#coachRequestRecords").textContent.includes("已达成") && doc.querySelector("#coachRequestRecords").textContent.includes("商议已结束"), "Special requests must retain agreed, expired, and ended request histories.");
+  doc.querySelector("#coachBookingRecordsTrigger").click();
+  win.openBookingDetails(booked.id);
+  doc.querySelector('#bookingDetailsBody [data-request-id="request-change"]').click();
+  assert(!doc.querySelector("#bookingDetailsDialog").open && doc.querySelector('[data-request-filter="history"]').classList.contains("active") && doc.querySelector("#coachRequestStatus").textContent === "已达成", "A terminal modification linked from a booking must open its history detail in the shared request workspace.");
   const pendingFixture = (count) => Array.from({ length: count }, (_, index) => ({
     id: `request-count-${index}`, type: "new-booking", coachId: "maya", student: { name: `Student ${index}` },
     status: "negotiating", waitingFor: "coach", proposerRole: "student", acceptedBy: ["student"],

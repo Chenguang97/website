@@ -437,10 +437,27 @@ svg [stroke="#fbbf24"], svg [fill="#f6c453"] { stroke: #a17d4f; }
 .coach-panel-heading > h3 { grid-area: title; margin: 0; }
 .coach-panel-heading > .liquid-switch { grid-area: switch; justify-self: end; }
 .coach-panel-heading > .heading-note { grid-area: note; margin: 0; }
-.coach-booking-content-nav { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
-.coach-request-section-trigger { display: inline-flex; align-items: center; justify-content: center; gap: 9px; min-width: 184px; min-height: 50px; padding: 9px 20px; border: 0; border-radius: var(--radius-pill); background: #eae5da; box-shadow: none; color: var(--brand-hover); font-size: 14px; font-weight: 600; line-height: 1.4; }
+.coach-booking-content-nav { display: flex; align-items: center; justify-content: flex-end; gap: 16px; }
+.bookings-panel { position: relative; }
+.coach-booking-side-nav-position { position: absolute; top: 0; bottom: 0; right: calc(100% + 24px); width: 144px; }
+.coach-booking-side-nav { position: sticky; top: 94px; display: grid; justify-items: end; gap: 12px; }
+.coach-booking-side-nav .coach-request-section-trigger { white-space: nowrap; min-height: 44px; font-size: 13px; padding: 9px 12px; gap: 6px; }
+.coach-request-history-trigger { margin-top: 16px; }
+.coach-request-summary .coach-request-booking-link { grid-column: 1 / -1; border-right: 0; }
+.coach-request-reply-row[hidden] { display: none; }
+.bookings-panel[data-booking-view="requests"] .coach-booking-content-nav { display: none; }
+.bookings-panel .coach-panel-heading { padding-right: 220px; min-height: 50px; }
+.bookings-panel:not([data-booking-view="requests"]) .coach-booking-content-nav { position: absolute; right: 20px; top: 20px; }
+.bookings-panel[data-booking-view="requests"] .coach-panel-heading { padding-right: 0; }
+@media (max-width: 1100px) {
+  .coach-booking-side-nav-position { position: static; width: auto; }
+  .coach-booking-side-nav { position: static; display: flex; }
+  .bookings-panel:not([data-booking-view="requests"]) .coach-booking-content-nav { position: static; }
+  .bookings-panel .coach-panel-heading { padding-right: 0; }
+}
+.coach-request-section-trigger { display: inline-flex; align-items: center; justify-content: center; gap: 7px; width: max-content; min-width: 0; min-height: 50px; padding: 9px 14px; border: 0; border-radius: var(--radius-pill); background: #eae5da; box-shadow: none; color: var(--brand-hover); font-size: 14px; font-weight: 600; line-height: 1.4; }
 .coach-request-section-trigger:hover { border: 0; background: #dfe5d6; color: var(--brand-hover); }
-.coach-request-section-trigger.active { border: 0; background: var(--brand); box-shadow: none; color: #fffdf8; }
+.coach-request-section-trigger.active { border: 0; background: linear-gradient(135deg, #819376 0%, #687c60 100%); box-shadow: none; color: #fffdf8; }
 .coach-request-section-trigger:focus,
 .coach-request-section-trigger:focus-visible { outline: 0 !important; outline-offset: 0 !important; }
 html[data-input-modality="keyboard"] .coach-request-section-trigger:focus { box-shadow: inset 0 0 0 2px rgba(255, 253, 248, .72); }
@@ -633,12 +650,6 @@ html[data-input-modality="keyboard"] .coach-request-section-trigger:focus { box-
 .coach-appointments-list-content { display: grid; gap: 22px; }
 .coach-history-group { display: grid; gap: 10px; }
 .coach-history-group > h4 { margin: 0 4px; font-size: 15px; }
-.coach-historical-request-list { display: grid; gap: 8px; }
-.coach-historical-request { display: grid; gap: 5px; padding: 13px 15px; border: 1px solid var(--line); border-radius: 12px; background: #faf7f0; }
-.coach-historical-request > div { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
-.coach-historical-request strong { font-size: 13px; }
-.coach-historical-request div > span { color: var(--brand-hover); font-size: 11px; font-weight: 600; }
-.coach-historical-request p, .coach-historical-request small { margin: 0; color: var(--muted); font-size: 11px; }
 .coach-booking-related-requests { display: grid; gap: 6px; }
 .coach-booking-related-request { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 9px; background: #faf7f0; color: var(--text); text-align: left; }
 .coach-booking-related-request span { color: var(--brand-hover); font-size: 12px; font-weight: 600; }

@@ -1,3 +1,28 @@
+/* All coach tabs share one frame. The auxiliary booking navigation never
+   changes the frame; narrower desktop windows reserve the same space on every tab. */
+html:has(body[data-page="coach"]) { overflow-y: scroll; scrollbar-gutter: stable; }
+body[data-page="coach"] .coach-workspace-container {
+  width: min(100%, 1160px);
+  margin-inline: auto;
+}
+body[data-page="coach"] .coach-layout > .coach-panel { width: 100%; margin: 0; }
+body[data-page="coach"] .coach-layout > .profile-panel { padding: 0; }
+body[data-page="coach"] .profile-save-state[hidden] {
+  display: grid !important;
+  visibility: hidden;
+}
+body[data-page="coach"] #saveProfileChanges[hidden] {
+  display: inline-flex !important;
+  visibility: hidden;
+  pointer-events: none;
+}
+@media (min-width: 1101px) {
+  body[data-page="coach"] .coach-app-shell .workspace {
+    width: min(100%, 1320px);
+    padding: 20px 28px 20px clamp(28px, calc(852px - 50vw), 192px);
+  }
+}
+
 @layer legacy {
   .hero-strip {
     display: grid;
@@ -538,13 +563,6 @@
 
   .profile-save-state[hidden],
   .profile-preview-note[hidden] {
-    display: none;
-  }
-
-  html[data-active-coach-panel="bookingsPanel"] .profile-save-state,
-  html[data-active-coach-panel="availabilityPanel"] .profile-save-state,
-  html[data-active-coach-panel="bookingsPanel"] #saveProfileChanges,
-  html[data-active-coach-panel="availabilityPanel"] #saveProfileChanges {
     display: none;
   }
 

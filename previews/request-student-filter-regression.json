@@ -1,0 +1,172 @@
+{
+  "passed": true,
+  "testedUrl": "http://127.0.0.1:4173/coach/",
+  "css": "../css/design-system.css?v=coach-student-filter-footer-19",
+  "measurements": [
+    {
+      "scrollY": 140,
+      "panel": {
+        "x": 263,
+        "y": 212.390625,
+        "width": 420,
+        "height": 480,
+        "bottom": 692.390625,
+        "right": 683
+      },
+      "options": {
+        "x": 264,
+        "y": 322.390625,
+        "width": 418,
+        "height": 312,
+        "bottom": 634.390625,
+        "right": 682
+      },
+      "footer": {
+        "x": 264,
+        "y": 634.390625,
+        "width": 418,
+        "height": 57,
+        "bottom": 691.390625,
+        "right": 682
+      },
+      "trigger": {
+        "x": 263,
+        "y": 170.390625,
+        "width": 327.109375,
+        "height": 36,
+        "bottom": 206.390625,
+        "right": 590.109375
+      },
+      "viewport": {
+        "width": 1512,
+        "height": 724
+      },
+      "placement": "below",
+      "name": "current requests at screenshot scroll position"
+    },
+    {
+      "scrollY": 140,
+      "panel": {
+        "x": 263,
+        "y": 212.390625,
+        "width": 420,
+        "height": 480,
+        "bottom": 692.390625,
+        "right": 683
+      },
+      "options": {
+        "x": 264,
+        "y": 322.390625,
+        "width": 418,
+        "height": 312,
+        "bottom": 634.390625,
+        "right": 682
+      },
+      "footer": {
+        "x": 264,
+        "y": 634.390625,
+        "width": 418,
+        "height": 57,
+        "bottom": 691.390625,
+        "right": 682
+      },
+      "trigger": {
+        "x": 263,
+        "y": 170.390625,
+        "width": 327.109375,
+        "height": 36,
+        "bottom": 206.390625,
+        "right": 590.109375
+      },
+      "viewport": {
+        "width": 1512,
+        "height": 724
+      },
+      "placement": "below",
+      "name": "current request options scrolled"
+    },
+    {
+      "scrollY": 140,
+      "panel": {
+        "x": 263,
+        "y": 212.390625,
+        "width": 420,
+        "height": 480,
+        "bottom": 692.390625,
+        "right": 683
+      },
+      "options": {
+        "x": 264,
+        "y": 322.390625,
+        "width": 418,
+        "height": 312,
+        "bottom": 634.390625,
+        "right": 682
+      },
+      "footer": {
+        "x": 264,
+        "y": 634.390625,
+        "width": 418,
+        "height": 57,
+        "bottom": 691.390625,
+        "right": 682
+      },
+      "trigger": {
+        "x": 263,
+        "y": 170.390625,
+        "width": 327.109375,
+        "height": 36,
+        "bottom": 206.390625,
+        "right": 590.109375
+      },
+      "viewport": {
+        "width": 1512,
+        "height": 724
+      },
+      "placement": "below",
+      "name": "request history with same picker"
+    },
+    {
+      "scrollY": 140,
+      "panel": {
+        "x": 245,
+        "y": 212.390625,
+        "width": 420,
+        "height": 375.609375,
+        "bottom": 588,
+        "right": 665
+      },
+      "options": {
+        "x": 246,
+        "y": 322.390625,
+        "width": 418,
+        "height": 207.609375,
+        "bottom": 530,
+        "right": 664
+      },
+      "footer": {
+        "x": 246,
+        "y": 530,
+        "width": 418,
+        "height": 57,
+        "bottom": 587,
+        "right": 664
+      },
+      "trigger": {
+        "x": 245,
+        "y": 170.390625,
+        "width": 293.109375,
+        "height": 36,
+        "bottom": 206.390625,
+        "right": 538.109375
+      },
+      "viewport": {
+        "width": 1280,
+        "height": 600
+      },
+      "placement": "below",
+      "name": "short request viewport"
+    }
+  ],
+  "errors": []
+}

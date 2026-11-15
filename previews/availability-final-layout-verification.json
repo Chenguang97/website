@@ -1,0 +1,35 @@
+{
+  "passed": true,
+  "bookingCalendarUnchanged": true,
+  "frameUnchanged": true,
+  "layouts": [
+    {
+      "width": 1536,
+      "scrollWidth": 1536,
+      "dateFont": "16px",
+      "dateWidth": 340,
+      "textWidth": 216.546875
+    },
+    {
+      "width": 1280,
+      "scrollWidth": 1280,
+      "dateFont": "16px",
+      "dateWidth": 340,
+      "textWidth": 216.546875
+    },
+    {
+      "width": 1024,
+      "scrollWidth": 1024,
+      "dateFont": "16px",
+      "dateWidth": 340,
+      "textWidth": 216.546875
+    },
+    {
+      "width": 1920,
+      "scrollWidth": 1920,
+      "dateFont": "16px",
+      "dateWidth": 340,
+      "textWidth": 216.546875
+    }
+  ]
+}

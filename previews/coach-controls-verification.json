@@ -1,0 +1,436 @@
+{
+  "browser": "isolated headless Chromium",
+  "deviceScaleFactor": 1,
+  "checks": [
+    {
+      "label": "stable-基本资料",
+      "frame": {
+        "x": 380,
+        "y": 20,
+        "width": 1160,
+        "height": 1364.21875
+      },
+      "header": {
+        "x": 380,
+        "y": 20,
+        "width": 1160,
+        "height": 67
+      },
+      "tabs": {
+        "x": 380,
+        "y": 107,
+        "width": 288,
+        "height": 56.390625
+      },
+      "card": {
+        "x": 380,
+        "y": 183.390625,
+        "width": 1160,
+        "height": 451.734375
+      }
+    },
+    {
+      "label": "stable-预约管理",
+      "frame": {
+        "x": 380,
+        "y": 20,
+        "width": 1160,
+        "height": 1222.9375
+      },
+      "header": {
+        "x": 380,
+        "y": 20,
+        "width": 1160,
+        "height": 67
+      },
+      "tabs": {
+        "x": 380,
+        "y": 107,
+        "width": 288,
+        "height": 56.390625
+      },
+      "card": {
+        "x": 380,
+        "y": 183.390625,
+        "width": 1160,
+        "height": 1059.546875
+      }
+    },
+    {
+      "label": "stable-开放时间",
+      "frame": {
+        "x": 380,
+        "y": 20,
+        "width": 1160,
+        "height": 1826.75
+      },
+      "header": {
+        "x": 380,
+        "y": 20,
+        "width": 1160,
+        "height": 67
+      },
+      "tabs": {
+        "x": 380,
+        "y": 107,
+        "width": 288,
+        "height": 56.390625
+      },
+      "card": {
+        "x": 380,
+        "y": 183.390625,
+        "width": 1160,
+        "height": 1663.359375
+      }
+    },
+    {
+      "label": "stable-预约管理",
+      "frame": {
+        "x": 380,
+        "y": 20,
+        "width": 1160,
+        "height": 1222.9375
+      },
+      "header": {
+        "x": 380,
+        "y": 20,
+        "width": 1160,
+        "height": 67
+      },
+      "tabs": {
+        "x": 380,
+        "y": 107,
+        "width": 288,
+        "height": 56.390625
+      },
+      "card": {
+        "x": 380,
+        "y": 183.390625,
+        "width": 1160,
+        "height": 1059.546875
+      }
+    },
+    {
+      "label": "profile-clean-side",
+      "frame": {
+        "x": 380,
+        "y": 20,
+        "width": 1160,
+        "height": 1364.21875
+      },
+      "toolbar": {
+        "x": 1564,
+        "y": 916,
+        "width": 120,
+        "height": 140
+      },
+      "preview": {
+        "x": 1564,
+        "y": 952,
+        "width": 120,
+        "height": 46
+      },
+      "save": {
+        "x": 1564,
+        "y": 1010,
+        "width": 120,
+        "height": 46
+      },
+      "outer": {
+        "border": "0px",
+        "shadow": "none",
+        "background": "rgba(0, 0, 0, 0)"
+      }
+    },
+    {
+      "label": "profile-dirty-side",
+      "frame": {
+        "x": 380,
+        "y": 20,
+        "width": 1160,
+        "height": 1364.21875
+      },
+      "toolbar": {
+        "x": 1564,
+        "y": 916,
+        "width": 120,
+        "height": 140
+      },
+      "preview": {
+        "x": 1564,
+        "y": 952,
+        "width": 120,
+        "height": 46
+      },
+      "save": {
+        "x": 1564,
+        "y": 1010,
+        "width": 120,
+        "height": 46
+      },
+      "outer": {
+        "border": "0px",
+        "shadow": "none",
+        "background": "rgba(0, 0, 0, 0)"
+      }
+    },
+    {
+      "label": "preview-confirmation",
+      "cleanDirect": true,
+      "cancelRetainsDraft": true,
+      "continueShowsSavedVersion": true
+    },
+    {
+      "label": "profile-failure-side",
+      "frame": {
+        "x": 380,
+        "y": 20,
+        "width": 1160,
+        "height": 1364.21875
+      },
+      "toolbar": {
+        "x": 1564,
+        "y": 848,
+        "width": 120,
+        "height": 208
+      },
+      "preview": {
+        "x": 1564,
+        "y": 884,
+        "width": 120,
+        "height": 46
+      },
+      "save": {
+        "x": 1564,
+        "y": 942,
+        "width": 120,
+        "height": 46
+      },
+      "outer": {
+        "border": "0px",
+        "shadow": "none",
+        "background": "rgba(0, 0, 0, 0)"
+      }
+    },
+    {
+      "label": "profile-success-side",
+      "frame": {
+        "x": 380,
+        "y": 20,
+        "width": 1160,
+        "height": 1364.21875
+      },
+      "toolbar": {
+        "x": 1564,
+        "y": 916,
+        "width": 120,
+        "height": 140
+      },
+      "preview": {
+        "x": 1564,
+        "y": 952,
+        "width": 120,
+        "height": 46
+      },
+      "save": {
+        "x": 1564,
+        "y": 1010,
+        "width": 120,
+        "height": 46
+      },
+      "outer": {
+        "border": "0px",
+        "shadow": "none",
+        "background": "rgba(0, 0, 0, 0)"
+      }
+    },
+    {
+      "label": "profile-save",
+      "failedDraftRetained": true,
+      "retryPersisted": true,
+      "successDisabled": true
+    },
+    {
+      "label": "booking-manual-draft-side",
+      "frame": {
+        "x": 380,
+        "y": 20,
+        "width": 1160,
+        "height": 1222.9375
+      },
+      "toolbar": {
+        "x": 1564,
+        "y": 916,
+        "width": 120,
+        "height": 140
+      },
+      "preview": {
+        "x": 1564,
+        "y": 952,
+        "width": 120,
+        "height": 46
+      },
+      "save": {
+        "x": 1564,
+        "y": 1010,
+        "width": 120,
+        "height": 46
+      },
+      "outer": {
+        "border": "0px",
+        "shadow": "none",
+        "background": "rgba(0, 0, 0, 0)"
+      }
+    },
+    {
+      "label": "booking-save-and-instant-request",
+      "manualDraftSaved": true,
+      "replyImmediatelyPersisted": true,
+      "pendingBefore": 2,
+      "pendingAfter": 1,
+      "noRedundantSaveArea": true
+    },
+    {
+      "label": "left-navigation-scrolled",
+      "nav": {
+        "x": 213,
+        "y": 94,
+        "width": 144,
+        "height": 100
+      },
+      "stickyHeader": {
+        "x": 380,
+        "y": 0,
+        "width": 1160,
+        "height": 67
+      }
+    },
+    {
+      "label": "availability-clean-side",
+      "frame": {
+        "x": 380,
+        "y": 20,
+        "width": 1160,
+        "height": 1847.546875
+      },
+      "toolbar": {
+        "x": 1564,
+        "y": 916,
+        "width": 120,
+        "height": 140
+      },
+      "preview": {
+        "x": 1564,
+        "y": 952,
+        "width": 120,
+        "height": 46
+      },
+      "save": {
+        "x": 1564,
+        "y": 1010,
+        "width": 120,
+        "height": 46
+      },
+      "outer": {
+        "border": "0px",
+        "shadow": "none",
+        "background": "rgba(0, 0, 0, 0)"
+      }
+    },
+    {
+      "label": "narrow-stable-基本资料",
+      "frame": {
+        "x": 192,
+        "y": 20,
+        "width": 1160,
+        "height": 1364.21875
+      }
+    },
+    {
+      "label": "narrow-stable-预约管理",
+      "frame": {
+        "x": 192,
+        "y": 20,
+        "width": 1160,
+        "height": 1995.4375
+      }
+    },
+    {
+      "label": "narrow-stable-开放时间",
+      "frame": {
+        "x": 192,
+        "y": 20,
+        "width": 1160,
+        "height": 1847.546875
+      }
+    },
+    {
+      "label": "narrow-stable-预约管理",
+      "frame": {
+        "x": 192,
+        "y": 20,
+        "width": 1160,
+        "height": 1995.4375
+      }
+    },
+    {
+      "label": "bottom-clearance-基本资料",
+      "status": {
+        "x": 1296,
+        "y": 736,
+        "width": 120,
+        "height": 24
+      },
+      "preview": {
+        "x": 1296,
+        "y": 772,
+        "width": 120,
+        "height": 46
+      },
+      "save": {
+        "x": 1296,
+        "y": 830,
+        "width": 120,
+        "height": 46
+      },
+      "lastContentBottom": 712.21875,
+      "toolbarTop": 736,
+      "clearance": 23.78125,
+      "vertical": true,
+      "unframed": true
+    },
+    {
+      "label": "bottom-clearance-开放时间",
+      "status": {
+        "x": 1296,
+        "y": 736,
+        "width": 120,
+        "height": 24
+      },
+      "preview": {
+        "x": 1296,
+        "y": 772,
+        "width": 120,
+        "height": 46
+      },
+      "save": {
+        "x": 1296,
+        "y": 830,
+        "width": 120,
+        "height": 46
+      },
+      "lastContentBottom": 711.546875,
+      "toolbarTop": 736,
+      "clearance": 24.453125,
+      "vertical": true,
+      "unframed": true
+    },
+    {
+      "label": "availability-save",
+      "draftEnabled": true,
+      "failureReasonVisible": true,
+      "retrySucceeded": true
+    }
+  ],
+  "errors": []
+}

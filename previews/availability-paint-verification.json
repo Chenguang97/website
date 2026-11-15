@@ -1,0 +1,179 @@
+{
+  "checks": [
+    "desktop layout and no horizontal overflow at 1024/1280/1536/1920",
+    "full week range and navigation",
+    "full-day toggle",
+    "location selection changes tools only, not calendar or records",
+    "real mouse drag across original purple/green/unsaved gold/grey/booking",
+    "downward retraction restores original colors, names and open state",
+    "upward reverse retraction",
+    "Escape and pointercancel preserve earlier unsaved drafts",
+    "same-location unsaved drag never implicitly erases",
+    "final range only committed",
+    "blocking does not modify existing booking including availability metadata",
+    "form view and conflict cancel",
+    "save failure keeps draft, retry succeeds and persists across reload",
+    "weekly recurrence retained"
+  ],
+  "layouts": [
+    {
+      "width": 1536,
+      "scrollWidth": 1536,
+      "card": {
+        "x": 216,
+        "y": 183.390625,
+        "width": 1160,
+        "right": 1376,
+        "bottom": 1520.640625
+      },
+      "toolbar": {
+        "x": 237,
+        "y": 272.1875,
+        "width": 1118,
+        "right": 1355,
+        "bottom": 316.1875
+      },
+      "picker": {
+        "x": 237,
+        "y": 330.1875,
+        "width": 1118,
+        "right": 1355,
+        "bottom": 431.265625
+      },
+      "calendar": {
+        "x": 237,
+        "y": 478.453125,
+        "width": 1118,
+        "right": 1355,
+        "bottom": 1118.453125
+      },
+      "switch": {
+        "x": 1151,
+        "y": 204.390625,
+        "width": 204,
+        "right": 1355,
+        "bottom": 254.390625
+      }
+    },
+    {
+      "width": 1280,
+      "scrollWidth": 1280,
+      "card": {
+        "x": 192,
+        "y": 183.390625,
+        "width": 1060,
+        "right": 1252,
+        "bottom": 1520.640625
+      },
+      "toolbar": {
+        "x": 213,
+        "y": 272.1875,
+        "width": 1018,
+        "right": 1231,
+        "bottom": 316.1875
+      },
+      "picker": {
+        "x": 213,
+        "y": 330.1875,
+        "width": 1018,
+        "right": 1231,
+        "bottom": 431.265625
+      },
+      "calendar": {
+        "x": 213,
+        "y": 478.453125,
+        "width": 1018,
+        "right": 1231,
+        "bottom": 1118.453125
+      },
+      "switch": {
+        "x": 1027,
+        "y": 204.390625,
+        "width": 204,
+        "right": 1231,
+        "bottom": 254.390625
+      }
+    },
+    {
+      "width": 1024,
+      "scrollWidth": 1024,
+      "card": {
+        "x": 28,
+        "y": 227.390625,
+        "width": 968,
+        "right": 996,
+        "bottom": 1564.640625
+      },
+      "toolbar": {
+        "x": 49,
+        "y": 316.1875,
+        "width": 926,
+        "right": 975,
+        "bottom": 360.1875
+      },
+      "picker": {
+        "x": 49,
+        "y": 374.1875,
+        "width": 926,
+        "right": 975,
+        "bottom": 475.265625
+      },
+      "calendar": {
+        "x": 49,
+        "y": 522.453125,
+        "width": 926,
+        "right": 975,
+        "bottom": 1162.453125
+      },
+      "switch": {
+        "x": 771,
+        "y": 248.390625,
+        "width": 204,
+        "right": 975,
+        "bottom": 298.390625
+      }
+    },
+    {
+      "width": 1920,
+      "scrollWidth": 1920,
+      "card": {
+        "x": 380,
+        "y": 183.390625,
+        "width": 1160,
+        "right": 1540,
+        "bottom": 1520.640625
+      },
+      "toolbar": {
+        "x": 401,
+        "y": 272.1875,
+        "width": 1118,
+        "right": 1519,
+        "bottom": 316.1875
+      },
+      "picker": {
+        "x": 401,
+        "y": 330.1875,
+        "width": 1118,
+        "right": 1519,
+        "bottom": 431.265625
+      },
+      "calendar": {
+        "x": 401,
+        "y": 478.453125,
+        "width": 1118,
+        "right": 1519,
+        "bottom": 1118.453125
+      },
+      "switch": {
+        "x": 1315,
+        "y": 204.390625,
+        "width": 204,
+        "right": 1519,
+        "bottom": 254.390625
+      }
+    }
+  ],
+  "errors": [],
+  "videoFrames": 8,
+  "passed": true
+}

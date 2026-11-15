@@ -43,8 +43,6 @@ function getCoachBookingStudents() {
 }
 function renderCoachSlots() {
   const students = getCoachBookingStudents();
-  const appliedKeys = getAppliedCoachBookingStudentKeys();
-  const selectedStudents = students.filter((student) => appliedKeys.includes(student.key));
   renderCoachBookingStudentPicker(students);
   const isHistory = state.coachBookingListPeriod === "past";
   elements.coachAppointmentsListContent.hidden = false;
@@ -59,9 +57,9 @@ function renderCoachSlots() {
     button.setAttribute("aria-pressed", String(active));
   });
   if (elements.coachBookingListSummary) {
-    const selectedLabel = selectedStudents.length === 1 ? selectedStudents[0].name : selectedStudents.length > 1 ? `已选 ${selectedStudents.length} 位学生` : "全部学生";
-    elements.coachBookingListSummary.textContent = `${selectedLabel} · ${isHistory ? "历史记录 · 课程" : "即将上课"} ${visible.length} 条 · ${isHistory ? "最近在前" : "时间由近到远"}`;
+    elements.coachBookingListSummary.textContent = `共 ${visible.length} 节预约`;
   }
+  if (elements.coachBookingListSort) elements.coachBookingListSort.textContent = isHistory ? "按上课时间从新到旧" : "按上课时间由近到远";
   if (!visible.length) {
     elements.coachSlots.innerHTML = `<div class="empty-state coach-booking-empty"><strong>${hasAppliedCoachBookingStudentFilter() ? "所选学生暂无" : "暂无"}${isHistory ? "课程历史记录" : "即将上课的预约"}</strong><p>可切换预约列表分类，或调整上方学生筛选。列表包含所有周的预约。</p></div>`;
     return;
@@ -76,10 +74,12 @@ function renderCoachSlots() {
 }
 function renderCoachBookingDateGroup(group) {
   const text = escapeHtml;
-  const date = new Intl.DateTimeFormat("zh-CN", { year: "numeric", month: "2-digit", day: "2-digit", weekday: "short" }).format(/* @__PURE__ */ new Date(`${group.date}T00:00:00`));
+  const day = new Date(`${group.date}T00:00:00`);
+  const date = new Intl.DateTimeFormat("zh-CN", { year: "numeric", month: "long", day: "numeric" }).format(day);
+  const weekday = new Intl.DateTimeFormat("zh-CN", { weekday: "short" }).format(day);
   return `
     <section class="coach-booking-date-group" data-booking-date="${text(group.date)}">
-      <div class="coach-booking-date-heading"><time datetime="${text(group.date)}">${text(date)}</time><span>${group.slots.length} 节</span></div>
+      <div class="coach-booking-date-heading"><time datetime="${text(group.date)}">${text(date)} · ${text(weekday)}</time><span>${group.slots.length} 节</span></div>
       <div class="coach-booking-date-list">${group.slots.map(renderCoachBookingCard).join("")}</div>
     </section>`;
 }

@@ -15,7 +15,6 @@ import { findSlotAt, slotOverlapsBlockedException } from "../../core/scheduling-
 import {
   addDaysIso,
   cellKey,
-  formatDate,
   formatWeekday,
   isPastCalendarCell,
   minutesFromTime,
@@ -102,20 +101,28 @@ export function renderCalendarRinkOptions() {
     ["Any served rink", formatLocationLabel("Any served rink")],
     ...servedRinks.map((rink) => [rink, formatLocationLabel(rink)]),
     ["Zoom", "Zoom"],
-    [unavailableSelection, "不可预约"],
   ];
 
   elements.calendarRinkOptions.innerHTML = options
     .map(([value, label]) => {
       const isActive = elements.calendarLocationType.value === value;
       return `
-        <button class="rink-option ${isActive ? "active" : ""}" type="button" data-rink="${value}" style="--rink-option-color:${getRinkColor(value)}">
+        <button class="rink-option ${isActive ? "active" : ""}" type="button" data-rink="${escapeHtml(value)}" aria-pressed="${isActive}" style="--rink-option-color:${getRinkColor(value)}">
           <i class="legend-dot" aria-hidden="true"></i>
-          <span>${label}</span>
+          <span>${escapeHtml(label)}</span>
         </button>
       `;
     })
     .join("");
+  const location = elements.calendarLocationType.value;
+  const unavailable = location === unavailableSelection;
+  elements.calendarUnavailableTool.classList.toggle("active", unavailable);
+  elements.calendarUnavailableTool.setAttribute("aria-pressed", String(unavailable));
+  elements.calendarPaintHint.textContent = unavailable
+    ? "在下方日历拖选，即可将对应开放时段设为不可预约；已有预约不受影响。"
+    : location === "Any served rink"
+      ? "在下方日历拖选，即可设置为不限冰场的开放时段。"
+      : `在下方日历拖选，即可设置为在 ${formatLocationLabel(location)} 授课的开放时段。`;
 }
 
 function getScheduleLegendItems() {
@@ -129,7 +136,7 @@ function getScheduleLegendItems() {
 }
 
 function renderScheduleLegend() {
-  elements.scheduleLegend.innerHTML = [
+  const markup = [
     ...getScheduleLegendItems().map(([value, label]) => {
       return `
         <div class="schedule-legend-row">
@@ -144,6 +151,7 @@ function renderScheduleLegend() {
     `<div class="schedule-legend-row compact"><strong>不可预约</strong><div class="schedule-legend-states"><span><i class="legend-dot blocked"></i>不可预约</span></div></div>`,
     `<p class="schedule-request-note">商议中的特殊请求不会在日历中占用或锁定时段。</p>`,
   ].join("");
+  elements.scheduleLegend.innerHTML = markup;
 }
 
 function getSlotsForDate(date) {
@@ -201,7 +209,7 @@ export function renderDropdownOpenSlots() {
   elements.selectedDateMeta.textContent = `${selectedDate} · ${formatWeekday(selectedDate)}`;
 
   if (!visible.length) {
-    elements.dropdownOpenSlots.innerHTML = `<p class="empty-state">这一天还没有开放时间。用上面的 Dropdown 添加，或切到 Calendar 拖选。</p>`;
+    elements.dropdownOpenSlots.innerHTML = `<p class="empty-state">这一天暂无开放时间。可在上方添加，或切到日历拖选。</p>`;
     return;
   }
 
@@ -230,7 +238,7 @@ export function renderDropdownOpenSlots() {
 
 export function renderDropdownWeekSlots() {
   const weekStart = startOfWeekIso(elements.slotDate.value || todayIso());
-  const cards = dayLabels.map((label, index) => {
+  const cards = dayLabels.map((_, index) => {
     const date = addDaysIso(weekStart, index);
     const daySlots = groupSlotsForDisplay(getSlotsForDate(date), { ignoreBooked: true }).filter((group) => group.type === "open");
     const chips = daySlots.length
@@ -241,8 +249,8 @@ export function renderDropdownWeekSlots() {
 
     return `
       <article class="week-day-card">
-        <strong>${label}</strong>
-        <span>${formatDate(date)}</span>
+        <strong>${formatWeekday(date).replace("星期", "周")}</strong>
+        <span><time datetime="${date}">${date.slice(5).replace("-", "/")}</time></span>
         <div>${chips}</div>
       </article>
     `;
@@ -254,6 +262,12 @@ export function renderDropdownWeekSlots() {
 export function renderDragCalendar() {
   const weekStart = startOfWeekIso(elements.calendarWeekStart.value || todayIso());
   elements.calendarWeekStart.value = weekStart;
+  const weekEnd = addDaysIso(weekStart, 6);
+  const [year, month, day] = weekStart.split("-").map(Number);
+  const [endYear, endMonth, endDay] = weekEnd.split("-").map(Number);
+  const rangeLabel = `${year}年${month}月${day}日—${endYear !== year ? `${endYear}年` : ""}${endMonth}月${endDay}日`;
+  elements.availabilityWeekRange.textContent = rangeLabel;
+  elements.calendarWeekStart.setAttribute("aria-label", `选择开放时间周：${rangeLabel}`);
   const displayStart = state.calendarShowsFullDay ? fullDayStart : coreDayStart;
   const displayEnd = state.calendarShowsFullDay ? fullDayEnd : coreDayEnd;
 
@@ -284,7 +298,7 @@ export function renderCalendarAvailability() {
     cell.classList.toggle("has-slot", Boolean(slot));
     cell.classList.toggle("has-booking", Boolean(slot && slot.booked));
     cell.classList.toggle("has-blocked", !slot);
-    cell.classList.toggle("is-editing", isUnsavedOpen || isUnsavedBlock || isRecurringEdit);
+    cell.classList.toggle("is-editing", !slot?.booked && (isUnsavedOpen || isUnsavedBlock || isRecurringEdit));
     cell.classList.toggle("is-past", isPast);
     cell.title = slot
       ? `${slot.start}-${slot.end} ${formatLocationLabel(getAvailabilityLocation(slot))}${slot.booked ? ` · 已预约 · ${formatLocationLabel(slot.location)}` : " · 可预约"}${isPast ? " · 已过去" : ""}`

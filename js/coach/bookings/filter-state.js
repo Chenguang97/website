@@ -1,10 +1,11 @@
 let appliedStudentKeys = [];
 let activeScope = "records";
-const scopeSelections = { records: [], requests: [] };
+const scopeSelections = { records: [], requests: [], requestHistory: [] };
 
-export function selectCoachBookingFilterScope(scope) {
+export function selectCoachBookingFilterScope(scope, { inheritFrom = null } = {}) {
   if (scope === activeScope) return;
   scopeSelections[activeScope] = appliedStudentKeys.slice();
+  if (inheritFrom) scopeSelections[scope] = getAppliedCoachBookingStudentKeys(inheritFrom);
   activeScope = scope;
   appliedStudentKeys = scopeSelections[scope].slice();
 }

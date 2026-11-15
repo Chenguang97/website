@@ -48,7 +48,7 @@ export function openBlockTimeDialog() {
     elements.blockDialogStart.value = defaultStart;
     syncEndTimeOptions(elements.blockDialogStart, elements.blockDialogEnd, "12:00");
     elements.blockRepeatWeekly.checked = false;
-    setBlockDialogMessage("");
+    clearBlockTimeDialogErrors();
     setCoachBookingActionMessage("");
     elements.blockDialog.showModal();
   } catch (error) {
@@ -63,11 +63,20 @@ export function closeBlockTimeDialog() {
 
 export function addBlockException(event) {
   event.preventDefault();
+  clearBlockTimeDialogErrors();
   const start = elements.blockDialogStart.value;
   const end = elements.blockDialogEnd.value;
   const date = elements.blockDialogDate.value;
+  if (!date || !elements.blockDialogDate.validity.valid) {
+    showBlockDialogError("请选择有效日期。", [elements.blockDialogDate]);
+    return;
+  }
+  if (!start || !end) {
+    showBlockDialogError("请选择完整的开始和结束时间。", [!start ? elements.blockDialogStart : elements.blockDialogEnd]);
+    return;
+  }
   if (minutesFromTime(end) <= minutesFromTime(start)) {
-    setBlockDialogMessage("结束时间需要晚于开始时间。", true);
+    showBlockDialogError("结束时间需要晚于开始时间。", [elements.blockDialogEnd]);
     return;
   }
 
@@ -77,8 +86,7 @@ export function addBlockException(event) {
     && dates.includes(slot.date)
     && rangesOverlap(minutesFromTime(start), minutesFromTime(end), minutesFromTime(slot.start), minutesFromTime(slot.end)));
   if (bookingConflict) {
-    setBlockDialogMessage(`该时间与 ${bookingConflict.date} ${bookingConflict.start}–${bookingConflict.end} 的已有预约冲突，请调整时间。`, true);
-    elements.blockDialogStart.focus();
+    showBlockDialogError(`该时间与 ${bookingConflict.date} ${bookingConflict.start}–${bookingConflict.end} 的已有预约冲突，请调整时间。`, [elements.blockDialogStart, elements.blockDialogEnd]);
     return;
   }
 
@@ -122,10 +130,20 @@ function renderAffectedAvailabilityViews() {
   renderDropdownWeekSlots();
 }
 
-function setBlockDialogMessage(message) {
-  if (!elements.blockDialogMessage) return;
-  elements.blockDialogMessage.textContent = message;
-  elements.blockDialogMessage.hidden = !message;
+export function clearBlockTimeDialogErrors() {
+  [elements.blockDialogDateMessage, elements.blockDialogMessage].forEach((message) => {
+    message.textContent = "";
+    message.hidden = true;
+  });
+  [elements.blockDialogDate, elements.blockDialogStart, elements.blockDialogEnd].forEach((field) => field.removeAttribute("aria-invalid"));
+}
+
+function showBlockDialogError(message, fields) {
+  const target = fields.includes(elements.blockDialogDate) ? elements.blockDialogDateMessage : elements.blockDialogMessage;
+  target.textContent = message;
+  target.hidden = false;
+  fields.forEach((field) => field.setAttribute("aria-invalid", "true"));
+  fields[0].focus();
 }
 
 function setCoachBookingActionMessage(message, isError = false) {

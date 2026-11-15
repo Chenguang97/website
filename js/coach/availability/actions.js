@@ -8,7 +8,7 @@ import {
   recurringPastWeeks,
   unavailableSelection,
 } from "../../core/config.js";
-import { isActiveBooking, rangesOverlap } from "../../domain/scheduling.mjs";
+import { rangesOverlap } from "../../domain/scheduling.mjs";
 import { coachElements } from "../../dom/coach-elements.js";
 import {
   getAvailabilityLesson,
@@ -19,7 +19,6 @@ import {
   state,
 } from "../../core/state.js";
 import { formatLocationLabel } from "../../ui/display.js";
-import { findSlotAt } from "../../core/scheduling-rules.js";
 import { clearUndoHistory } from "../../core/undo-history.js";
 import {
   renderDragCalendar,
@@ -28,7 +27,7 @@ import {
   renderDropdownWeekSlots,
   syncEndTimeOptions,
 } from "./render.js";
-import { getRinkColor } from "../calendar-colors.js";
+import { beginAvailabilityDragPreview, clearAvailabilityDragPreview, paintAvailabilityDragPreview } from "./drag-preview.js";
 import { renderExceptionCalendarAvailability } from "../bookings/calendar-render.js";
 import {
   captureAvailabilityUndoState,
@@ -120,7 +119,7 @@ function requestAvailabilityChange(change, allowOverride = false) {
 
 function applyAvailabilityChange(change, trimCrossRinkConflicts = false) {
   const undoSnapshot = captureAvailabilityUndoState();
-  const { newSlots, overwritten, bookedTemplateUpdates, trimmed } = replaceRecurringAvailabilityRange(
+  const { newSlots, overwritten, trimmed } = replaceRecurringAvailabilityRange(
     currentCoachId,
     change.date,
     change.startMinutes,
@@ -131,7 +130,7 @@ function applyAvailabilityChange(change, trimCrossRinkConflicts = false) {
     trimCrossRinkConflicts
   );
 
-  if (!newSlots.length && !overwritten.length && !bookedTemplateUpdates.length && !trimmed.length) {
+  if (!newSlots.length && !overwritten.length && !trimmed.length) {
     showFormMessage("这段时间没有可覆盖的开放时间，可能已经被预约。");
     return;
   }
@@ -139,7 +138,7 @@ function applyAvailabilityChange(change, trimCrossRinkConflicts = false) {
   pushAvailabilityUndoState(undoSnapshot);
   elements.coachNote.value = "";
   refreshAvailabilityDirty();
-  showFormMessage(`已同步每周可预约时间：${newSlots.length} 个新时间，${overwritten.length} 个开放时间，${trimmed.length} 个裁剪时段，${bookedTemplateUpdates.length} 个已预约时间底色。`);
+  showFormMessage(`已同步每周可预约时间：${newSlots.length} 个新时间，${overwritten.length} 个开放时间，${trimmed.length} 个裁剪时段。已有预约保持不变。`);
   renderAvailabilityChanges();
 }
 
@@ -170,7 +169,7 @@ function findRecurringAvailabilityConflicts(date, startMinutes, endMinutes, loca
 function showAvailabilityConflictDialog(change, conflicts) {
   const sample = conflicts.slice(0, 4).map((slot) => `${formatDate(slot.date)} ${slot.start}-${slot.end} · ${formatLocationLabel(slot.location)}`);
   const extra = conflicts.length > sample.length ? `，另有 ${conflicts.length - sample.length} 个重叠时段` : "";
-  elements.conflictDetails.textContent = `新时段 ${formatDate(change.date)} ${timeFromMinutes(change.startMinutes)}-${timeFromMinutes(change.endMinutes)} · ${formatLocationLabel(change.location)} 与其他冰场开放时间重叠：${sample.join("；")}${extra}。请选择 Override 裁剪旧时段，或 Cancel 保留原状。`;
+  elements.conflictDetails.textContent = `新时段 ${formatDate(change.date)} ${timeFromMinutes(change.startMinutes)}-${timeFromMinutes(change.endMinutes)} · ${formatLocationLabel(change.location)} 与其他冰场开放时间重叠：${sample.join("；")}${extra}。选择「覆盖并添加」将裁剪旧的开放时段；选择「取消」保留原状。`;
   if (typeof elements.conflictDialog.showModal === "function") {
     elements.conflictDialog.showModal();
   } else {
@@ -201,12 +200,14 @@ export function confirmAvailabilityConflictOverride() {
 }
 
 export function toggleCalendarHours() {
+  cancelCalendarDrag();
   state.calendarShowsFullDay = !state.calendarShowsFullDay;
   elements.toggleCalendarHours.textContent = state.calendarShowsFullDay ? "收起全天" : "显示全天";
   renderDragCalendar();
 }
 
 export function renderWeeklyAvailabilityViews() {
+  cancelCalendarDrag();
   renderDragCalendar();
   renderDropdownWeekSlots();
 }
@@ -232,14 +233,6 @@ function cloneSlotSegment(slot, startMinutes, endMinutes) {
 }
 
 function replaceAvailabilityRange(coachId, date, startMinutes, endMinutes, lesson, location, note, trimCrossRinkConflicts = false) {
-  const bookedTemplateUpdates = state.slots.filter((slot) => {
-    return (
-      slot.coachId === coachId &&
-      slot.date === date &&
-      isActiveBooking(slot) &&
-      rangesOverlap(minutesFromTime(slot.start), minutesFromTime(slot.end), startMinutes, endMinutes)
-    );
-  });
   const overwritten = state.slots.filter((slot) => {
     return (
       slot.coachId === coachId &&
@@ -281,12 +274,7 @@ function replaceAvailabilityRange(coachId, date, startMinutes, endMinutes, lesso
   const newSlots = createSlotsFromRange(coachId, date, startMinutes, endMinutes, lesson, location, note, true, state.slots);
   replaceSlots([...state.slots, ...newSlots]);
   newSlots.forEach(markAddedSlot);
-  bookedTemplateUpdates.forEach((slot) => {
-    slot.availabilityLocation = location;
-    markRangeCells(slot.date, Math.max(minutesFromTime(slot.start), startMinutes), Math.min(minutesFromTime(slot.end), endMinutes), state.unsavedRecurringCellKeys);
-  });
-
-  return { newSlots, overwritten, bookedTemplateUpdates, trimmed };
+  return { newSlots, overwritten, trimmed };
 }
 
 function getRecurringDatesForDate(coachId, date) {
@@ -329,23 +317,14 @@ function replaceRecurringAvailabilityRange(coachId, date, startMinutes, endMinut
       const result = replaceAvailabilityRange(coachId, recurringDate, startMinutes, endMinutes, lesson, location, note, trimCrossRinkConflicts);
       summary.newSlots.push(...result.newSlots);
       summary.overwritten.push(...result.overwritten);
-      summary.bookedTemplateUpdates.push(...result.bookedTemplateUpdates);
       summary.trimmed.push(...result.trimmed);
       return summary;
     },
-    { newSlots: [], overwritten: [], bookedTemplateUpdates: [], trimmed: [] }
+    { newSlots: [], overwritten: [], trimmed: [] }
   );
 }
 
 function removeAvailabilityRange(coachId, date, startMinutes, endMinutes) {
-  const bookedTemplateUpdates = state.slots.filter((slot) => {
-    return (
-      slot.coachId === coachId &&
-      slot.date === date &&
-      isActiveBooking(slot) &&
-      rangesOverlap(minutesFromTime(slot.start), minutesFromTime(slot.end), startMinutes, endMinutes)
-    );
-  });
   const removed = state.slots.filter((slot) => {
     return (
       slot.coachId === coachId &&
@@ -358,10 +337,6 @@ function removeAvailabilityRange(coachId, date, startMinutes, endMinutes) {
 
   removed.forEach(markDeletedSlot);
   replaceSlots(state.slots.filter((slot) => !removedIds.has(slot.id)));
-  bookedTemplateUpdates.forEach((slot) => {
-    slot.availabilityLocation = unavailableSelection;
-    markRangeCells(slot.date, Math.max(minutesFromTime(slot.start), startMinutes), Math.min(minutesFromTime(slot.end), endMinutes), state.unsavedRecurringCellKeys);
-  });
 
   return removed;
 }
@@ -453,127 +428,65 @@ function markAddedSlot(slot) {
   }
 }
 
-function undoEditingRange(date, start, end, showMessage = true) {
-  const addedIdsToRemove = new Set();
-  state.slots.forEach((slot) => {
-    if (
-      slot.coachId === currentCoachId &&
-      slot.date === date &&
-      state.unsavedAddedSlotIds.has(slot.id) &&
-      rangesOverlap(minutesFromTime(slot.start), minutesFromTime(slot.end), start, end)
-    ) {
-      addedIdsToRemove.add(slot.id);
-    }
-  });
-
-  replaceSlots(state.slots.filter((slot) => !addedIdsToRemove.has(slot.id)));
-  addedIdsToRemove.forEach((id) => state.unsavedAddedSlotIds.delete(id));
-
-  const restored = [];
-  state.pendingDeletedSlots.forEach((slot, id) => {
-    if (
-      slot.coachId === currentCoachId &&
-      slot.date === date &&
-      rangesOverlap(minutesFromTime(slot.start), minutesFromTime(slot.end), start, end)
-    ) {
-      restored.push(slot);
-      state.pendingDeletedSlots.delete(id);
-      for (let minutes = minutesFromTime(slot.start); minutes < minutesFromTime(slot.end); minutes += calendarStep) {
-        state.unsavedBlockedCellKeys.delete(cellKey(slot.date, minutes));
-      }
-    }
-  });
-
-  const blockIdsToRemove = new Set();
-  state.blockedExceptions.forEach((block) => {
-    if (
-      block.coachId === currentCoachId &&
-      block.date === date &&
-      state.unsavedBlockExceptionIds.has(block.id) &&
-      rangesOverlap(minutesFromTime(block.start), minutesFromTime(block.end), start, end)
-    ) {
-      blockIdsToRemove.add(block.id);
-      for (let minutes = minutesFromTime(block.start); minutes < minutesFromTime(block.end); minutes += calendarStep) {
-        state.unsavedBlockedCellKeys.delete(cellKey(block.date, minutes));
-      }
-    }
-  });
-  replaceBlockedExceptions(state.blockedExceptions.filter((block) => !blockIdsToRemove.has(block.id)));
-  blockIdsToRemove.forEach((id) => state.unsavedBlockExceptionIds.delete(id));
-  for (let minutes = start; minutes < end; minutes += calendarStep) {
-    state.unsavedRecurringCellKeys.delete(cellKey(date, minutes));
-  }
-
-  replaceSlots([...state.slots, ...restored]);
-  const changed = addedIdsToRemove.size || restored.length || blockIdsToRemove.size;
-  refreshAvailabilityDirty(changed ? "已撤销未保存编辑" : "没有可撤销的编辑");
-  if (showMessage) {
-    showFormMessage(changed ? "已取消选中的未保存 editing。" : "这段没有未保存的 editing。");
-  }
-  return Boolean(changed);
-}
-
-function undoRecurringEditingRange(date, start, end) {
-  const changedCount = getRecurringDatesForDate(currentCoachId, date).filter((recurringDate) => {
-    return undoEditingRange(recurringDate, start, end, false);
-  }).length;
-  showFormMessage(changedCount ? `已取消 ${changedCount} 周的未保存 recurring editing。` : "这段没有未保存的 editing。");
-  return changedCount;
-}
-
 export function startCalendarDrag(event) {
+  if (event.button !== undefined && event.button !== 0) return;
   const cell = event.target.closest(".calendar-cell");
-  if (!cell) return;
-
-  const date = addDaysIso(elements.calendarWeekStart.value, Number(cell.dataset.dayIndex));
+  if (!cell || cell.classList.contains("has-booking")) return;
+  const dayIndex = Number(cell.dataset.dayIndex);
+  const date = addDaysIso(elements.calendarWeekStart.value, dayIndex);
   const minutes = Number(cell.dataset.minutes);
   if (isPastCalendarCell(date, minutes)) {
     cell.blur();
     return;
   }
-  const slot = findSlotAt(currentCoachId, date, minutes);
-  const selectedLocation = elements.calendarLocationType.value;
-  const isUnsavedOpen = Boolean(slot && state.unsavedAddedSlotIds.has(slot.id));
-  const isUnsavedBlocked = !slot && state.unsavedBlockedCellKeys.has(cellKey(date, minutes));
-  const shouldUndoEditing =
-    (isUnsavedOpen && selectedLocation === slot.location) ||
-    (isUnsavedBlocked && selectedLocation === unavailableSelection);
+  cancelCalendarDrag();
   state.dragState = {
-    dayIndex: Number(cell.dataset.dayIndex),
-    start: minutes,
-    end: minutes,
-    mode: shouldUndoEditing ? "undo" : "open",
+    dayIndex, date, start: minutes, end: minutes,
+    location: elements.calendarLocationType.value,
+    pointerId: event.pointerId,
   };
-  cell.setPointerCapture(event.pointerId);
-  paintDragSelection();
+  beginAvailabilityDragPreview();
+  elements.dragCalendar.setPointerCapture?.(event.pointerId);
+  event.preventDefault?.();
+  paintAvailabilityDragPreview(state.dragState);
 }
 
 export function moveCalendarDrag(event) {
-  if (!state.dragState) return;
-
-  const target = document.elementFromPoint(event.clientX, event.clientY);
-  const cell = target && target.closest(".calendar-cell");
-  if (!cell || Number(cell.dataset.dayIndex) !== state.dragState.dayIndex) return;
-
-  state.dragState.end = Number(cell.dataset.minutes);
-  paintDragSelection();
+  const drag = state.dragState;
+  if (!drag || (event.pointerId !== undefined && event.pointerId !== drag.pointerId)) return;
+  const cell = document.elementFromPoint(event.clientX, event.clientY)?.closest(".calendar-cell");
+  if (!cell || !elements.dragCalendar.contains(cell) || Number(cell.dataset.dayIndex) !== drag.dayIndex) return;
+  if (isPastCalendarCell(drag.date, Number(cell.dataset.minutes))) return;
+  drag.end = Number(cell.dataset.minutes);
+  paintAvailabilityDragPreview(drag);
 }
 
-export function finishCalendarDrag() {
-  if (!state.dragState) return;
+export function cancelCalendarDrag(event) {
+  const drag = state.dragState;
+  if (!drag || (event?.pointerId !== undefined && event.pointerId !== drag.pointerId)) return;
+  state.dragState = null;
+  clearAvailabilityDragPreview();
+  if (elements.dragCalendar.hasPointerCapture?.(drag.pointerId)) {
+    elements.dragCalendar.releasePointerCapture(drag.pointerId);
+  }
+}
 
-  const start = Math.min(state.dragState.start, state.dragState.end);
-  const end = Math.max(state.dragState.start, state.dragState.end) + calendarStep;
-  const date = addDaysIso(elements.calendarWeekStart.value, state.dragState.dayIndex);
+export function handleCalendarDragKeydown(event) {
+  if (event.key !== "Escape" || !state.dragState) return;
+  event.preventDefault();
+  cancelCalendarDrag();
+}
+
+export function finishCalendarDrag(event) {
+  const drag = state.dragState;
+  if (!drag || (event?.pointerId !== undefined && event.pointerId !== drag.pointerId)) return;
+  // Restore the exact pre-gesture view before committing only the final range.
+  cancelCalendarDrag();
+  const start = Math.min(drag.start, drag.end);
+  const end = Math.max(drag.start, drag.end) + calendarStep;
   const undoSnapshot = captureAvailabilityUndoState();
-
-  if (state.dragState.mode === "undo") {
-    const changedCount = undoRecurringEditingRange(date, start, end);
-    if (changedCount) {
-      pushAvailabilityUndoState(undoSnapshot);
-    }
-  } else if (elements.calendarLocationType.value === unavailableSelection) {
-    const removed = removeRecurringAvailabilityRange(currentCoachId, date, start, end);
+  if (drag.location === unavailableSelection) {
+    const removed = removeRecurringAvailabilityRange(currentCoachId, drag.date, start, end);
     if (removed.length) {
       pushAvailabilityUndoState(undoSnapshot);
       refreshAvailabilityDirty();
@@ -582,56 +495,15 @@ export function finishCalendarDrag() {
       showFormMessage("这段没有可删除的开放时间，可能已经被预约或本来就是不可预约。");
     }
   } else {
-    const lesson = getAvailabilityLesson();
-    if (end - start < calendarStep) {
-      showFormMessage(`拖选范围少于 ${calendarStep} 分钟，无法生成可预约时间。`, true);
-      state.dragState = null;
-      clearDragSelection();
-      return;
-    }
-
     requestAvailabilityChange({
-      date,
+      date: drag.date,
       startMinutes: start,
       endMinutes: end,
-      lesson,
-      location: elements.calendarLocationType.value,
-      note: `从日历添加：${formatLocationLabel(elements.calendarLocationType.value)}。`,
+      lesson: getAvailabilityLesson(),
+      location: drag.location,
+      note: `从日历添加：${formatLocationLabel(drag.location)}。`,
       source: "calendar",
     });
   }
-
-  state.dragState = null;
-  clearDragSelection();
   renderAvailabilityChanges();
 }
-
-function paintDragSelection() {
-  const start = Math.min(state.dragState.start, state.dragState.end);
-  const end = Math.max(state.dragState.start, state.dragState.end);
-  const isRemovingAvailability = elements.calendarLocationType.value === unavailableSelection;
-  const selectionColor = isRemovingAvailability ? "#e2e8f0" : getRinkColor(elements.calendarLocationType.value);
-  elements.dragCalendar.querySelectorAll(".calendar-cell").forEach((cell) => {
-    cell.classList.remove("selecting", "blocking", "reverting", "removing");
-    const sameDay = Number(cell.dataset.dayIndex) === state.dragState.dayIndex;
-    const minutes = Number(cell.dataset.minutes);
-    const inRange = sameDay && minutes >= start && minutes <= end;
-    if (inRange && state.dragState.mode === "open") {
-      cell.style.setProperty("--selection-color", selectionColor);
-    } else {
-      cell.style.removeProperty("--selection-color");
-    }
-    cell.classList.toggle("selecting", inRange && state.dragState.mode === "open");
-    cell.classList.toggle("removing", inRange && state.dragState.mode === "open" && isRemovingAvailability);
-    cell.classList.toggle("reverting", inRange && state.dragState.mode === "undo");
-  });
-}
-
-export function clearDragSelection() {
-  elements.dragCalendar.querySelectorAll(".calendar-cell").forEach((cell) => {
-    cell.classList.remove("selecting", "blocking", "reverting", "removing");
-    cell.style.removeProperty("--selection-color");
-  });
-}
-
-

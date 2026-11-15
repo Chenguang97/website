@@ -3,6 +3,7 @@ import { animateAvailabilityMethod } from "./availability/method-motion.js?v=con
 import { animateCoachTab } from "./tab-motion.js?v=coach-top-liquid-2";
 import { closeCoachBookingFilter, renderAppliedCoachBookingStudentFilter } from "./bookings/controls.js?v=booking-liquid-restored-1";
 import { selectCoachBookingFilterScope } from "./bookings/filter-state.js";
+import { getCoachRequestStudentScope } from "./bookings/request-state.js";
 import { confirmDiscardProfileChanges } from "./profile/actions.js";
 import { activeCoachPanelStorageKey } from "../core/config.js";
 import { coachElements as elements } from "../dom/coach-elements.js";
@@ -66,13 +67,16 @@ export function activateBookingSection(sectionId, { animate = false } = {}) {
   }
   const button = [...elements.bookingSubtabs].find((item) => item.dataset.bookingSection === sectionId) || null;
   const targetSectionId = showsRequests ? "coachRequestWorkspace" : (button?.dataset.bookingSection || "bookingCalendarSection");
+  const showsList = targetSectionId === "bookingListSection";
   if (animate && button) animateBookingView(button);
   closeCoachBookingFilter();
-  selectCoachBookingFilterScope(scope);
+  selectCoachBookingFilterScope(showsRequests ? getCoachRequestStudentScope() : "records");
   if (!showsRequests) recordSection = targetSectionId;
-  elements.coachBookingPanel.dataset.bookingView = showsRequests ? "requests" : targetSectionId === "bookingListSection" ? "list" : "calendar";
+  elements.coachBookingPanel.dataset.bookingView = showsRequests ? "requests" : showsList ? "list" : "calendar";
   elements.coachBookingContentTitle.textContent = showsRequests ? "特殊请求" : "预约记录";
-  elements.coachBookingContentNote.textContent = showsRequests ? "处理需要双方商议的例外安排" : "查看已成立的预约与安排不可预约时间";
+  elements.coachBookingContentNote.textContent = showsRequests ? "处理需要双方商议的例外安排" : showsList ? "查看即将开始和历史预约" : "查看已成立的预约与安排不可预约时间";
+  elements.coachBookingContentNote.hidden = showsRequests;
+  elements.openBlockDialog.textContent = showsList ? "＋ 设置不可预约时间" : "＋ 不可预约时间";
   elements.coachBookingRecordsTrigger.classList.toggle("active", !showsRequests);
   elements.coachBookingRecordsTrigger.setAttribute("aria-pressed", String(!showsRequests));
   elements.coachRequestSectionTrigger.classList.toggle("active", showsRequests);
@@ -84,7 +88,8 @@ export function activateBookingSection(sectionId, { animate = false } = {}) {
   });
   elements.bookingSections.forEach((section) => section.classList.toggle("active", !showsRequests && section.dataset.bookingContent === targetSectionId));
   elements.coachRequestWorkspace.hidden = !showsRequests;
-  const studentFilterMount = showsRequests ? elements.coachRequestStudentFilterMount : elements.coachScheduleStudentFilterMount;
+  const studentFilterMount = showsRequests ? elements.coachRequestStudentFilterMount : showsList ? elements.coachListStudentFilterMount : elements.coachScheduleStudentFilterMount;
+  elements.coachBookingStudentLabel.textContent = showsRequests ? "学生" : showsList ? "学生：" : "查看学生";
   if (elements.coachBookingStudentPicker.parentElement !== studentFilterMount) studentFilterMount.append(elements.coachBookingStudentPicker);
   if (scope !== previousScope) {
     renderAppliedCoachBookingStudentFilter();

@@ -3,14 +3,14 @@ import { initializeBookingPeriodMotion } from "./bookings/period-motion.js?v=boo
 import { initializeAvailabilityMethodMotion } from "./availability/method-motion.js?v=confirmed-liquid-switch-1";
 import { initializeCoachTabMotion } from "./tab-motion.js?v=coach-top-liquid-2";
 import {
-  addAvailability, cancelAvailabilityConflict, clearDragSelection,
+  addAvailability, cancelAvailabilityConflict, cancelCalendarDrag, handleCalendarDragKeydown,
   confirmAvailabilityConflictOverride, finishCalendarDrag,
   goToCurrentCalendarWeek, handleAvailabilitySlotAction, moveCalendarDrag,
   renderWeeklyAvailabilityViews, saveAvailabilityChanges,
   shiftCalendarWeek, startCalendarDrag, toggleCalendarHours,
 } from "./availability/actions.js";
 import {
-  addBlockException, closeBlockTimeDialog, goToCurrentScheduleWeek,
+  addBlockException, clearBlockTimeDialogErrors, closeBlockTimeDialog, goToCurrentScheduleWeek,
   handleCoachBookingAction, openBlockTimeDialog, shiftScheduleWeek,
   toggleScheduleCalendarHours,
 } from "./bookings/actions.js?v=coach-booking-row-effect-1";
@@ -20,13 +20,13 @@ import { handleCoachBookingUndoKeydown } from "./bookings/undo.js";
 import {
   handleCoachBookingFilterAction, handleCoachBookingStudentKeydown,
   handleCoachBookingStudentOutsideClick, openCoachBookingStudentSearch,
-  searchCoachBookingStudents, switchCoachBookingPeriod,
+  searchCoachBookingStudents, switchCoachBookingPeriod, repositionCoachBookingStudentPicker,
 } from "./bookings/controls.js?v=coach-booking-row-effect-1";
 import { initializeCoachScheduleDatePicker } from "./bookings/date-picker.js";
 import {
   acceptCurrentCoachRequest, cancelCoachRequestProposal,
   counterCurrentCoachRequest, endCurrentCoachRequest, extendCurrentCoachRequest, filterCoachRequests,
-  handleCoachRequestRecordClick, openCoachRequestOriginalBooking, openCoachRequestProposal, openCoachRequestSection, openCoachRequestWorkspace, sendCoachRequestReply,
+  handleCoachRequestRecordClick, openCoachRequestOriginalBooking, openCoachRequestProposal, openCoachRequestSection, openCoachRequestWorkspace, returnToCurrentCoachRequests, sendCoachRequestReply,
 } from "./bookings/request-actions.js?v=coach-booking-row-effect-1";
 import {
   addLessonOption, addCustomSpecialty, closeCoachPhotoDialog, closeCustomSpecialtyEditor,
@@ -57,14 +57,17 @@ import { refreshOpenCoachBookingRequest, renderCoachBookingRequests } from "./bo
 import { storageGetItem } from "../core/storage-adapter.js";
 import { nextWeekdayIso, startOfWeekIso } from "../core/utils-data.js";
 import { initializeInputModality } from "../ui/input-modality.js";
-import { saveCoachHeaderChanges } from "./header-actions.js";
+import { previewCoachSavedProfile, saveCoachHeaderChanges } from "./header-actions.js";
+import { initializeCoachSaveToolbarLayout } from "./save-toolbar-layout.js";
+import { initializeCoachBookingListLayout } from "./bookings/list-layout.js";
 
 const elements = { ...coachElements, ...bookingDialogElements };
 
 function bindCoachEvents() {
   elements.saveProfileChanges.addEventListener("click", saveCoachHeaderChanges);
-  elements.coachTabs.forEach((button) => button.addEventListener("click", switchCoachPanel));
-  elements.methodButtons.forEach((button) => button.addEventListener("click", switchMethod));
+  elements.previewCoachProfile.addEventListener("click", previewCoachSavedProfile);
+  elements.coachTabs.forEach((button) => button.addEventListener("click", (event) => { cancelCalendarDrag(); switchCoachPanel(event); }));
+  elements.methodButtons.forEach((button) => button.addEventListener("click", (event) => { cancelCalendarDrag(); switchMethod(event); }));
   elements.availabilitySubtabs.forEach((button) => button.addEventListener("click", switchAvailabilitySection));
   elements.bookingSubtabs.forEach((button) => button.addEventListener("click", switchBookingSection));
   elements.coachRequestSectionTrigger.addEventListener("click", openCoachRequestSection);
@@ -74,9 +77,12 @@ function bindCoachEvents() {
   elements.coachBookingPanel.addEventListener("click", handleCoachBookingFilterAction);
   document.addEventListener("keydown", handleCoachBookingStudentKeydown);
   document.addEventListener("click", handleCoachBookingStudentOutsideClick);
+  window.addEventListener("resize", repositionCoachBookingStudentPicker);
+  document.addEventListener("scroll", repositionCoachBookingStudentPicker, { capture: true, passive: true });
   elements.coachBookingPeriods.forEach((button) => button.addEventListener("click", switchCoachBookingPeriod));
   elements.coachPendingTrigger.addEventListener("click", () => openCoachRequestWorkspace());
   elements.coachRequestFilters.forEach((button) => button.addEventListener("click", filterCoachRequests));
+  elements.coachRequestReturnCurrent.addEventListener("click", returnToCurrentCoachRequests);
   elements.coachRequestRecords.addEventListener("click", handleCoachRequestRecordClick);
   elements.coachRequestSummary.addEventListener("click", openCoachRequestOriginalBooking);
   elements.bookingDetailsBody.addEventListener("click", handleCoachRequestRecordClick);
@@ -132,10 +138,16 @@ function bindCoachEvents() {
   elements.closeBlockDialog.addEventListener("click", closeBlockTimeDialog);
   elements.cancelBlockDialog.addEventListener("click", closeBlockTimeDialog);
   elements.cancelConflictOverride.addEventListener("click", cancelAvailabilityConflict);
+  elements.conflictDialog.addEventListener("cancel", cancelAvailabilityConflict);
   elements.confirmConflictOverride.addEventListener("click", confirmAvailabilityConflictOverride);
   elements.calendarRinkOptions.addEventListener("click", selectCalendarRink);
+  elements.calendarUnavailableTool.addEventListener("click", selectCalendarRink);
   elements.startTime.addEventListener("change", () => syncEndTimeOptions(elements.startTime, elements.endTime));
   elements.blockDialogStart.addEventListener("change", () => syncEndTimeOptions(elements.blockDialogStart, elements.blockDialogEnd));
+  [elements.blockDialogDate, elements.blockDialogStart, elements.blockDialogEnd].forEach((field) => {
+    field.addEventListener("input", clearBlockTimeDialogErrors);
+    field.addEventListener("change", clearBlockTimeDialogErrors);
+  });
   elements.toggleCalendarHours.addEventListener("click", toggleCalendarHours);
   elements.toggleExceptionCalendarHours.addEventListener("click", toggleScheduleCalendarHours);
   elements.previousCalendarWeek.addEventListener("click", () => shiftCalendarWeek(-1));
@@ -157,10 +169,10 @@ function bindCoachEvents() {
   elements.dragCalendar.addEventListener("pointerdown", startCalendarDrag);
   elements.dragCalendar.addEventListener("pointermove", moveCalendarDrag);
   elements.dragCalendar.addEventListener("pointerup", finishCalendarDrag);
-  elements.dragCalendar.addEventListener("pointercancel", () => {
-    state.dragState = null;
-    clearDragSelection();
-  });
+  elements.dragCalendar.addEventListener("pointercancel", cancelCalendarDrag);
+  elements.dragCalendar.addEventListener("lostpointercapture", cancelCalendarDrag);
+  document.addEventListener("keydown", handleCalendarDragKeydown);
+  window.addEventListener("blur", () => cancelCalendarDrag());
   elements.closeBookingDetails.addEventListener("click", () => elements.bookingDetailsDialog.close());
   elements.removeBookingDetails.addEventListener("click", removeCoachBookingFromDetails);
   document.addEventListener("keydown", handleCoachUndoKeydown);
@@ -208,5 +220,7 @@ export function initializeCoachApp() {
   renderDragCalendar();
   renderExceptionDragCalendar();
   renderCoachPage();
+  initializeCoachSaveToolbarLayout();
+  initializeCoachBookingListLayout();
 }
 

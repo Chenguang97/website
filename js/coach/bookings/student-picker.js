@@ -1,4 +1,5 @@
 import { coachElements as elements } from "../../dom/coach-elements.js";
+import { positionCoachBookingStudentPanel } from "./student-picker-layout.js";
 import {
   getAppliedCoachBookingStudentKeys,
   setAppliedCoachBookingStudentKeys,
@@ -25,7 +26,7 @@ function closedLabel(students) {
   const selected = selectedStudents(students);
   if (!getAppliedCoachBookingStudentKeys().length) return "全部学生";
   if (selected.length === 1) return selected[0].name;
-  return `已选${selected.length}位学生`;
+  return `已选 ${selected.length} 位学生`;
 }
 
 function duplicateNames(students) {
@@ -96,12 +97,13 @@ function renderCoachBookingStudentPicker(students) {
   renderOptions(students);
   const clearSearch = elements.coachBookingStudentResults.querySelector('[data-student-action="clear-search"]');
   clearSearch.hidden = !searchQuery;
-  elements.coachBookingStudentDraftCount.textContent = `已选${draftKeys.size}位`;
+  elements.coachBookingStudentDraftCount.textContent = `已选 ${draftKeys.size} 位学生`;
   const apply = elements.coachBookingStudentResults.querySelector('[data-student-action="apply"]');
   apply.disabled = draftKeys.size === 0;
   elements.coachBookingStudentValidation.hidden = draftKeys.size !== 0;
   const selectMatches = elements.coachBookingStudentResults.querySelector('[data-student-action="select-matches"]');
   selectMatches.textContent = searchQuery.trim() ? "全选搜索结果" : "全选";
+  positionCoachBookingStudentPanel();
 }
 
 function openCoachBookingStudentPicker(students) {

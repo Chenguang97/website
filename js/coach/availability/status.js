@@ -4,6 +4,7 @@ import { setCoachHeaderSaveFeedback } from "../header-status.js";
 function showFormMessage(message, isError = false) {
   if (!elements.formMessage) return;
   elements.formMessage.textContent = message;
+  elements.formMessage.dataset.tone = isError ? "error" : "success";
   elements.formMessage.style.color = isError ? "var(--red)" : "var(--green)";
 }
 function setAvailabilityDirty(isDirty, message) {

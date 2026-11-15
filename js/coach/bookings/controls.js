@@ -17,6 +17,7 @@ import { state } from "../../core/state.js";
 import { animateBookingPeriod } from "./period-motion.js?v=booking-period-liquid-1";
 import { renderCoachBookingRequests } from "./request-render.js?v=coach-booking-row-effect-1";
 import { clearAppliedCoachBookingStudentKeys } from "./filter-state.js";
+import { positionCoachBookingStudentPanel } from "./student-picker-layout.js";
 
 export function renderAppliedCoachBookingStudentFilter() {
   renderCoachSlots();
@@ -34,6 +35,7 @@ export function openCoachBookingStudentSearch() {
 }
 
 export function handleCoachBookingStudentKeydown(event) {
+  if (!isCoachBookingStudentPickerOpen()) return;
   if (event.target !== elements.coachBookingStudentSearch && event.key !== "Escape") return;
   if (event.key === "ArrowDown" || event.key === "ArrowUp") {
     event.preventDefault();
@@ -58,6 +60,12 @@ export function handleCoachBookingStudentOutsideClick(event) {
   const picker = elements.coachBookingStudentPicker;
   const eventPath = event.composedPath?.() || [];
   if (isCoachBookingStudentPickerOpen() && !picker?.contains(event.target) && !eventPath.includes(picker)) {
+    closeCoachBookingStudentPicker(getCoachBookingStudents());
+  }
+}
+
+export function repositionCoachBookingStudentPicker() {
+  if (isCoachBookingStudentPickerOpen() && !positionCoachBookingStudentPanel()) {
     closeCoachBookingStudentPicker(getCoachBookingStudents());
   }
 }

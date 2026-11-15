@@ -17,18 +17,18 @@
       })();
     </script>
     <link rel="stylesheet" href="../css/base.css?v=warm-ui-1" />
-    <link rel="stylesheet" href="../css/coach-profile.css?v=coach-floating-actions-3" />
+    <link rel="stylesheet" href="../css/coach-profile.css?v=coach-availability-paint-20" />
     <link rel="stylesheet" href="../css/calendar.css?v=warm-ui-1" />
     <link rel="stylesheet" href="../css/forms-dialogs.css?v=warm-ui-1" />
     <link rel="stylesheet" href="../css/student-bookings.css?v=warm-ui-1" />
     <link rel="stylesheet" href="../css/responsive.css?v=warm-ui-1" />
-    <link rel="stylesheet" href="../css/design-system.css?v=shared-coach-header-8" />
+    <link rel="stylesheet" href="../css/design-system.css?v=coach-availability-paint-20" />
   </head>
   <body data-page="coach">
     <main class="app-shell coach-app-shell">
       <section class="workspace">
         <div class="coach-workspace-container">
-          <a class="role-home-link coach-global-home" href="../index.html"><svg class="coach-operation-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m3 10 9-7 9 7M5 9v11h5v-6h4v6h5V9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg><span>首页</span></a>
+          <a class="role-home-link coach-global-home" href="../index.html"><svg class="coach-operation-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1" stroke="currentColor" stroke-width="1.8"/><rect x="14" y="3" width="7" height="7" rx="1" stroke="currentColor" stroke-width="1.8"/><rect x="3" y="14" width="7" height="7" rx="1" stroke="currentColor" stroke-width="1.8"/><rect x="14" y="14" width="7" height="7" rx="1" stroke="currentColor" stroke-width="1.8"/></svg><span>切换入口</span><svg class="coach-portal-arrow" viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false"><path d="M6 18 18 6M6 6h12v12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></a>
           <section id="coachView" class="view active" aria-labelledby="coachHeading">
             <div class="section-header coach-action-bar">
               <div class="coach-header-identity">
@@ -46,9 +46,8 @@
                 <div class="profile-save-state" aria-live="polite">
                   <span id="profileSaveStatus" class="profile-save-status" data-tone="saved">已保存</span>
                 </div>
-                <a id="previewCoachProfile" class="ghost-button coach-header-action" href="profile.html?coach=maya" target="_blank" rel="noopener" aria-describedby="profilePreviewNote" title="预览仅显示已保存版本"><svg class="coach-operation-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.8"/></svg><span>预览主页</span></a>
+                <a id="previewCoachProfile" class="ghost-button coach-header-action" href="profile.html?coach=maya" target="_blank" rel="noopener" title="预览已保存版本"><svg class="coach-operation-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.8"/></svg><span>预览</span></a>
                 <button id="saveProfileChanges" class="primary-button coach-header-action" type="button" disabled><svg class="coach-operation-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 3h13l4 4v14H3V3h1ZM7 3v6h10V3M7 21v-8h10v8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg><span id="coachSaveLabel">保存更改</span></button>
-                <p id="profilePreviewNote" class="coach-save-preview-note">预览仅显示已保存版本</p>
                 <p id="coachSaveError" class="coach-save-error" role="alert" hidden></p>
             </section>
 
@@ -219,20 +218,21 @@
 
             <section class="availability-panel coach-panel" data-coach-content="availabilityPanel">
               <div class="panel-heading coach-panel-heading">
-                <h3>设置每周固定开放时间</h3>
-                <div class="method-switch liquid-switch availability-method-switch" role="tablist" aria-label="选择可预约时间设置方式">
-                  <button class="method-button active" type="button" data-method="calendarPanel" aria-selected="true">日历</button>
-                  <button class="method-button" type="button" data-method="dropdownPanel" aria-selected="false">下拉选择</button>
+                <h3>开放时间</h3>
+                <div class="method-switch liquid-switch availability-method-switch booking-view-switch" role="tablist" aria-label="选择可预约时间设置方式">
+                  <button class="method-button active" type="button" data-method="calendarPanel" aria-selected="true"><svg class="booking-view-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="3.5" y="5.5" width="17" height="15" rx="2.5" stroke="currentColor" stroke-width="1.8"/><path d="M8 3.5v4M16 3.5v4M3.5 9.5h17" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg><span>日历</span></button>
+                  <button class="method-button" type="button" data-method="dropdownPanel" aria-selected="false"><svg class="booking-view-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="5" cy="6.5" r="1.2" fill="currentColor"/><circle cx="5" cy="12" r="1.2" fill="currentColor"/><circle cx="5" cy="17.5" r="1.2" fill="currentColor"/><path d="M9 6.5h11M9 12h11M9 17.5h11" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg><span>表单</span></button>
                 </div>
-                <p class="heading-note">老师每周重复开放给学生预约的时间。默认周一到周五 6:00-16:00 对不限冰场开放。</p>
+                <p class="heading-note">设置每周重复的可预约时间</p>
               </div>
 
               <section id="regularAvailabilitySection" class="availability-section active" data-availability-content="regularAvailabilitySection">
+              <p id="formMessage" class="form-message coach-availability-feedback" role="status" aria-live="polite"></p>
               <div id="dropdownPanel" class="method-panel is-hidden" data-method-panel="dropdownPanel">
                 <form id="availabilityForm" class="form-panel">
                   <div>
-                    <p class="eyebrow">下拉选择</p>
-                    <h3>用下拉选时间</h3>
+                    <h4>添加开放时间</h4>
+                    <p class="coach-filter-note">按所选日期的星期设置每周重复的开放时段。</p>
                   </div>
 
                   <div class="two-column">
@@ -264,20 +264,21 @@
 
                   <label>
                     备注
-                    <textarea id="coachNote" rows="3" placeholder="例如：Beginner edges / private lesson / competition prep"></textarea>
+                    <textarea id="coachNote" rows="3" placeholder="例如：成人基础训练、比赛前专项训练"></textarea>
                   </label>
 
+                  <div class="dialog-actions">
                   <button class="primary-button" type="submit">
                     <span class="button-icon" aria-hidden="true">+</span>
                     添加可预约时间
                   </button>
+                  </div>
                 </form>
 
                 <section class="dropdown-open-panel" aria-label="所选日期开放时间">
                   <div class="panel-heading compact-heading">
                     <div>
-                      <p class="eyebrow">所选日期</p>
-                      <h3>已开放时间</h3>
+                      <h4>所选日期的开放时间</h4>
                       <p id="selectedDateMeta" class="date-meta"></p>
                     </div>
                   </div>
@@ -287,8 +288,7 @@
                 <section class="dropdown-open-panel" aria-label="每周可预约时间总览">
                   <div class="panel-heading compact-heading">
                     <div>
-                      <p class="eyebrow">本周总览</p>
-                      <h3>本周开放总览</h3>
+                      <h4>本周开放总览</h4>
                     </div>
                   </div>
                   <div id="dropdownWeekSlots" class="week-open-grid" aria-live="polite"></div>
@@ -296,50 +296,69 @@
               </div>
 
               <div id="calendarPanel" class="calendar-panel method-panel" data-method-panel="calendarPanel">
-                <div class="panel-heading">
-                <div>
-                  <p class="eyebrow">日历选择</p>
-                  <h3>在日历上拖选</h3>
-                </div>
-                <button id="toggleCalendarHours" class="ghost-button" type="button">显示全天</button>
-                </div>
-
-                <div class="calendar-controls">
-                  <div class="week-jump-control">
-                    <label>
-                      本周开始日期
-                      <input id="calendarWeekStart" type="date" />
-                    </label>
-                    <button id="todayCalendarWeek" class="calendar-today-button" type="button">今天</button>
+                <div class="coach-availability-calendar-toolbar">
+                  <div class="coach-booking-date-filter">
+                    <div class="coach-booking-date-controls">
+                      <div class="coach-schedule-week-navigation" role="group" aria-label="切换开放时间周">
+                        <button id="previousCalendarWeek" class="calendar-side-arrow" type="button" aria-label="上一周">‹</button>
+                        <div class="coach-schedule-date-picker coach-availability-week-picker">
+                          <span id="availabilityWeekRange" class="coach-schedule-week-range" aria-hidden="true"></span>
+                          <svg class="control-chevron" viewBox="0 0 16 16" aria-hidden="true"><path d="m3 6 5 5 5-5"/></svg>
+                          <input id="calendarWeekStart" type="date" aria-label="选择开放时间周" />
+                        </div>
+                        <button id="nextCalendarWeek" class="calendar-side-arrow" type="button" aria-label="下一周">›</button>
+                      </div>
+                      <button id="todayCalendarWeek" class="calendar-today-button" type="button">本周</button>
+                    </div>
                   </div>
+                  <button id="toggleCalendarHours" class="ghost-button" type="button">显示全天</button>
                 </div>
 
-                <div class="rink-picker" aria-label="选择开放地点">
-                  <div class="rink-picker-label">选择开放地点</div>
-                  <div id="calendarRinkOptions" class="rink-option-grid"></div>
+                <div class="rink-picker" aria-label="新增开放时段的授课地点">
+                  <div class="coach-availability-location-heading">
+                    <span class="rink-picker-label">新增开放时段的授课地点</span>
+                    <span class="coach-filter-note">先选择授课地点，再在日历上拖选开放时段。</span>
+                  </div>
+                  <div class="coach-availability-paint-tools">
+                    <div id="calendarRinkOptions" class="rink-option-grid" role="group" aria-label="新增开放时段的授课地点"></div>
+                    <button id="calendarUnavailableTool" class="ghost-button coach-availability-unavailable" type="button" data-rink="Unavailable" aria-pressed="false"><svg class="coach-operation-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="8.5" stroke="currentColor" stroke-width="1.8"/><path d="M8 12h8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg><span>设为不可预约</span></button>
+                  </div>
+                  <p id="calendarPaintHint" class="coach-filter-note" role="status" aria-live="polite"></p>
                   <select id="calendarLocationType" class="hidden-control" aria-hidden="true" tabindex="-1">
                     <option value="Any served rink">不限冰场</option>
                   </select>
                 </div>
 
-                <div class="calendar-help">
-                  选择授课地点，然后在日历的灰色区域拖动以设置可预约时间。深色边框表示尚未保存的更改，可拖动调整或取消。
+                <div class="coach-availability-calendar-notes">
+                  <p class="coach-filter-note">已有预约同步显示，方便参考；调整开放时间不会更改已有预约。</p>
+                  <details class="coach-availability-help">
+                    <summary>操作说明</summary>
+                    <ul>
+                      <li>选择授课地点后拖选，可设置或覆盖每周重复的开放时段；仅选择地点不会修改或筛选日历。</li>
+                      <li>「设为不可预约」是独立的时间设置，拖选后移除对应开放时段，已有预约保持不变。</li>
+                      <li>拖选回缩时恢复本次拖动前的安排；按 Esc 可取消本次拖选。</li>
+                      <li>深色描边表示未保存的修改；保存前可用 Ctrl / ⌘ + Z 撤销上一步。</li>
+                      <li>商议中的特殊请求不会占用或锁定时段。</li>
+                    </ul>
+                  </details>
                 </div>
-                <section class="form-panel">
+                <div id="dragCalendar" class="drag-calendar coach-week-calendar" aria-label="拖选可预约时间日历"></div>
+
+                <section class="coach-availability-rules" aria-labelledby="coachAvailabilityRulesTitle">
                   <div>
-                    <p class="eyebrow">预约规则设置</p>
-                    <h3>确认模式、提前时间与切换时间</h3>
+                    <h4 id="coachAvailabilityRulesTitle">预约规则设置</h4>
+                    <p class="coach-filter-note">确认方式、预约提前时间及跨冰场切换时间。</p>
                   </div>
                   <div class="two-column">
                     <label>
-                      预约确认模式 / manual confirmation
+                      预约确认模式
                       <select id="coachConfirmationMode">
                         <option value="instant">自动确认</option>
                         <option value="manual">需要教练手动确认</option>
                       </select>
                     </label>
                     <label>
-                      最短预约提前时间 / lead time cutoff
+                      最短预约提前时间
                       <select id="minimumLeadTime">
                         <option value="120">提前 2 小时</option>
                         <option value="240">提前 4 小时</option>
@@ -349,7 +368,7 @@
                   </div>
                   <div class="two-column">
                     <label>
-                      固定跨冰场切换时间 / travel buffer
+                      固定跨冰场切换时间（分钟）
                       <input id="defaultTravelBuffer" type="number" min="0" step="5" value="30" />
                     </label>
                     <label>
@@ -358,28 +377,17 @@
                     </label>
                   </div>
                   <label>
-                    按冰场组合与方向设置时间 / directional travel buffers
+                    按冰场组合与方向设置时间（分钟）
                     <textarea id="directionalTravelBuffers" rows="3">Polar Ice Rink → Arcadia Ice Arena: 30
 Arcadia Ice Arena → Oceanside Ice Arena: 45
 Oceanside Ice Arena → Polar Ice Rink: 40</textarea>
                   </label>
                 </section>
-                <div class="calendar-legend weekly-availability-legend" aria-label="可预约时间图例">
-                  <span><i class="legend-dot status-open-sample"></i>场馆颜色：可预约</span>
-                  <span><i class="legend-dot status-booked-sample"></i>灰色斜纹：已预约</span>
-                  <span><i class="legend-dot blocked"></i>灰色：未开放</span>
-                </div>
-                <div class="calendar-week-frame">
-                  <button id="previousCalendarWeek" class="calendar-side-arrow" type="button" aria-label="Previous week">‹</button>
-                  <div id="dragCalendar" class="drag-calendar coach-week-calendar" aria-label="拖选可预约时间日历"></div>
-                  <button id="nextCalendarWeek" class="calendar-side-arrow" type="button" aria-label="Next week">›</button>
-                </div>
               </div>
-              <div class="availability-actions">
+              <div class="availability-actions" hidden>
                 <button id="saveAvailability" class="primary-button" type="button">保存</button>
                 <span id="availabilitySaveMessage" class="save-status">没有未保存修改</span>
               </div>
-              <p id="formMessage" class="form-message" role="status"></p>
               </section>
 
             </section>
@@ -403,7 +411,12 @@ Oceanside Ice Arena → Polar Ice Rink: 40</textarea>
                 </div>
               </div>
 
+              <div class="coach-booking-controls">
               <div class="coach-booking-filter-row">
+                <div class="method-switch liquid-switch booking-period-switch" role="group" aria-label="预约列表分类">
+                  <button class="method-button coach-booking-period active" type="button" data-coach-booking-period="upcoming" aria-pressed="true">即将上课</button>
+                  <button class="method-button coach-booking-period" type="button" data-coach-booking-period="past" aria-pressed="false">历史预约</button>
+                </div>
                 <div id="coachScheduleStudentFilterMount">
                 <div id="coachBookingStudentPicker" class="coach-student-picker">
                   <span id="coachBookingStudentLabel" class="coach-booking-filter-label">查看学生</span>
@@ -422,14 +435,14 @@ Oceanside Ice Arena → Polar Ice Rink: 40</textarea>
                       <button type="button" data-student-action="clear-draft">清空选择</button>
                     </div>
                     <div id="coachBookingStudentOptions" class="coach-student-options" role="listbox" aria-multiselectable="true"></div>
-                    <div class="coach-student-panel-footer">
+                    <div class="coach-student-panel-footer" aria-label="学生筛选操作">
                       <div class="coach-student-selection-meta">
-                        <span id="coachBookingStudentDraftCount">已选0位</span>
-                        <span id="coachBookingStudentValidation" class="coach-student-selection-hint" hidden>选择学生后应用</span>
+                        <span id="coachBookingStudentDraftCount" aria-live="polite">已选 0 位学生</span>
+                        <span id="coachBookingStudentValidation" class="coach-student-selection-hint" hidden>请选择至少一位学生</span>
                       </div>
-                      <div>
+                      <div class="coach-student-panel-actions">
                         <button type="button" class="ghost-button" data-student-action="cancel">取消</button>
-                        <button type="button" class="primary-button" data-student-action="apply">应用</button>
+                        <button type="button" class="primary-button" data-student-action="apply" aria-describedby="coachBookingStudentValidation">应用筛选</button>
                       </div>
                     </div>
                   </div>
@@ -476,6 +489,7 @@ Oceanside Ice Arena → Polar Ice Rink: 40</textarea>
                   <button id="openBlockDialog" class="danger-button" type="button">＋ 不可预约时间</button>
                 </div>
               </div>
+              </div>
 
               <section id="bookingCalendarSection" class="booking-section active" data-booking-content="bookingCalendarSection">
                 <div id="exceptionCalendarPanel" class="exception-method-panel" data-exception-method-panel="exceptionCalendarPanel">
@@ -485,16 +499,16 @@ Oceanside Ice Arena → Polar Ice Rink: 40</textarea>
               </section>
 
               <section id="bookingListSection" class="booking-section" data-booking-content="bookingListSection">
-                <div class="coach-booking-list-toolbar">
-                  <div class="method-switch liquid-switch booking-period-switch" role="group" aria-label="预约列表分类">
-                    <button class="method-button coach-booking-period active" type="button" data-coach-booking-period="upcoming" aria-pressed="true">即将上课</button>
-                    <button class="method-button coach-booking-period" type="button" data-coach-booking-period="past" aria-pressed="false">历史预约</button>
+                <div class="coach-booking-list-results">
+                  <div class="coach-booking-list-filter">
+                    <div id="coachListStudentFilterMount"></div>
+                    <p id="coachBookingListSummary" class="coach-filter-note" role="status"></p>
                   </div>
-                  <p id="coachBookingListSummary" class="coach-filter-note" role="status"></p>
+                  <p id="coachBookingListSort" class="coach-filter-note"></p>
                 </div>
                 <div id="coachAppointmentsListContent" class="coach-appointments-list-content">
                   <section id="coachAppointmentRecords" class="coach-history-group" aria-labelledby="coachAppointmentRecordsHeading">
-                    <h4 id="coachAppointmentRecordsHeading" hidden>课程记录</h4>
+                    <h4 id="coachAppointmentRecordsHeading" class="visually-hidden" hidden>课程记录</h4>
                     <div id="coachSlots" class="slot-list" aria-live="polite"></div>
                   </section>
                 </div>
@@ -503,17 +517,21 @@ Oceanside Ice Arena → Polar Ice Rink: 40</textarea>
               <section id="coachRequestWorkspace" class="coach-request-workspace" aria-label="特殊请求" hidden>
                 <div class="coach-request-workspace-body">
                   <aside class="coach-request-master" aria-label="商议记录">
+                    <div id="coachRequestScopeHeading" class="coach-request-scope-heading">
+                      <div class="coach-request-scope-label"><h5 id="coachRequestScopeTitle">当前请求</h5><span id="coachRequestScopeCount" class="coach-request-scope-count">0</span></div>
+                      <button id="coachRequestHistoryTrigger" class="coach-request-text-action coach-request-history-link" type="button" data-request-filter="history" aria-pressed="false"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4.3 8.2A8 8 0 1 1 4 15M3 3.5v5.2h5.2M12 7.5V12l3 2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg><span>历史请求 →</span></button>
+                      <button id="coachRequestReturnCurrent" class="coach-request-text-action" type="button" hidden>← 返回当前请求</button>
+                    </div>
                     <div id="coachRequestStudentFilterMount" class="coach-request-student-filter-mount"></div>
-                    <div class="coach-request-filters" role="group" aria-label="筛选商议记录">
-                      <button class="coach-request-filter active" type="button" data-request-filter="all" aria-pressed="true">全部</button>
-                      <button class="coach-request-filter" type="button" data-request-filter="coach" aria-pressed="false">等我回应 <span id="coachRequestFilterBadge" class="coach-pending-badge" hidden></span></button>
-                      <button class="coach-request-filter" type="button" data-request-filter="student" aria-pressed="false">等待对方</button>
+                    <div id="coachRequestCurrentFilters" class="coach-request-filters" role="group" aria-label="筛选商议记录">
+                      <button class="coach-request-filter active" type="button" data-request-filter="all" aria-pressed="true">全部 <span id="coachRequestAllCount" class="coach-request-count">0</span></button>
+                      <button class="coach-request-filter" type="button" data-request-filter="coach" aria-pressed="false">等我回应 <span id="coachRequestFilterBadge" class="coach-request-count">0</span></button>
+                      <button class="coach-request-filter" type="button" data-request-filter="student" aria-pressed="false">等待对方 <span id="coachRequestStudentCount" class="coach-request-count">0</span></button>
                     </div>
                     <div id="coachRequestRecords" class="coach-request-record-list" aria-live="polite"></div>
-                    <button class="coach-request-history-trigger coach-request-filter" type="button" data-request-filter="history" aria-pressed="false">查看请求历史</button>
                   </aside>
 
-                  <form id="coachRequestForm" class="coach-request-detail" aria-labelledby="coachRequestDialogTitle">
+                  <form id="coachRequestForm" class="coach-request-detail" aria-labelledby="coachRequestDialogTitle" aria-describedby="coachRequestType">
                     <input id="coachRequestId" type="hidden" />
                     <div id="coachRequestEmpty" class="empty-state coach-request-empty">
                       <strong>暂无商议记录</strong>
@@ -523,6 +541,7 @@ Oceanside Ice Arena → Polar Ice Rink: 40</textarea>
                       <div class="coach-request-detail-heading">
                         <div class="coach-request-title-line">
                           <h4 id="coachRequestDialogTitle">商议详情</h4>
+                          <span id="coachRequestType" class="coach-request-type"></span>
                           <span id="coachRequestStatus" class="coach-request-status-pill"></span>
                         </div>
                         <span id="coachRequestActionLabel" class="coach-request-action-label"></span>
@@ -613,29 +632,30 @@ Oceanside Ice Arena → Polar Ice Rink: 40</textarea>
       </form>
     </dialog>
 
-    <dialog id="blockDialog" class="booking-dialog">
-      <form id="blockDialogForm" method="dialog">
+    <dialog id="blockDialog" class="booking-dialog" aria-labelledby="blockDialogTitle">
+      <form id="blockDialogForm" method="dialog" novalidate>
         <div class="dialog-heading">
           <div>
             <p class="eyebrow">课表日历</p>
-            <h3>添加不可预约时间</h3>
+            <h3 id="blockDialogTitle">添加不可预约时间</h3>
           </div>
           <button class="icon-button" type="button" id="closeBlockDialog" aria-label="关闭">×</button>
         </div>
-        <div class="two-column">
-          <label>
-            日期
-            <input id="blockDialogDate" type="date" required />
-          </label>
+        <label>
+          日期
+          <input id="blockDialogDate" type="date" required autofocus aria-describedby="blockDialogDateMessage" />
+          <span id="blockDialogDateMessage" class="dialog-field-message" role="alert" hidden></span>
+        </label>
+        <div class="two-column block-time-range">
           <label>
             开始时间
-            <select id="blockDialogStart" required></select>
+            <select id="blockDialogStart" required aria-describedby="blockDialogMessage"></select>
+          </label>
+          <label>
+            结束时间
+            <select id="blockDialogEnd" required aria-describedby="blockDialogMessage"></select>
           </label>
         </div>
-        <label>
-          结束时间
-          <select id="blockDialogEnd" required></select>
-        </label>
         <p id="blockDialogMessage" class="dialog-field-message" role="alert" hidden></p>
         <label class="checkbox-row">
           <input id="blockRepeatWeekly" type="checkbox" />
@@ -643,27 +663,27 @@ Oceanside Ice Arena → Polar Ice Rink: 40</textarea>
         </label>
         <div class="dialog-actions">
           <button class="ghost-button" type="button" id="cancelBlockDialog">取消</button>
-          <button class="danger-button" type="submit">确认添加</button>
+          <button class="primary-button" type="submit">添加不可预约时间</button>
         </div>
       </form>
     </dialog>
 
-    <dialog id="conflictDialog" class="booking-dialog" data-conflict-dialog>
+    <dialog id="conflictDialog" class="booking-dialog" data-conflict-dialog aria-labelledby="conflictDialogTitle">
       <form method="dialog">
         <div class="dialog-heading">
           <div>
-            <p class="eyebrow">可用时间冲突</p>
-            <h3>确认覆盖重叠时段</h3>
+            <p class="eyebrow">开放时间冲突</p>
+            <h3 id="conflictDialogTitle">确认覆盖重叠时段</h3>
           </div>
         </div>
         <p id="conflictDetails" class="dialog-note">新时段与其他冰场已有开放时间重叠。</p>
         <div class="dialog-actions">
-          <button class="ghost-button" type="button" id="cancelConflictOverride">Cancel</button>
-          <button class="danger-button" type="button" id="confirmConflictOverride">Override</button>
+          <button class="ghost-button" type="button" id="cancelConflictOverride" autofocus>取消</button>
+          <button class="primary-button" type="button" id="confirmConflictOverride">覆盖并添加</button>
         </div>
       </form>
     </dialog>
 
-    <script type="module" src="../js/coach-entry.js?v=coach-floating-actions-3"></script>
+    <script type="module" src="../js/coach-entry.js?v=coach-availability-paint-20"></script>
   </body>
 </html>

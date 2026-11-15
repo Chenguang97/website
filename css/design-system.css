@@ -180,8 +180,8 @@ input::file-selector-button { padding: 6px 12px; margin-right: 10px; border: 0; 
 .stat-grid div { background: #ffffff80; border: 1px solid var(--line); border-radius: var(--radius-panel); padding: 12px; }
 .stat-grid strong { color: var(--brand); }
 .stat-grid span { color: var(--muted); }
-.coach-page-nav, .page-back-nav { display: flex; margin-bottom: 8px; padding: 0; background: transparent; border: 0; }
-.coach-page-nav .role-home-link, .page-back-nav .role-home-link { display: inline-flex; align-items: center; min-height: 44px; color: var(--muted); }
+.page-back-nav { display: flex; margin-bottom: 8px; padding: 0; background: transparent; border: 0; }
+.page-back-nav .role-home-link { display: inline-flex; align-items: center; min-height: 44px; color: var(--muted); }
 :where(.section-header, .panel-heading, .dialog-heading, .student-calendar-header, .student-day-availability-heading) { gap: 16px; align-items: center; flex-wrap: wrap; }
 .section-header { margin-bottom: 20px; }
 .section-header h2 { font-size: 28px; line-height: 1.25; }

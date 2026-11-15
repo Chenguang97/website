@@ -57,10 +57,12 @@ import { refreshOpenCoachBookingRequest, renderCoachBookingRequests } from "./bo
 import { storageGetItem } from "../core/storage-adapter.js";
 import { nextWeekdayIso, startOfWeekIso } from "../core/utils-data.js";
 import { initializeInputModality } from "../ui/input-modality.js";
+import { saveCoachHeaderChanges } from "./header-actions.js";
 
 const elements = { ...coachElements, ...bookingDialogElements };
 
 function bindCoachEvents() {
+  elements.saveProfileChanges.addEventListener("click", saveCoachHeaderChanges);
   elements.coachTabs.forEach((button) => button.addEventListener("click", switchCoachPanel));
   elements.methodButtons.forEach((button) => button.addEventListener("click", switchMethod));
   elements.availabilitySubtabs.forEach((button) => button.addEventListener("click", switchAvailabilitySection));
@@ -163,7 +165,7 @@ function bindCoachEvents() {
   elements.removeBookingDetails.addEventListener("click", removeCoachBookingFromDetails);
   document.addEventListener("keydown", handleCoachUndoKeydown);
   window.addEventListener("beforeunload", (event) => {
-    if (!state.hasUnsavedProfileChanges) return;
+    if (!state.hasUnsavedProfileChanges && !state.hasUnsavedAvailabilityChanges) return;
     event.preventDefault();
     event.returnValue = "";
   });

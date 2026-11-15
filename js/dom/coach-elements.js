@@ -28,6 +28,7 @@ export const coachElements = selectElements({
   customSpecialtyEditor: "#customSpecialtyEditor", customSpecialtyInput: "#customSpecialtyInput", addCustomSpecialty: "#addCustomSpecialty",
   cancelCustomSpecialty: "#cancelCustomSpecialty", customSpecialtyMessage: "#customSpecialtyMessage", saveProfileChanges: "#saveProfileChanges",
   profileSaveStatus: "#profileSaveStatus", profilePreviewNote: "#profilePreviewNote", previewCoachProfile: "#previewCoachProfile",
+  coachSaveToolbar: "#coachSaveToolbar", coachSaveLabel: "#coachSaveLabel", coachSaveError: "#coachSaveError",
   lessonOptionsList: "#lessonOptionsList", openLessonOptionEditor: "#openLessonOptionEditor", lessonOptionEditor: "#lessonOptionEditor",
   lessonName: "#lessonName", lessonDuration: "#lessonDuration", lessonPrice: "#lessonPrice", lessonNameError: "#lessonNameError",
   lessonDurationError: "#lessonDurationError", lessonPriceError: "#lessonPriceError", addLessonOption: "#addLessonOption",

@@ -178,11 +178,11 @@ async function testCoachPage() {
 
   assertNoRuntimeErrors("coach/index.html", errors);
   assert(document.querySelector(".view.active")?.id === "coachView", "Coach page did not open on the coach view.");
-  assert(document.querySelector('.role-page-nav a[href="../index.html"]')?.textContent.includes("返回首页"), "Coach page home navigation is missing.");
+  assert(document.querySelector('.coach-global-home[href="../index.html"]')?.textContent === "首页" && !document.querySelector(".coach-header-identity a"), "Home must have an independent global entry outside the title row.");
   assert(document.querySelector("#coachHeading")?.textContent === "教练工作台", "Coach workspace title did not use the page-wide meaning.");
   assert(!document.body.textContent.includes("更新学生在预约页面看到的信息"), "The profile-only subtitle remained on the coach workspace.");
   const workspaceContainer = document.querySelector(".coach-workspace-container");
-  assert(workspaceContainer?.contains(document.querySelector(".coach-page-nav")) && workspaceContainer.contains(document.querySelector("#coachView")), "Coach navigation and panels must share one content container.");
+  assert(document.querySelector(".coach-global-home")?.parentElement === workspaceContainer && workspaceContainer.contains(document.querySelector("#coachView")), "The home entry must anchor to the common frame outside the content view.");
 
   document.querySelector('[data-coach-panel="bookingsPanel"]').click();
   assert(
@@ -217,6 +217,11 @@ async function testCoachPage() {
   );
   assert(document.querySelectorAll("#calendarRinkOptions .rink-option").length > 0, "Rink options did not render.");
   assert(document.querySelectorAll("#dragCalendar .calendar-cell").length > 0, "Availability calendar did not render cells.");
+  for (const panel of ["profilePanel", "bookingsPanel", "availabilityPanel", "bookingsPanel"]) {
+    document.querySelector(`[data-coach-panel="${panel}"]`).click();
+    assert(document.querySelector("#saveProfileChanges").disabled && document.querySelector("#coachSaveToolbar").hidden === (panel === "bookingsPanel") && document.querySelector(".header-actions").children.length === 1, "The clean editing tabs must show the floating save area; booking management must show only its pending reminder in the header.");
+  }
+  dom.window.close();
 }
 
 async function testBlockedTimeDialogFlow() {
@@ -231,7 +236,7 @@ async function testBlockedTimeDialogFlow() {
   const form = document.querySelector("#blockDialogForm");
   const currentWeek = dom.window.startOfWeekIso(dom.window.todayIso());
   document.querySelector("#exceptionCalendarWeekStart").value = currentWeek;
-  assert(dom.window.getComputedStyle(document.querySelector("#saveProfileChanges")).visibility === "hidden" && dom.window.getComputedStyle(document.querySelector("#profileSaveStatus").parentElement).visibility === "hidden", "Appointment management must hide profile-only actions while preserving their header space.");
+  assert(document.querySelector("#coachSaveToolbar").hidden, "Clean booking management must not display an inactive save area.");
   assert(document.querySelector("#blockRepeatWeekly").parentElement.textContent.includes("每周重复") && document.querySelector("#cancelBlockDialog").textContent === "取消" && form.querySelector('button[type="submit"]').textContent === "确认添加", "Blocked-time dialog actions must use consistent Chinese labels.");
   openButton.click();
   assert(document.querySelector("#blockDialogDate").value === dom.window.todayIso(), "Opening blocked-time setup for the current week must default to today.");
@@ -270,7 +275,9 @@ async function testBlockedTimeDialogFlow() {
   assert(document.querySelector('#exceptionDragCalendar [data-day-index="6"][data-minutes="840"]').classList.contains("is-editing"), "New blocked time must appear immediately as an unsaved calendar edit.");
   assert(document.querySelector("#coachBookingActionStatus").textContent.includes("开放时间") && !document.querySelector("#coachBookingActionStatus").hidden, "Appointment view must explain where the blocked-time draft is saved.");
 
-  document.querySelector("#saveAvailability").click();
+  assert(!document.querySelector("#saveProfileChanges").disabled && !document.querySelector("#coachSaveToolbar").hidden, "Unsaved blocked time must reveal and enable the existing shared save action.");
+  document.querySelector("#saveProfileChanges").click();
+  assert(document.querySelector("#saveProfileChanges").disabled && document.querySelector("#profileSaveStatus").textContent === "已保存", "The header save must commit the scheduling draft and return to its saved state.");
   const savedStorage = dumpLocalStorage(dom.window);
   const savedSlots = savedStorage["ice-skating-coach-booking-slots-v12"];
   assert(document.querySelector("#availabilitySaveMessage").textContent.includes("已保存"), "Blocked-time draft must use the existing availability save action.");
@@ -428,7 +435,7 @@ async function testDesktopPageContracts() {
     assert(document.querySelector(shellSelector), `${fileName} lost its desktop application shell.`);
     assert(document.querySelector(".view.active")?.id === activeView, `${fileName} opened the wrong role view.`);
     foreignViews.forEach((viewId) => assert(!document.getElementById(viewId), `${fileName} still contains the foreign ${viewId} DOM.`));
-    assert(document.querySelector('.role-page-nav a[href="../index.html"]'), `${fileName} lost its home navigation.`);
+    assert(document.querySelector('.role-home-link[href="../index.html"]'), `${fileName} lost its home navigation.`);
     assert(!document.documentElement.classList.contains("is-mobile"), `${fileName} unexpectedly entered a mobile-only layout.`);
     dom.window.close();
   }
@@ -486,7 +493,8 @@ async function testCoachProfileDraftAndSave() {
 
   assertNoRuntimeErrors("coach profile draft setup", errors);
   assert(doc.querySelectorAll("#saveProfileChanges").length === 1, "Coach profile must have exactly one save button.");
-  assert(doc.querySelector(".coach-action-bar .header-actions #saveProfileChanges")?.getAttribute("form") === "coachProfileForm", "The sticky header save button must submit the full profile form.");
+  assert(doc.querySelector("#coachSaveToolbar #saveProfileChanges")?.type === "button" && !doc.querySelector(".coach-action-bar #saveProfileChanges"), "Editing actions must live in the floating area and retain their save dispatch.");
+  assert(doc.querySelector("#profileSaveStatus").parentElement.nextElementSibling.id === "previewCoachProfile" && doc.querySelector("#previewCoachProfile").nextElementSibling.id === "saveProfileChanges", "The fixed-width status must sit before preview and save.");
   const previewProfileButton = doc.querySelector("#previewCoachProfile");
   const saveProfileButton = doc.querySelector("#saveProfileChanges");
   const pendingButton = doc.querySelector("#coachPendingTrigger");
@@ -495,7 +503,7 @@ async function testCoachProfileDraftAndSave() {
   const pendingButtonStyle = win.getComputedStyle(pendingButton);
   assert(previewProfileButton.classList.contains("coach-header-action") && saveProfileButton.classList.contains("coach-header-action"), "Coach preview and save actions must reuse the shared header button geometry.");
   assert(["height", "minHeight", "borderRadius", "fontSize", "fontWeight", "lineHeight", "paddingLeft", "paddingRight"].every((property) => previewProfileButtonStyle[property] === saveProfileButtonStyle[property]), "Coach preview and save actions must have matching dimensions, typography and horizontal padding.");
-  assert(["height", "minHeight", "minWidth", "borderRadius", "fontSize", "fontWeight", "lineHeight", "paddingLeft", "paddingRight"].every((property) => pendingButtonStyle[property] === previewProfileButtonStyle[property]), "Pending, preview and save must share one header action geometry.");
+  assert(pendingButton.querySelector("svg") && !pendingButton.closest("#coachSaveToolbar"), "The pending reminder must retain its inbox icon and independent header placement.");
   assert(previewProfileButton.classList.contains("ghost-button") && saveProfileButton.classList.contains("primary-button"), "Coach header actions must retain secondary preview and primary save hierarchy.");
   assert(doc.querySelectorAll(".coach-action-bar").length === 1 && doc.querySelector("#profileSaveStatus").textContent.trim() === "已保存", "The coach page must expose one initialized sticky action bar.");
   assert(doc.querySelector("#previewCoachProfile").target === "_blank" && doc.querySelector("#previewCoachProfile").getAttribute("aria-describedby") === "profilePreviewNote", "Profile preview must preserve the draft tab and describe saved-content behavior.");
@@ -625,7 +633,7 @@ async function testCoachProfileDraftAndSave() {
   doc.querySelector("#coachBio").value = "这段介绍应被放弃。";
   doc.querySelector("#coachBio").dispatchEvent(new win.Event("input", { bubbles: true }));
   doc.querySelector('#coachTeachingDisciplines input[value="pairs"]').click();
-  assert(doc.querySelector("#profileSaveStatus").textContent.trim() === "有未保存的更改" && !doc.querySelector("#profilePreviewNote").hidden, "Editing the profile did not update the sticky unsaved state or preview note.");
+  assert(doc.querySelector("#profileSaveStatus").textContent.trim() === "未保存更改" && doc.querySelector("#profilePreviewNote").textContent.includes("仅显示已保存版本"), "Editing must show its pending state and explicitly explain the saved-version preview.");
   const beforeUnload = new win.Event("beforeunload", { cancelable: true });
   win.dispatchEvent(beforeUnload);
   assert(beforeUnload.defaultPrevented, "Leaving with an unsaved profile did not trigger the beforeunload guard.");
@@ -648,7 +656,7 @@ async function testCoachProfileDraftAndSave() {
   doc.querySelector('[data-coach-panel="profilePanel"]').click();
   const rinkInputs = [...doc.querySelectorAll('input[name="servedRinks"]')];
   rinkInputs.forEach((input) => { input.checked = false; });
-  doc.querySelector("#saveProfileChanges").click();
+  submit(doc.querySelector("#coachProfileForm"));
   assert(doc.querySelector("#profileMessage").textContent.includes("至少选择一个"), "The unified save lost the teaching-rink validation.");
   assert(JSON.stringify(win.getSavedProfile("maya")) === JSON.stringify(originalProfile), "Invalid profile data was saved.");
   rinkInputs.forEach((input) => { input.checked = originalProfile.servedRinks.includes(input.value); });
@@ -754,7 +762,7 @@ async function testCoachProfileDraftAndSave() {
   assert(win.getProfile("maya").travelsToOtherRinks && win.getProfile("maya").travelConditions === "限市区范围，交通费用另议。", "The unified profile save did not retain negotiable travel conditions.");
   assert(!win.hasUnsavedProfileChanges, "Saving the profile did not clear the dirty state.");
   assert(doc.querySelector("#profileMessage").textContent.trim() === "已保存" && doc.querySelector("#profileSaveStatus").textContent.trim() === "已保存", "The unified profile save did not show success feedback in both status locations.");
-  assert(!doc.querySelector("#saveProfileChanges").disabled && !doc.querySelector("#saveProfileChanges").hasAttribute("aria-busy"), "The profile save action remained busy after completion.");
+  assert(doc.querySelector("#saveProfileChanges").disabled && !doc.querySelector("#saveProfileChanges").hasAttribute("aria-busy"), "Successful saving must disable the clean save action and clear its busy state.");
   assert(JSON.parse(win.localStorage.getItem("ice-skating-coach-profiles-v2")).maya.rate === newRate, "Saved profile data was not persisted.");
   const savedStorage = dumpLocalStorage(win);
   win.Image = NativeImage;
@@ -832,7 +840,7 @@ async function testLessonDeletionDraftAndSave() {
   assert(!win.getProfile("maya").lessonOptions.some((lesson) => lesson.id === savedLesson.id), "Deleting a lesson did not remove it immediately from the profile draft.");
   assert(win.getSavedProfile("maya").lessonOptions.some((lesson) => lesson.id === savedLesson.id), "Deleting a lesson persisted before the unified save.");
   assert(doc.querySelector("#profileMessage").textContent.trim() === "已移除课程，保存后生效" && !doc.querySelector("#undoProfileChange").hidden, "Draft deletion did not expose the required pending-save feedback and undo action.");
-  assert(doc.querySelector("#profileSaveStatus").textContent.trim() === "有未保存的更改", "Draft deletion did not update the sticky unsaved state.");
+  assert(doc.querySelector("#profileSaveStatus").textContent.trim() === "未保存更改", "Draft deletion did not update the floating unsaved state.");
 
   doc.querySelector("#undoProfileChange").click();
   assert(JSON.stringify(win.getProfile("maya").lessonOptions[savedIndex]) === JSON.stringify(savedLesson), "Undo did not restore the removed lesson content and original position.");
@@ -873,9 +881,12 @@ async function testProfileSaveFailureKeepsDraft() {
   assert(win.getSavedProfile("maya").bio === originalBio, "A failed save changed the saved profile.");
   assert(win.getProfile("maya").bio === "保存失败时必须保留的草稿" && win.hasUnsavedProfileChanges, "A failed save discarded the profile draft or dirty state.");
   assert(doc.querySelector("#profileSaveStatus").textContent.trim() === "保存失败" && doc.querySelector("#profileMessage").textContent.includes("存储"), "A failed save did not explain the storage failure.");
+  assert(!doc.querySelector("#coachSaveError").hidden && doc.querySelector("#coachSaveError").textContent.includes("存储"), "The floating save area must explain a failed save beside the retry action.");
   assert(!doc.querySelector("#saveProfileChanges").disabled && !doc.querySelector("#saveProfileChanges").hasAttribute("aria-busy"), "The save action remained locked after failure.");
 
   win.localStorage.setItem = nativeSetItem;
+  doc.querySelector("#saveProfileChanges").click();
+  assert(win.getSavedProfile("maya").bio === "保存失败时必须保留的草稿" && doc.querySelector("#saveProfileChanges").disabled && doc.querySelector("#coachSaveError").hidden && doc.querySelector("#profileSaveStatus").textContent === "已保存", "Retrying from the floating action area must save the retained profile draft and clear its error.");
   assertNoRuntimeErrors("profile save failure", errors);
   dom.window.close();
 }
@@ -940,8 +951,21 @@ async function testRecurringAvailabilityAcceptance() {
   assert(createdSlots.length === 2, "Recurring availability create did not add the selected date slots.");
   assert(repeatedSlots.length === 2, "Recurring availability create did not repeat on the following week.");
   assert(document.querySelector("#availabilitySaveMessage").textContent.includes("未保存"), "Create should mark availability as unsaved.");
-
-  document.querySelector("#saveAvailability").click();
+  assert(!document.querySelector("#saveProfileChanges").disabled && document.querySelector("#profileSaveStatus").dataset.tone === "dirty", "Availability edits must enable the header save action and show its dirty state.");
+  const scheduleBeforeUnload = new coachPage.dom.window.Event("beforeunload", { cancelable: true });
+  coachPage.dom.window.dispatchEvent(scheduleBeforeUnload);
+  assert(scheduleBeforeUnload.defaultPrevented, "Leaving via the home link must retain unsaved scheduling protection.");
+  const originalScheduleStorage = coachPage.dom.window.localStorage.setItem;
+  let sawScheduleBusy = false;
+  coachPage.dom.window.localStorage.setItem = () => {
+    sawScheduleBusy ||= document.querySelector("#saveProfileChanges").disabled && document.querySelector("#saveProfileChanges").getAttribute("aria-busy") === "true" && document.querySelector("#coachSaveLabel").textContent === "保存中…";
+    throw new coachPage.dom.window.DOMException("Storage unavailable", "QuotaExceededError");
+  };
+  document.querySelector("#saveProfileChanges").click();
+  assert(sawScheduleBusy && !document.querySelector("#saveProfileChanges").disabled && document.querySelector("#profileSaveStatus").textContent === "保存失败" && !document.querySelector("#coachSaveError").hidden && document.querySelector("#availabilitySaveMessage").textContent.includes("未保存"), `A failed schedule save must expose busy feedback, retain edits, and allow retry beside its reason: ${JSON.stringify({busy: sawScheduleBusy, disabled: document.querySelector("#saveProfileChanges").disabled, status: document.querySelector("#profileSaveStatus").textContent, error: document.querySelector("#coachSaveError").textContent, hidden: document.querySelector("#coachSaveError").hidden, availability: document.querySelector("#availabilitySaveMessage").textContent})}`);
+  coachPage.dom.window.localStorage.setItem = originalScheduleStorage;
+  document.querySelector("#saveProfileChanges").click();
+  assert(document.querySelector("#saveProfileChanges").disabled && document.querySelector("#profileSaveStatus").textContent === "已保存", "Header saving must commit availability through the existing save behavior.");
   assert(document.querySelector("#availabilitySaveMessage").textContent.includes("已保存"), "Save button did not save availability changes.");
 
   const savedAfterCreate = dumpLocalStorage(coachPage.dom.window);
@@ -1386,7 +1410,7 @@ async function testCoachScheduleFilters() {
   assert(doc.querySelector(".bookings-panel").dataset.bookingView === "list" && win.getComputedStyle(doc.querySelector(".coach-booking-date-filter")).display === "none" && win.getComputedStyle(doc.querySelector("#toggleExceptionCalendarHours")).display === "none", "List view must hide week navigation and calendar-only display settings.");
   assert(!doc.querySelector("#bookingCalendarSection").classList.contains("active") && doc.querySelector("#bookingListSection").classList.contains("active") && doc.querySelector("#scheduleLegend").closest(".booking-section") === doc.querySelector("#bookingCalendarSection"), "List view must hide the calendar and its dedicated legend while keeping the list active.");
   assert(doc.querySelector("#coachBookingListSummary").textContent === "Ada · 即将上课 2 条 · 时间由近到远" && !doc.querySelector("#coachBookingListSummary").textContent.includes("本周"), `List summary must match the upcoming cross-week range: ${doc.querySelector("#coachBookingListSummary").textContent}`);
-  assert(win.getComputedStyle(pickerTrigger).display !== "none" && win.getComputedStyle(doc.querySelector("#saveProfileChanges")).visibility === "hidden", "List view must retain student filtering without exposing the profile save action or shifting header actions.");
+  assert(win.getComputedStyle(pickerTrigger).display !== "none" && !doc.querySelector("#saveProfileChanges").hidden, "List view must retain student filtering and the common header save entry.");
   calendarTab.click();
   assert(pickerSummary.textContent === "Ada" && doc.querySelector(".bookings-panel").dataset.bookingView === "calendar" && win.getComputedStyle(doc.querySelector(".coach-booking-date-filter")).display !== "none", "Calendar/list switching must preserve the selected student and restore calendar controls.");
   const dayIndex = (win.weekdayIndex(future) + 6) % 7;
@@ -1638,6 +1662,7 @@ async function testCoachPendingRequestFlow() {
   const replied = win.bookingRequests.find((request) => request.id === "request-open");
   assert(replied.waitingFor === "student" && replied.acceptedBy.join(",") === "student" && replied.events.at(-1).message === "请确认场地是否允许外教授课。", "A saved reply must persist, hand the turn to the student, and preserve proposal acceptance.");
   assert(doc.querySelector("#coachPendingBadge").textContent === "1" && doc.querySelector("#coachRequestConversation").textContent.includes("请确认场地是否允许外教授课。"), "Replying must refresh both pending counts and the visible conversation.");
+  assert(doc.querySelector("#coachSaveToolbar").hidden && doc.querySelector("#saveProfileChanges").disabled, "An immediately saved request reply must not show a redundant save area.");
 
   doc.querySelector('#coachRequestRecords [data-request-id="request-conflict"]').click();
   assert(!doc.querySelector("#coachRequestConflict").hidden && doc.querySelector("#coachRequestConflict").textContent.includes("暂时不能接受") && doc.querySelector("#coachRequestConflict").textContent.includes("调整方案") && doc.querySelector("#acceptCoachRequest").disabled, "Occupied proposals must retain one explicit red warning and disable acceptance.");

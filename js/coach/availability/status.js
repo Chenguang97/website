@@ -1,5 +1,6 @@
 import { coachElements as elements } from "../../dom/coach-elements.js";
 import { state } from "../../core/state.js";
+import { setCoachHeaderSaveFeedback } from "../header-status.js";
 function showFormMessage(message, isError = false) {
   if (!elements.formMessage) return;
   elements.formMessage.textContent = message;
@@ -7,6 +8,7 @@ function showFormMessage(message, isError = false) {
 }
 function setAvailabilityDirty(isDirty, message) {
   state.hasUnsavedAvailabilityChanges = isDirty;
+  setCoachHeaderSaveFeedback("schedule", isDirty ? "有未保存的更改" : "已保存", isDirty ? "dirty" : "saved");
   if (!elements.availabilitySaveMessage) return;
   elements.availabilitySaveMessage.textContent = message || (isDirty ? "有未保存修改" : "没有未保存修改");
   elements.availabilitySaveMessage.style.color = isDirty ? "var(--red)" : "var(--muted)";

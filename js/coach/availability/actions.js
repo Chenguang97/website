@@ -1,4 +1,5 @@
 import { refreshAvailabilityDirty, setAvailabilityDirty, showFormMessage } from "./status.js";
+import { isCoachScheduleSaving, setCoachHeaderSaveFeedback, setCoachScheduleSaving } from "../header-status.js";
 import {
   calendarStep,
   currentCoachId,
@@ -373,20 +374,28 @@ function removeRecurringAvailabilityRange(coachId, date, startMinutes, endMinute
 }
 
 export function saveAvailabilityChanges() {
-  if (!saveSlots()) {
-    showFormMessage(getLastStorageRecoveryMessage() || "保存失败。请清理浏览器存储后再试，当前草稿已保留。", true);
-    return;
+  if (isCoachScheduleSaving()) return;
+  setCoachScheduleSaving(true);
+  try {
+    if (!saveSlots()) {
+      const reason = getLastStorageRecoveryMessage() || "保存失败。请清理浏览器存储后再试，当前草稿已保留。";
+      setCoachHeaderSaveFeedback("schedule", "保存失败", "error", reason);
+      showFormMessage(reason, true);
+      return;
+    }
+    state.unsavedAddedSlotIds.clear();
+    state.unsavedBlockedCellKeys.clear();
+    state.unsavedRecurringCellKeys.clear();
+    state.unsavedBlockExceptionIds.clear();
+    state.pendingDeletedSlots.clear();
+    clearAvailabilityUndoHistory();
+    clearUndoHistory("booking");
+    setAvailabilityDirty(false, "已保存");
+    showFormMessage(getLastStorageRecoveryMessage() || "可预约时间已保存。");
+    renderAvailabilityChanges();
+  } finally {
+    setCoachScheduleSaving(false);
   }
-  state.unsavedAddedSlotIds.clear();
-  state.unsavedBlockedCellKeys.clear();
-  state.unsavedRecurringCellKeys.clear();
-  state.unsavedBlockExceptionIds.clear();
-  state.pendingDeletedSlots.clear();
-  clearAvailabilityUndoHistory();
-  clearUndoHistory("booking");
-  setAvailabilityDirty(false, "已保存");
-  showFormMessage(getLastStorageRecoveryMessage() || "可预约时间已保存。");
-  renderAvailabilityChanges();
 }
 
 export function handleAvailabilitySlotAction(event) {

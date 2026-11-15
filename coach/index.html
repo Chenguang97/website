@@ -17,38 +17,40 @@
       })();
     </script>
     <link rel="stylesheet" href="../css/base.css?v=warm-ui-1" />
-    <link rel="stylesheet" href="../css/coach-profile.css?v=stable-coach-frame-1" />
+    <link rel="stylesheet" href="../css/coach-profile.css?v=coach-floating-actions-3" />
     <link rel="stylesheet" href="../css/calendar.css?v=warm-ui-1" />
     <link rel="stylesheet" href="../css/forms-dialogs.css?v=warm-ui-1" />
     <link rel="stylesheet" href="../css/student-bookings.css?v=warm-ui-1" />
     <link rel="stylesheet" href="../css/responsive.css?v=warm-ui-1" />
-    <link rel="stylesheet" href="../css/design-system.css?v=stable-coach-frame-7" />
+    <link rel="stylesheet" href="../css/design-system.css?v=shared-coach-header-8" />
   </head>
   <body data-page="coach">
     <main class="app-shell coach-app-shell">
       <section class="workspace">
         <div class="coach-workspace-container">
-          <nav class="role-page-nav coach-page-nav" aria-label="页面导航">
-            <a class="role-home-link" href="../index.html">← 返回首页</a>
-          </nav>
-
+          <a class="role-home-link coach-global-home" href="../index.html"><svg class="coach-operation-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m3 10 9-7 9 7M5 9v11h5v-6h4v6h5V9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg><span>首页</span></a>
           <section id="coachView" class="view active" aria-labelledby="coachHeading">
             <div class="section-header coach-action-bar">
-              <h2 id="coachHeading">教练工作台</h2>
+              <div class="coach-header-identity">
+                <h2 id="coachHeading">教练工作台</h2>
+              </div>
               <div class="header-actions">
-                <div class="profile-save-state" aria-live="polite">
-                  <span id="profileSaveStatus" class="profile-save-status" data-tone="saved">已保存</span>
-                  <span id="profilePreviewNote" class="profile-preview-note" hidden>预览显示已保存内容</span>
-                </div>
                 <div class="coach-pending-menu">
                   <button id="coachPendingTrigger" class="ghost-button coach-header-action coach-pending-trigger" type="button" aria-controls="coachRequestWorkspace">
-                    待处理<span id="coachPendingBadge" class="coach-pending-badge" hidden></span>
+                    <svg class="coach-operation-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m6 4-3 9v7h18v-7l-3-9H6ZM3 13h5l2 3h4l2-3h5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg><span>待处理</span><span id="coachPendingBadge" class="coach-pending-badge" hidden></span>
                   </button>
                 </div>
-                <a id="previewCoachProfile" class="ghost-button coach-header-action" href="profile.html?coach=maya" target="_blank" rel="noopener" aria-describedby="profilePreviewNote">预览主页</a>
-                <button id="saveProfileChanges" class="primary-button coach-header-action" type="submit" form="coachProfileForm">保存更改</button>
               </div>
             </div>
+            <section id="coachSaveToolbar" class="coach-save-toolbar" aria-label="编辑操作">
+                <div class="profile-save-state" aria-live="polite">
+                  <span id="profileSaveStatus" class="profile-save-status" data-tone="saved">已保存</span>
+                </div>
+                <a id="previewCoachProfile" class="ghost-button coach-header-action" href="profile.html?coach=maya" target="_blank" rel="noopener" aria-describedby="profilePreviewNote" title="预览仅显示已保存版本"><svg class="coach-operation-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.8"/></svg><span>预览主页</span></a>
+                <button id="saveProfileChanges" class="primary-button coach-header-action" type="button" disabled><svg class="coach-operation-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 3h13l4 4v14H3V3h1ZM7 3v6h10V3M7 21v-8h10v8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg><span id="coachSaveLabel">保存更改</span></button>
+                <p id="profilePreviewNote" class="coach-save-preview-note">预览仅显示已保存版本</p>
+                <p id="coachSaveError" class="coach-save-error" role="alert" hidden></p>
+            </section>
 
           <div class="coach-tabs" role="tablist" aria-label="Coach settings">
             <button class="coach-tab active" type="button" data-coach-panel="profilePanel" aria-selected="true">基本资料</button>
@@ -662,6 +664,6 @@ Oceanside Ice Arena → Polar Ice Rink: 40</textarea>
       </form>
     </dialog>
 
-    <script type="module" src="../js/coach-entry.js?v=coach-request-focus-2"></script>
+    <script type="module" src="../js/coach-entry.js?v=coach-floating-actions-3"></script>
   </body>
 </html>

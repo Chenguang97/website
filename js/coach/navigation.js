@@ -8,6 +8,7 @@ import { activeCoachPanelStorageKey } from "../core/config.js";
 import { coachElements as elements } from "../dom/coach-elements.js";
 import { renderCalendarRinkOptions } from "./availability/render.js";
 import { storageSetItem } from "../core/storage-adapter.js";
+import { renderCoachHeaderSave } from "./header-status.js";
 
 let recordSection = "bookingCalendarSection";
 const scrollPositions = { records: 0, requests: 0 };
@@ -98,10 +99,8 @@ export function activateBookingSection(sectionId, { animate = false } = {}) {
 
 export function activateCoachPanel(panelId, shouldPersist = true) {
   const targetPanelId = [...elements.coachTabs].some((button) => button.dataset.coachPanel === panelId) ? panelId : "profilePanel";
-  const showsProfileSave = targetPanelId === "profilePanel";
   document.documentElement.dataset.activeCoachPanel = targetPanelId;
-  elements.saveProfileChanges.hidden = !showsProfileSave;
-  elements.profileSaveStatus.parentElement.hidden = !showsProfileSave;
+  renderCoachHeaderSave();
   elements.coachTabs.forEach((item) => {
     const isActive = item.dataset.coachPanel === targetPanelId;
     item.classList.toggle("active", isActive);

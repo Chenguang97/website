@@ -2,24 +2,33 @@
    changes the frame; narrower desktop windows reserve the same space on every tab. */
 html:has(body[data-page="coach"]) { overflow-y: scroll; scrollbar-gutter: stable; }
 body[data-page="coach"] .coach-workspace-container {
+  position: relative;
   width: min(100%, 1160px);
   margin-inline: auto;
 }
 body[data-page="coach"] .coach-layout > .coach-panel { width: 100%; margin: 0; }
 body[data-page="coach"] .coach-layout > .profile-panel { padding: 0; }
-body[data-page="coach"] .profile-save-state[hidden] {
-  display: grid !important;
-  visibility: hidden;
-}
-body[data-page="coach"] #saveProfileChanges[hidden] {
-  display: inline-flex !important;
-  visibility: hidden;
-  pointer-events: none;
+body[data-page="coach"] .coach-header-identity { display: flex; align-items: center; gap: 18px; flex-shrink: 0; }
+body[data-page="coach"] .coach-header-identity h2 { margin: 0; }
+body[data-page="coach"] .coach-global-home { position: absolute; top: 4px; right: calc(100% + 24px); width: 144px; display: flex; justify-content: flex-end; align-items: center; gap: 8px; padding: 0 12px; min-height: 44px; color: var(--muted); text-decoration: none; white-space: nowrap; font-size: 13px; }
+body[data-page="coach"] .coach-global-home:hover { color: var(--brand-hover); text-decoration: underline; }
+.coach-operation-icon { width: 18px; height: 18px; flex: 0 0 18px; }
+body[data-page="coach"] .coach-pending-trigger { min-width: 0; gap: 8px; }
+body[data-page="coach"] .coach-save-toolbar { position: fixed; right: 24px; bottom: 24px; z-index: 30; display: grid; grid-template-columns: 126px auto auto; align-items: center; gap: 6px 12px; width: max-content; max-width: calc(100vw - 48px); padding: 12px 14px; border: 1px solid var(--line); border-radius: 18px; background: var(--surface); box-shadow: 0 6px 24px #29271f18; }
+body[data-page="coach"] .coach-save-toolbar[hidden] { display: none; }
+body[data-page="coach"] .profile-save-state { display: grid; align-content: center; justify-items: end; width: 126px; min-width: 126px; height: 46px; padding-right: 12px; border-right: 1px solid var(--line); }
+body[data-page="coach"] .coach-save-toolbar .coach-header-action { gap: 8px; }
+.coach-save-preview-note { grid-column: 2 / -1; margin: 0; color: var(--muted); font-size: 11px; line-height: 1.5; }
+.coach-save-error { grid-column: 1 / -1; max-width: 440px; margin: 2px 0 0; color: var(--red); font-size: 12px; line-height: 1.5; }
+.coach-save-error[hidden] { display: none; }
+body[data-page="coach"] .coach-app-shell .workspace { padding-bottom: 180px; }
+@media (max-width: 1100px) {
+  body[data-page="coach"] .coach-global-home { position: static; width: max-content; margin-bottom: 20px; }
 }
 @media (min-width: 1101px) {
   body[data-page="coach"] .coach-app-shell .workspace {
     width: min(100%, 1320px);
-    padding: 20px 28px 20px clamp(28px, calc(852px - 50vw), 192px);
+    padding: 20px 28px 180px clamp(28px, calc(852px - 50vw), 192px);
   }
 }
 
@@ -486,7 +495,6 @@ body[data-page="coach"] #saveProfileChanges[hidden] {
     margin-inline: auto;
   }
 
-  .coach-page-nav,
   #coachView,
   .coach-layout,
   .coach-layout > .coach-panel {
@@ -1192,14 +1200,6 @@ body[data-page="coach"] #saveProfileChanges[hidden] {
   }
 
   /* Keep the coach editor compact without stretching short fields across the page. */
-  .coach-app-shell .coach-page-nav {
-    margin-bottom: 4px;
-  }
-
-  .coach-app-shell .coach-page-nav .role-home-link {
-    min-height: 32px;
-  }
-
   .coach-app-shell #coachView > .section-header {
     align-items: center;
     margin-bottom: 10px;

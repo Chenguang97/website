@@ -1,6 +1,5 @@
-export function showFormMessage(message, isError = false) {
-  const element = document.querySelector("#formMessage");
+export function showFormMessage(element, message, isError = false, successColor = "var(--green)") {
   if (!element) return;
   element.textContent = message;
-  element.style.color = isError ? "var(--red)" : "var(--green)";
+  element.style.color = isError ? "var(--red)" : successColor;
 }

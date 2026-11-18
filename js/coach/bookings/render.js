@@ -1,58 +1,17 @@
-import { currentCoachId } from "../../core/config.js";
-import { getAppliedCoachBookingStudentKeys, hasAppliedCoachBookingStudentFilter } from "./filter-state.js";
+import { captureCoachBookingReadModel } from "./read-model.js";
 import { renderCoachBookingStudentPicker } from "./student-picker.js";
-import { isCancelledBooking, isPastBooking, slotSort } from "../../domain/scheduling.mjs";
-import { getBookingCancellationEligibility } from "../../core/scheduling-rules.js";
 import { coachElements as elements } from "../../dom/coach-elements.js";
-import { state } from "../../core/state.js";
 import { formatLocationLabel } from "../../ui/display.js";
 import { escapeHtml } from "../../ui/safe-html.mjs";
-import { addDaysIso, minutesFromTime } from "../../core/utils-data.js";
-import { getBookingStatusLabel } from "../../ui/booking-status.js";
-import { getBookingRequestStatus } from "../../domain/booking-requests.mjs";
-import { getCoachBookingStudentKey } from "./student-identity.js";
-function coachBookingMatchesStudent(slot) {
-  const appliedKeys = getAppliedCoachBookingStudentKeys();
-  return !appliedKeys.length || appliedKeys.includes(getCoachBookingStudentKey(slot));
-}
-function getCoachBookingStudents() {
-  const students = /* @__PURE__ */ new Map();
-  for (const slot of state.slots) {
-    if (!slot.booked || slot.coachId !== currentCoachId) continue;
-    const key = getCoachBookingStudentKey(slot);
-    students.set(key, { key, id: slot.student?.id || key, name: slot.student?.name || "学生（未填写姓名）", email: slot.student?.email || "" });
-  }
-  for (const request of state.bookingRequests) {
-    if (request.coachId !== currentCoachId || !request.student) continue;
-    const key = getCoachBookingStudentKey(request);
-    students.set(key, { key, id: request.student.id || key, name: request.student.name || "学生（未填写姓名）", email: request.student.email || "" });
-  }
-  const weekStart = elements.exceptionCalendarWeekStart?.value;
-  const weekEnd = weekStart ? addDaysIso(weekStart, 7) : "";
-  return [...students.values()]
-    .map((student) => ({
-      ...student,
-      weekCount: weekStart ? state.slots.filter((slot) => slot.booked
-        && !isCancelledBooking(slot)
-        && slot.coachId === currentCoachId
-        && slot.date >= weekStart
-        && slot.date < weekEnd
-        && getCoachBookingStudentKey(slot) === student.key).length : 0,
-    }))
-    .sort((a, b) => `${a.name}${a.email}`.localeCompare(`${b.name}${b.email}`, "zh-CN"));
-}
-function renderCoachSlots() {
-  const students = getCoachBookingStudents();
-  renderCoachBookingStudentPicker(students);
-  const isHistory = state.coachBookingListPeriod === "past";
+import { minutesFromTime } from "../../core/utils-data.js";
+function renderCoachSlots(model = captureCoachBookingReadModel()) {
+  renderCoachBookingStudentPicker(model.students);
+  const isHistory = model.period === "past";
   elements.coachAppointmentsListContent.hidden = false;
   elements.coachAppointmentRecordsHeading.hidden = !isHistory;
-  const visible = state.slots.filter((slot) => slot.booked
-    && slot.coachId === currentCoachId
-    && coachBookingMatchesStudent(slot)
-    && (isCancelledBooking(slot) || isPastBooking(slot)) === isHistory).slice().sort((a, b) => (isHistory ? -1 : 1) * (slotSort(a, b) || String(a.id).localeCompare(String(b.id))));
+  const visible = model.bookings;
   elements.coachBookingPeriods.forEach((button) => {
-    const active = button.dataset.coachBookingPeriod === state.coachBookingListPeriod;
+    const active = button.dataset.coachBookingPeriod === model.period;
     button.classList.toggle("active", active);
     button.setAttribute("aria-pressed", String(active));
   });
@@ -61,18 +20,13 @@ function renderCoachSlots() {
   }
   if (elements.coachBookingListSort) elements.coachBookingListSort.textContent = isHistory ? "按上课时间从新到旧" : "按上课时间由近到远";
   if (!visible.length) {
-    elements.coachSlots.innerHTML = `<div class="empty-state coach-booking-empty"><strong>${hasAppliedCoachBookingStudentFilter() ? "所选学生暂无" : "暂无"}${isHistory ? "课程历史记录" : "即将上课的预约"}</strong><p>可切换预约列表分类，或调整上方学生筛选。列表包含所有周的预约。</p></div>`;
+    elements.coachSlots.innerHTML = `<div class="empty-state coach-booking-empty"><strong>${model.hasStudentFilter ? "所选学生暂无" : "暂无"}${isHistory ? "课程历史记录" : "即将上课的预约"}</strong><p>可切换预约列表分类，或调整上方学生筛选。列表包含所有周的预约。</p></div>`;
     return;
   }
-  const groups = visible.reduce((result, slot) => {
-    const current = result.at(-1);
-    if (current?.date === slot.date) current.slots.push(slot);
-    else result.push({ date: slot.date, slots: [slot] });
-    return result;
-  }, []);
-  elements.coachSlots.innerHTML = groups.map(renderCoachBookingDateGroup).join("");
+  elements.coachSlots.innerHTML = model.groups.map(group => renderCoachBookingDateGroup(group, model)).join("");
 }
-function renderCoachBookingDateGroup(group) {
+
+function renderCoachBookingDateGroup(group, model) {
   const text = escapeHtml;
   const day = new Date(`${group.date}T00:00:00`);
   const date = new Intl.DateTimeFormat("zh-CN", { year: "numeric", month: "long", day: "numeric" }).format(day);
@@ -80,7 +34,7 @@ function renderCoachBookingDateGroup(group) {
   return `
     <section class="coach-booking-date-group" data-booking-date="${text(group.date)}">
       <div class="coach-booking-date-heading"><time datetime="${text(group.date)}">${text(date)} · ${text(weekday)}</time><span>${group.slots.length} 节</span></div>
-      <div class="coach-booking-date-list">${group.slots.map(renderCoachBookingCard).join("")}</div>
+      <div class="coach-booking-date-list">${group.slots.map(slot => renderCoachBookingCard(slot, model)).join("")}</div>
     </section>`;
 }
 function renderBookingLocationIcon(location) {
@@ -97,13 +51,6 @@ function formatCoachBookingLesson(slot, duration) {
     || normalizedName.includes(`${duration} 分钟`);
   return includesDuration ? lessonName : `${lessonName} · ${duration} 分钟`;
 }
-function getActiveBookingChangeRequest(slot) {
-  return state.bookingRequests
-    .filter((request) => request.type === "booking-change"
-      && request.bookingId === slot.id
-      && getBookingRequestStatus(request) === "negotiating")
-    .sort((a, b) => String(b.createdAt || "").localeCompare(String(a.createdAt || "")))[0] || null;
-}
 function getBookingChangeRequestLabel(slot, request) {
   const proposal = request?.proposal || {};
   if (proposal.date !== slot.date || proposal.start !== slot.start || proposal.end !== slot.end) return "改期商议中";
@@ -111,17 +58,18 @@ function getBookingChangeRequestLabel(slot, request) {
   if (Number(proposal.price) !== Number(slot.lessonPrice)) return "价格商议中";
   return "修改商议中";
 }
-function renderCoachBookingCard(slot) {
+function renderCoachBookingCard(slot, model) {
   const text = escapeHtml;
   const student = slot.student || {};
   const duration = Number(slot.lessonDuration) || minutesFromTime(slot.end) - minutesFromTime(slot.start);
   const hasPrice = slot.lessonPrice !== null && slot.lessonPrice !== void 0 && slot.lessonPrice !== "" && Number.isFinite(Number(slot.lessonPrice));
   const price = hasPrice ? `$${Number(slot.lessonPrice).toLocaleString("en-US", { maximumFractionDigits: 2 })}` : "价格暂未提供";
-  const status = getBookingStatusLabel(slot);
-  const cancellation = getBookingCancellationEligibility(slot);
+  const facts = model.booking(slot);
+  const status = facts.status;
+  const cancellation = facts.cancellation;
   const lesson = formatCoachBookingLesson(slot, duration);
-  const changeRequest = getActiveBookingChangeRequest(slot);
-  const statusTone = isCancelledBooking(slot) ? "cancelled" : isPastBooking(slot) ? "ended" : "success";
+  const changeRequest = model.activeChange(slot.id);
+  const statusTone = facts.cancelled ? "cancelled" : facts.past ? "ended" : "success";
   return `
     <article class="coach-booking-card" data-slot-id="${text(slot.id)}">
       <div class="coach-booking-time-block">
@@ -147,25 +95,15 @@ function renderCoachBookingCard(slot) {
       </div>
     </article>`;
 }
-function renderCoachCalendarFilterSummary() {
+function renderCoachCalendarFilterSummary(model = captureCoachBookingReadModel()) {
   if (!elements.coachCalendarFilterSummary) return;
-  const weekStart = elements.exceptionCalendarWeekStart.value;
-  const weekEnd = addDaysIso(weekStart, 7);
-  const count = state.slots.filter((slot) => slot.booked && !isCancelledBooking(slot) && slot.coachId === currentCoachId && slot.date >= weekStart && slot.date < weekEnd && coachBookingMatchesStudent(slot)).length;
-  const appliedKeys = getAppliedCoachBookingStudentKeys();
-  const selectedStudents = getCoachBookingStudents().filter((student) => appliedKeys.includes(student.key));
+  const count = model.weekCount;
+  const selectedStudents = model.selectedStudents;
   const selectedLabel = selectedStudents.length === 1 ? selectedStudents[0].name : selectedStudents.length > 1 ? `${selectedStudents.length}位学生` : "全部学生";
   elements.coachCalendarFilterSummary.classList.toggle("is-empty", count === 0);
   elements.coachCalendarFilterSummary.textContent = count
     ? `正在查看${selectedLabel}的预约 · 本周 ${count} 条`
     : `正在查看${selectedLabel}的预约 · 本周暂无预约`;
-  renderCoachBookingStudentPicker(getCoachBookingStudents());
+  renderCoachBookingStudentPicker(model.students);
 }
-export {
-  coachBookingMatchesStudent,
-  getCoachBookingStudentKey,
-  getCoachBookingStudents,
-  renderCoachCalendarFilterSummary,
-  renderCoachSlots
-};
-
+export { renderCoachCalendarFilterSummary, renderCoachSlots };

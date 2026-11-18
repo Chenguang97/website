@@ -1,14 +1,17 @@
-import { animateBookingView } from "./bookings/view-motion.js?v=booking-liquid-restored-1";
-import { animateAvailabilityMethod } from "./availability/method-motion.js?v=confirmed-liquid-switch-1";
-import { animateCoachTab } from "./tab-motion.js?v=coach-top-liquid-2";
-import { closeCoachBookingFilter, renderAppliedCoachBookingStudentFilter } from "./bookings/controls.js?v=booking-liquid-restored-1";
+import { coachCanManage } from "./service-controller.js";
+import { animateBookingView } from "./bookings/view-motion.js";
+import { animateAvailabilityMethod } from "./availability/method-motion.js";
+import { animateCoachTab } from "./tab-motion.js";
+import { closeCoachBookingFilter, renderAppliedCoachBookingStudentFilter } from "./bookings/controls.js";
 import { selectCoachBookingFilterScope } from "./bookings/filter-state.js";
 import { getCoachRequestStudentScope } from "./bookings/request-state.js";
-import { confirmDiscardProfileChanges } from "./profile/actions.js";
+import { confirmDiscardProfileChanges } from "./profile/save-controller.js";
 import { activeCoachPanelStorageKey } from "../core/config.js";
 import { coachElements as elements } from "../dom/coach-elements.js";
+import { setOpenSelection } from "./availability/calendar-selection.js";
+import { renderOpenSelection } from "./availability/open-block-render.js";
 import { renderCalendarRinkOptions } from "./availability/render.js";
-import { storageSetItem } from "../core/storage-adapter.js";
+import { writeStorageItem } from "../core/storage-adapter.js";
 import { renderCoachHeaderSave } from "./header-status.js";
 
 let recordSection = "bookingCalendarSection";
@@ -23,7 +26,9 @@ export function openCoachBookingRecords() {
 export function selectCalendarRink(event) {
   const button = event.target.closest("button[data-rink]");
   if (!button) return;
-  elements.calendarLocationType.value = button.dataset.rink;
+  elements.calendarLocationType.value = elements.calendarLocationType.value === button.dataset.rink ? "" : button.dataset.rink;
+  setOpenSelection(null);
+  renderOpenSelection();
   renderCalendarRinkOptions();
 }
 
@@ -55,6 +60,7 @@ export function switchBookingSection(event) {
 }
 
 export function activateBookingSection(sectionId, { animate = false } = {}) {
+  if (!coachCanManage()) return;
   const showsRequests = sectionId === "coachRequestWorkspace";
   const previousScope = elements.coachBookingPanel.dataset.bookingView === "requests" ? "requests" : "records";
   const scope = showsRequests ? "requests" : "records";
@@ -103,7 +109,7 @@ export function activateBookingSection(sectionId, { animate = false } = {}) {
 }
 
 export function activateCoachPanel(panelId, shouldPersist = true) {
-  const targetPanelId = [...elements.coachTabs].some((button) => button.dataset.coachPanel === panelId) ? panelId : "profilePanel";
+  const targetPanelId = !coachCanManage() ? "profilePanel" : [...elements.coachTabs].some((button) => button.dataset.coachPanel === panelId) ? panelId : "profilePanel";
   document.documentElement.dataset.activeCoachPanel = targetPanelId;
   renderCoachHeaderSave();
   elements.coachTabs.forEach((item) => {
@@ -114,7 +120,7 @@ export function activateCoachPanel(panelId, shouldPersist = true) {
   elements.coachPanels.forEach((panel) => panel.classList.toggle("active", panel.dataset.coachContent === targetPanelId));
   const activeButton = [...elements.coachTabs].find((button) => button.dataset.coachPanel === targetPanelId);
   if (activeButton) animateCoachTab(activeButton, { animate: shouldPersist });
-  if (shouldPersist) storageSetItem(activeCoachPanelStorageKey, targetPanelId);
+  if (shouldPersist) writeStorageItem(activeCoachPanelStorageKey, targetPanelId);
 }
 
 export function switchCoachPanel(event) {
@@ -122,4 +128,3 @@ export function switchCoachPanel(event) {
   if (event.currentTarget.dataset.coachPanel === "bookingsPanel") openCoachBookingRecords();
   activateCoachPanel(event.currentTarget.dataset.coachPanel);
 }
-

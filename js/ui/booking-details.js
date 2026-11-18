@@ -1,16 +1,20 @@
-import { bookingDialogElements as elements } from "../dom/booking-dialog-elements.js";
-import { state } from "../core/state.js";
+import { bookingDetailsElements as elements } from "../dom/booking-details-elements.js";
+import { readScheduleState } from "../core/state.js";
 import { formatLocationLabel } from "./display.js";
 import { escapeHtml } from "./safe-html.mjs";
 import { formatDate } from "../core/utils-data.js";
-import { getBookingCancellationEligibility, hasBookingLocationChanged } from "../core/scheduling-rules.js";
+import { getBookingCancellationEligibility, hasBookingLocationChanged, isPastStudentBooking } from "../core/scheduling-rules.js";
 import { getBookingStatusLabel } from "./booking-status.js";
 import { getBookingRequestStatus } from "../domain/booking-requests.mjs";
-import { getAvailabilityLocation } from "../domain/scheduling.mjs";
+import { getAvailabilityLocation, isCancelledBooking } from "../domain/scheduling.mjs";
 
 export function openBookingDetails(slotId) {
-  const slot = state.slots.find((item) => item.id === slotId);
+  const snapshot = readScheduleState();
+  const slot = snapshot.slots.find((item) => item.id === slotId);
   if (!slot || !slot.booked) return;
+  const now = new Date();
+  const past = isPastStudentBooking(slot, now);
+  const cancelled = isCancelledBooking(slot);
   const student = slot.student || {};
   const duration = Number(slot.lessonDuration) || "";
   const hasPrice = slot.lessonPrice !== null && slot.lessonPrice !== undefined && slot.lessonPrice !== "";
@@ -19,7 +23,7 @@ export function openBookingDetails(slotId) {
   const availabilityLocation = formatLocationLabel(getAvailabilityLocation(slot));
   elements.bookingDetailsTitle.textContent = `${formatDate(slot.date)} ${slot.start} - ${slot.end}`;
   elements.removeBookingDetails.dataset.id = slot.id;
-  const cancellation = getBookingCancellationEligibility(slot);
+  const cancellation = getBookingCancellationEligibility(slot, now);
   elements.removeBookingDetails.hidden = !cancellation.allowed;
   elements.removeBookingDetails.disabled = !cancellation.allowed;
   const cancellationNotice = cancellation.reason === "inside-policy-window"
@@ -31,14 +35,14 @@ export function openBookingDetails(slotId) {
   const demoEvent = [...(slot.notifications || [])].reverse().find((event) => event.channel === "demo-event");
   const requestStatusLabels = { negotiating: "商议中", agreed: "已达成", expired: "商议已到期", ended: "商议已结束" };
   const relatedRequests = document.body.dataset.page === "coach"
-    ? state.bookingRequests.filter((request) => request.bookingId === slot.id).map((request) => {
-      const status = getBookingRequestStatus(request);
+    ? snapshot.bookingRequests.filter((request) => request.bookingId === slot.id).map((request) => {
+      const status = getBookingRequestStatus(request, now);
       const action = status === "negotiating" ? (request.waitingFor === "coach" ? "等你回应" : "等待学生回应") : requestStatusLabels[status];
       return `<button class="coach-booking-related-request" type="button" data-request-id="${escapeHtml(request.id)}"><span>${escapeHtml(requestStatusLabels[status] || status)}</span><strong>${escapeHtml(action)}</strong></button>`;
     }).join("")
     : "";
   elements.bookingDetailsBody.innerHTML = `
-    <div><span>状态</span><strong>${escapeHtml(getBookingStatusLabel(slot))}</strong></div>
+    <div><span>状态</span><strong>${escapeHtml(getBookingStatusLabel({ status: slot.status, past, cancelled }))}</strong></div>
     <div><span>学生</span><strong>${escapeHtml(student.name || "学生")}</strong></div>
     <div><span>Email</span><strong>${escapeHtml(student.email || "暂无 email")}</strong></div>
     ${locationChanged

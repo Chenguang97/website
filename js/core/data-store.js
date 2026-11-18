@@ -1,67 +1,16 @@
+import { readServiceContext } from "./config.js";
 import {
   activeCoachPanelStorageKey,
   activeStudentPanelStorageKey,
   blockedStorageKey,
   bookingRequestsStorageKey,
   profileStorageKey,
-  rinks,
   slotsStorageKey
 } from "./config.js";
-import { createDefaultBookingRequests, createDefaultLessonOptions, createDefaultProfile, createDefaultProfiles, createDefaultSlots, ensureLocationChangeDemoBookings } from "./demo-data.js";
-import { migrateLegacyProfilePricing } from "../domain/pricing.mjs";
-import {
-  normalizeCoachSpecialties,
-  normalizeCoachTeachingDisciplines,
-  normalizeStartYear,
-  normalizeCustomCoachSpecialties,
-} from "../domain/coach-profile.mjs";
-import { storageGetItem, storageKeys, storageRemoveItem, storageSetItem } from "./storage-adapter.js";
+import { storageGetItem, storageKeys, removeStorageItem, writeStorageItem } from "./storage-adapter.js";
+import { serializeSlots, deserializeSlots } from "../domain/schedule-codec.mjs";
+import { normalizeSchedulingData, decodeLegacyArray } from "./storage-codecs.js";
 let lastStorageRecoveryMessage = "";
-const compactSlotFields = [
-  "id",
-  "coachId",
-  "date",
-  "start",
-  "end",
-  "location",
-  "availabilityLocation",
-  "note",
-  "lessonId",
-  "lessonName",
-  "lessonDuration",
-  "lessonPrice",
-  "booked",
-  "student",
-];
-const compactSlotFieldSet = new Set(compactSlotFields);
-
-function serializeSlots(slots) {
-  return JSON.stringify({
-    version: 2,
-    slots: slots.map((slot) => {
-      const row = compactSlotFields.map((field) => slot[field] ?? null);
-      const extra = Object.fromEntries(Object.entries(slot).filter(([field]) => !compactSlotFieldSet.has(field)));
-      if (Object.keys(extra).length) row.push(extra);
-      return row;
-    }),
-  });
-}
-
-function deserializeSlots(parsed) {
-  if (Array.isArray(parsed)) return parsed;
-  if (parsed?.version !== 2 || !Array.isArray(parsed.slots)) return null;
-  return parsed.slots.map((row) => {
-    if (!Array.isArray(row)) return null;
-    const slot = {};
-    compactSlotFields.forEach((field, index) => {
-      if (row[index] !== null && row[index] !== undefined) slot[field] = row[index];
-    });
-    const extra = row[compactSlotFields.length];
-    if (extra && typeof extra === "object" && !Array.isArray(extra)) Object.assign(slot, extra);
-    return slot;
-  }).filter(Boolean);
-}
-
 function getLastStorageRecoveryMessage() {
   return lastStorageRecoveryMessage;
 }
@@ -75,180 +24,171 @@ function cleanupLegacyAppStorage() {
   storageKeys().forEach((key) => {
     if (keepKeys.has(key)) return;
     if (prefixes.some((prefix) => key.startsWith(prefix))) {
-      storageRemoveItem(key);
+      removeStorageItem(key);
     }
   });
 }
+// Legacy cross-resource recovery: runs after any failed schedule write, even
+// unavailability; removes the old photo record before retry. The state owner must
+// explicitly adopt recoveredProfiles even when the schedule retry fails.
 function clearOversizedLocalPhotos(coachProfiles) {
+  const recoveredProfiles = JSON.parse(JSON.stringify(coachProfiles));
   let removedCount = 0;
-  Object.values(coachProfiles).forEach((profile) => {
+  Object.values(recoveredProfiles).forEach((profile) => {
     if (profile.photoUrl && profile.photoUrl.startsWith("data:image/")) {
       profile.photoUrl = "";
       removedCount += 1;
     }
   });
   if (!removedCount) return false;
-  storageRemoveItem(profileStorageKey);
-  storageSetItem(profileStorageKey, JSON.stringify(coachProfiles));
+  const removal = removeStorageItem(profileStorageKey);
+  const result = writeStorageItem(profileStorageKey, JSON.stringify(recoveredProfiles));
   lastStorageRecoveryMessage = `已清理 ${removedCount} 张过大的本地照片，并保存当前更改。`;
-  return true;
-}
-function normalizeProfile(profile) {
-  const defaultProfile = createDefaultProfile(profile.coachId);
-  const shouldInstallDemoPhoto = !profile.demoPhotoVersion && !(typeof profile.photoUrl === "string" && profile.photoUrl.trim());
-  const profileWithPricing = Object.prototype.hasOwnProperty.call(profile, "rate")
-    ? profile
-    : { ...profile, rate: defaultProfile.rate, basePriceUnitMinutes: defaultProfile.basePriceUnitMinutes };
-  const migration = migrateLegacyProfilePricing(profileWithPricing);
-  const normalized = { ...defaultProfile, ...migration.profile };
-  if (shouldInstallDemoPhoto) normalized.photoUrl = defaultProfile.photoUrl;
-  normalized.demoPhotoVersion = defaultProfile.demoPhotoVersion;
-  normalized.city = typeof normalized.city === "string" ? normalized.city : "";
-  normalized.bio = typeof normalized.bio === "string" ? normalized.bio : "";
-  normalized.teachingDisciplines = normalizeCoachTeachingDisciplines(normalized.teachingDisciplines);
-  normalized.skatingStartYear = normalizeStartYear(normalized.skatingStartYear);
-  normalized.coachingStartYear = normalizeStartYear(normalized.coachingStartYear);
-  normalized.specialties = normalizeCoachSpecialties(normalized.specialties);
-  normalized.customSpecialties = normalizeCustomCoachSpecialties(normalized.customSpecialties);
-  const hadSelectedCustomSpecialties = Array.isArray(profile.selectedCustomSpecialties);
-  const selectedCustomSpecialties = hadSelectedCustomSpecialties
-    ? normalizeCustomCoachSpecialties(profile.selectedCustomSpecialties)
-    : normalized.customSpecialties;
-  const customSpecialtySet = new Set(normalized.customSpecialties);
-  normalized.selectedCustomSpecialties = selectedCustomSpecialties.filter((specialty) => customSpecialtySet.has(specialty));
-  const hadTravelConditions = typeof profile.travelConditions === "string";
-  normalized.travelConditions = hadTravelConditions ? profile.travelConditions.trim() : "";
-  if (!hadTravelConditions && normalized.travelsToOtherRinks && Number(normalized.travelFee) > 0) {
-    normalized.travelConditions = `额外出行费 $${Number(normalized.travelFee)}/次，其他安排可协商。`;
-  }
-  if (!Array.isArray(normalized.servedRinks) || !normalized.servedRinks.length) {
-    normalized.servedRinks = [normalized.homeRink || rinks[0]];
-  }
-  if (!Array.isArray(normalized.lessonOptions) || !normalized.lessonOptions.length) {
-    normalized.lessonOptions = createDefaultLessonOptions(Number(normalized.rate || 0));
-  } else {
-    normalized.lessonOptions = normalized.lessonOptions.slice().sort((a, b) => Number(a.duration) - Number(b.duration));
-  }
-  const migratedProfileFields = !Array.isArray(profile.customSpecialties)
-    || !hadSelectedCustomSpecialties
-    || !hadTravelConditions
-    || !Array.isArray(profile.teachingDisciplines)
-    || !Object.prototype.hasOwnProperty.call(profile, "skatingStartYear")
-    || !Object.prototype.hasOwnProperty.call(profile, "coachingStartYear");
-  return { profile: normalized, migrated: migration.migrated || !profile.demoPhotoVersion || migratedProfileFields };
-}
-function loadProfiles() {
-  const stored = storageGetItem(profileStorageKey);
-  if (!stored) return createDefaultProfiles();
-  try {
-    const parsed = { ...createDefaultProfiles(), ...JSON.parse(stored) };
-    let didMigrate = false;
-    const normalizedProfiles = Object.fromEntries(Object.entries(parsed).map(([coachId, profile]) => {
-      const normalized = normalizeProfile({ ...profile, coachId });
-      didMigrate ||= normalized.migrated;
-      return [coachId, normalized.profile];
-    }));
-    if (didMigrate) storageSetItem(profileStorageKey, JSON.stringify(normalizedProfiles));
-    return normalizedProfiles;
-  } catch {
-    return createDefaultProfiles();
-  }
-}
-function loadSlots() {
-  const stored = storageGetItem(slotsStorageKey);
-  if (!stored) {
-    const defaultSlots = createDefaultSlots();
-    storageSetItem(slotsStorageKey, serializeSlots(defaultSlots));
-    return defaultSlots;
-  }
-  try {
-    const parsed = JSON.parse(stored);
-    const slots = deserializeSlots(parsed);
-    const normalizedSlots = slots ? slots.map((slot) => ({
-      ...slot,
-      status: String(slot.status || "").toLocaleLowerCase() === "confirmed" ? "Booked" : slot.status,
-      availabilityLocation: slot.availabilityLocation || slot.location,
-    })) : createDefaultSlots();
-    if (slots && ensureLocationChangeDemoBookings(normalizedSlots)) {
-      storageSetItem(slotsStorageKey, serializeSlots(normalizedSlots));
-    }
-    return normalizedSlots;
-  } catch {
-    return createDefaultSlots();
-  }
+  return { removedPhotos: removedCount, profiles: result, removal, recoveredProfiles };
 }
 function loadBlockedExceptions() {
-  const stored = storageGetItem(blockedStorageKey);
-  if (!stored) return [];
-  try {
-    const parsed = JSON.parse(stored);
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
+  const schedule = readScheduleEnvelope();
+  if (Array.isArray(schedule?.blockedExceptions)) return schedule.blockedExceptions;
+  return decodeLegacyArray(storageGetItem(blockedStorageKey), []);
 }
-function loadBookingRequests(slots) {
-  const stored = storageGetItem(bookingRequestsStorageKey);
-  if (!stored) return createDefaultBookingRequests(slots);
-  try {
-    const parsed = JSON.parse(stored);
-    return Array.isArray(parsed) ? parsed : createDefaultBookingRequests(slots);
-  } catch {
-    return createDefaultBookingRequests(slots);
-  }
-}
-function saveProfilesData(coachProfiles) {
+
+function persistProfiles(coachProfiles) {
+  if (readServiceContext().service) return { persisted: false, reason: "remote-required", message: "服务模式必须等待服务器确认，未写入本地数据。" };
   lastStorageRecoveryMessage = "";
   try {
     cleanupLegacyAppStorage();
-    const saved = storageSetItem(profileStorageKey, JSON.stringify(coachProfiles));
+    const result = writeStorageItem(profileStorageKey, JSON.stringify(coachProfiles));
+    const saved = result.persisted;
     if (!saved) {
       lastStorageRecoveryMessage = "浏览器本地存储不可用，本次更改只会保留到刷新前。";
     }
-    return saved;
+    return result;
   } catch (error) {
     console.error("Failed to save coach profiles.", error);
-    return false;
+    return { persisted: false, reason: "serialization", error };
   }
 }
-function saveSlotsData(slots, blockedExceptions, coachProfiles) {
+function readScheduleEnvelope() {
+  try {
+    const value = JSON.parse(storageGetItem(slotsStorageKey));
+    return value?.version === 2 ? value : null;
+  } catch {
+    return null;
+  }
+}
+function readLocalScheduleSnapshot() {
+  if (readServiceContext().service) return null;
+  try {
+    const parsed = JSON.parse(storageGetItem(slotsStorageKey));
+    const slots = deserializeSlots(parsed);
+    if (!slots) return null;
+    return {
+      slots,
+      scheduling: normalizeSchedulingData(parsed?.scheduling),
+      blockedExceptions: Array.isArray(parsed?.blockedExceptions)
+        ? parsed.blockedExceptions : loadBlockedExceptions(),
+      requests: Array.isArray(parsed?.bookingRequests) ? parsed.bookingRequests : undefined,
+    };
+  } catch {
+    return null;
+  }
+}
+function persistSchedule(slots, blockedExceptions, coachProfiles, scheduling, bookingRequests) {
+  if (readServiceContext().service) return { persisted: false, reason: "remote-required", message: "服务模式必须等待服务器确认，未写入本地数据。" };
   lastStorageRecoveryMessage = "";
   try {
     cleanupLegacyAppStorage();
-    const serializedSlots = serializeSlots(slots);
-    const serializedBlocks = JSON.stringify(blockedExceptions);
-    let slotsSaved = storageSetItem(slotsStorageKey, serializedSlots);
-    let blocksSaved = storageSetItem(blockedStorageKey, serializedBlocks);
-    if ((!slotsSaved || !blocksSaved) && clearOversizedLocalPhotos(coachProfiles)) {
-      slotsSaved = storageSetItem(slotsStorageKey, serializedSlots);
-      blocksSaved = storageSetItem(blockedStorageKey, serializedBlocks);
+    // The schedule envelope is one authoritative write for bookings/planning/occupancy.
+    // Photo recovery below is a separate resource and is not transactional.
+    // Old arrays and v2 slot-only envelopes continue to load unchanged.
+    const previous = readScheduleEnvelope();
+    const serializedSlots = serializeSlots(slots, {
+      ...previous,
+      blockedExceptions,
+      scheduling: scheduling || previous?.scheduling,
+      bookingRequests: bookingRequests || previous?.bookingRequests,
+    });
+    let result = writeStorageItem(slotsStorageKey, serializedSlots);
+    let recovery = null;
+    let slotsSaved = result.persisted;
+    if (!slotsSaved) {
+      const initialWrite = result;
+      recovery = clearOversizedLocalPhotos(coachProfiles);
+      if (recovery) {
+        recovery.trigger = initialWrite;
+        result = writeStorageItem(slotsStorageKey, serializedSlots);
+        slotsSaved = result.persisted;
+      }
     }
-    if (!slotsSaved || !blocksSaved) {
+    if (!slotsSaved) {
       lastStorageRecoveryMessage = "浏览器存储空间不足，未能保存；当前草稿已保留。";
-      return false;
     }
-    return true;
+    return { ...result, recovery };
   } catch (error) {
     console.error("Failed to save availability.", error);
-    return false;
+    return { persisted: false, reason: "serialization", error };
   }
 }
-function saveBookingRequestsData(requests) {
+function persistBookingRequests(requests) {
+  if (readServiceContext().service) return { persisted: false, reason: "remote-required", message: "服务模式必须等待服务器确认，未写入本地数据。" };
   try {
-    return storageSetItem(bookingRequestsStorageKey, JSON.stringify(requests));
+    const schedule = readScheduleEnvelope();
+    if (schedule) {
+      return writeStorageItem(slotsStorageKey, JSON.stringify({ ...schedule, bookingRequests: requests }));
+    }
+    return writeStorageItem(bookingRequestsStorageKey, JSON.stringify(requests));
   } catch (error) {
     console.error("Failed to save booking requests.", error);
-    return false;
+    return { persisted: false, reason: "serialization", error };
   }
 }
 export {
+  persistProfiles, persistSchedule, persistBookingRequests,
   getLastStorageRecoveryMessage,
-  loadBlockedExceptions,
-  loadBookingRequests,
-  loadProfiles,
-  loadSlots,
-  saveProfilesData,
-  saveBookingRequestsData,
-  saveSlotsData
+  readLocalScheduleSnapshot
 };
 
+import { readStorageItemResult } from "./storage-adapter.js";
+
+// Explicit user-requested backup only. No startup calls, demo installation or writes.
+export function exportSavedLocalApplicationData() {
+  if (readServiceContext().service || readServiceContext().mode !== "demo") {
+    return { ok: false, code: "local-export-unavailable", message: "请回到原来使用的网址导出本地资料。" };
+  }
+  const rawByKey = {};
+  for (const key of [slotsStorageKey, profileStorageKey, blockedStorageKey, bookingRequestsStorageKey]) {
+    const result = readStorageItemResult(key);
+    if (!result.ok) {
+      return { ok: false, code: "backup-read-failed", message: "无法可靠读取此浏览器已保存的资料，未生成完整备份。请保留原网址和资料，恢复浏览器存储访问后重试。" };
+    }
+    rawByKey[key] = result.value;
+  }
+  const issues = [];
+  const parsed = (key, fallback) => {
+    if (rawByKey[key] === null) return fallback;
+    try { return JSON.parse(rawByKey[key]); }
+    catch { issues.push({ key, message: "已保存内容无法读取；原文仍在私密备份中。" }); return fallback; }
+  };
+  const savedSchedule = parsed(slotsStorageKey, []);
+  const slots = deserializeSlots(savedSchedule);
+  if (!slots || slots.some(slot => !slot || typeof slot !== "object" || Array.isArray(slot)) || slots.length !== (Array.isArray(savedSchedule) ? savedSchedule.length : savedSchedule?.slots?.length)) {
+    issues.push({ key: slotsStorageKey, message: "部分时段无法读取；请保留原始备份，暂勿导入。" });
+  }
+  const source = { ...(savedSchedule?.version === 2 ? savedSchedule : {}), slots: slots || [] };
+  delete source.version;
+  const profiles = parsed(profileStorageKey, {});
+  if (!profiles || typeof profiles !== "object" || Array.isArray(profiles)) issues.push({ key: profileStorageKey, message: "教练资料格式异常；原文仍保留。" });
+  else source.coachProfiles = profiles;
+  for (const [field, key] of [["blockedExceptions", blockedStorageKey], ["bookingRequests", bookingRequestsStorageKey]]) {
+    const legacy = parsed(key, []);
+    if (!Array.isArray(legacy)) issues.push({ key, message: "已保存列表格式异常；原文仍保留。" });
+    if (!Array.isArray(source[field])) source[field] = Array.isArray(legacy) ? legacy : [];
+  }
+  const compatibleSource = issues.length ? source : JSON.parse(serializeSlots(source.slots, Object.fromEntries(Object.entries(source).filter(([key]) => key !== "slots"))));
+  const backup = { format: "icecoach-local-backup", version: 1, exportedAt: new Date().toISOString(),
+    readyForImport: issues.length === 0, source: compatibleSource, issues,
+    privateTrace: { notice: "包含学生联系方式、照片及原始保存内容，请勿公开。只自动导入 source；此原文用于备份核对。", rawByKey } };
+  const text = JSON.stringify(backup, null, 2);
+  if (new TextEncoder().encode(text).byteLength > 20 * 1024 * 1024) return { ok: false, code: "backup-too-large", message: "备份超过 20 MB，未截断或下载不完整资料。请先保留原网址和原始资料。" };
+  return { ok: true, backup, text, readyForImport: backup.readyForImport };
+}

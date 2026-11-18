@@ -1,6 +1,8 @@
 import { selectElements } from "./select-elements.js";
 
 export const studentElements = selectElements({
+  studentBookingSessions: "#studentBookingSessions",
+  studentQueryMessage: "#studentQueryMessage",
   studentCoachFilterGroup: "#studentCoachFilterGroup", studentRinkFilterGroup: "#studentRinkFilterGroup",
   studentCoachSearch: "#studentCoachSearch", studentRinkSearch: "#studentRinkSearch",
   studentCoachFilterSummary: "#studentCoachFilterSummary", studentRinkFilterSummary: "#studentRinkFilterSummary",

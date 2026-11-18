@@ -1,4 +1,5 @@
-export const rinks = ["Polar Ice Rink", "Arcadia Ice Arena", "Oceanside Ice Arena"];
+const localRinks = ["Polar Ice Rink", "Arcadia Ice Arena", "Oceanside Ice Arena"];
+export let rinks = localRinks;
 export const rinkColors = {
   "Polar Ice Rink": "#bbf7d0",
   "Arcadia Ice Arena": "#bfdbfe",
@@ -16,13 +17,14 @@ export const locationShortLabels = {
   Unavailable: "不可预约",
 };
 
-export const coaches = [
+const localCoaches = [
   { id: "maya", name: "Maya Chen", subject: "Figure Skating Coach" },
   { id: "alex", name: "Alex Rivera", subject: "Hockey Skating Coach" },
   { id: "sam", name: "Sam Patel", subject: "Off-ice & Jumps Coach" },
 ];
 
-export const currentCoachId = "maya";
+export let coaches = localCoaches;
+export let currentCoachId = "maya";
 export const slotsStorageKey = "ice-skating-coach-booking-slots-v12";
 export const profileStorageKey = "ice-skating-coach-profiles-v2";
 export const blockedStorageKey = "ice-skating-coach-blocked-exceptions-v1";
@@ -41,5 +43,39 @@ export const defaultEnd = "16:00";
 export const recurringPastWeeks = 8;
 export const recurringFutureWeeks = 52;
 export const publicStudentPreviewHours = 3;
-export const studentHasFullAccess = new URLSearchParams(window.location.search).get("access") === "full";
+export let studentHasFullAccess = new URLSearchParams(globalThis.location?.search || "").get("access") === "full";
 
+// Explicit dependency inversion: the page transport installs a read-only port.
+// Core never imports transport/page modules and this stores no business drafts.
+let serviceSource = null;
+const uninitializedService = Object.freeze({ mode: "uninitialized", service: false, user: null });
+export const readServiceContext = () => serviceSource?.readContext() || uninitializedService;
+export const readServiceSession = () => serviceSource?.readSession() || null;
+export const readServiceBootstrap = () => serviceSource?.readBootstrap() || null;
+export function requireServiceProjection() {
+  const projection = readServiceBootstrap();
+  if (!projection) throw new Error("服务数据尚未载入；请先完成异步 bootstrap。");
+  return projection.data;
+}
+export function synchronizeServiceIdentity() {
+  if (!serviceSource) return;
+  if (!readServiceContext().service) {
+    coaches = localCoaches; rinks = localRinks; currentCoachId = "maya";
+    studentHasFullAccess = !readServiceContext().publicView && new URLSearchParams(globalThis.location?.search || "").get("access") === "full";
+    return;
+  }
+  if (readServiceContext().reloadRequired) { coaches = Object.freeze([]); rinks = Object.freeze([]); currentCoachId = ""; studentHasFullAccess = false; return; }
+  const user = readServiceSession()?.user;
+  const data = readServiceBootstrap()?.data;
+  rinks = Object.freeze((data?.rinks || []).map(rink => typeof rink === "string" ? rink : rink.name).filter(Boolean));
+  const profiles = data?.coachProfiles || Object.fromEntries(serviceSource.readPublicCoachProfiles().map(packet => [packet.profile?.coachId, packet.profile]));
+  coaches = Object.freeze(Object.entries(profiles).filter(([, profile]) => profile).map(([id, profile]) => Object.freeze({ id, name: profile.name || "教练", subject: profile.subject || "" })));
+  currentCoachId = user?.coachId || "";
+  studentHasFullAccess = user?.role === "student" && user.status === "active";
+}
+export function connectServiceSource(port) {
+  if (serviceSource && serviceSource !== port) throw new Error("Service source is already connected");
+  if (!["readContext", "readSession", "readBootstrap", "readPublicCoachProfiles"].every(key => typeof port?.[key] === "function")) throw new TypeError("Invalid service source");
+  serviceSource = port;
+  synchronizeServiceIdentity();
+}

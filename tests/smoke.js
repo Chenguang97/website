@@ -1,7 +1,6 @@
 const fs = require("fs");
 const path = require("path");
 const { JSDOM, VirtualConsole } = require("jsdom");
-const esbuild = require("esbuild");
 
 function assert(condition, message) {
   if (!condition) {
@@ -9,45 +8,64 @@ function assert(condition, message) {
   }
 }
 
+function calendarMenuLabel(node) { return node.querySelector('.coach-open-menu-label')?.textContent || node.textContent; }
+
+const testPages = new Set();
 async function loadPage(fileName, options = {}) {
   const [filePathPart, query = ""] = fileName.split("?");
   const filePath = path.resolve(filePathPart);
   let html = fs.readFileSync(filePath, "utf8");
-  html = html.replace(/<script\s+type="module"\s+src="([^"]+)"\s*><\/script>/g, (_, source) => {
+  const { build } = await import("./fixtures/owner-build.mjs");
+  for (const match of [...html.matchAll(/<script\s+type="module"\s+src="([^"]+)"\s*><\/script>/g)]) {
+    const source = match[1];
     const entryPoint = path.resolve(path.dirname(filePath), source.split("?")[0]);
     const isAppEntry = /(?:admin|coach|student)-entry\.js$/.test(entryPoint);
     const testBridge = isAppEntry ? `
       import ${JSON.stringify(entryPoint)};
-      import { state, replaceBlockedExceptions, replaceBookingRequests, replaceSlots, getProfile, getSavedProfile, setCoachProfileDraft } from ${JSON.stringify(path.resolve("js/core/state.js"))};
+      import { readProfileState, replaceCoachProfileDraft } from ${JSON.stringify(path.resolve("js/core/state.js"))};
+      Object.assign(globalThis, { readProfileState, replaceCoachProfileDraft });
+      import { fixture, readScheduleState, publishAvailabilityDraft, publishBookingRequests, publishCoachProfileDraft, setSchedulingConfig, getSchedulingConfig } from ${JSON.stringify(path.resolve("js/core/state.js"))};
+      import { createSchedulingConfig } from ${JSON.stringify(path.resolve("js/domain/scheduling-config.mjs"))};
+      import { acceptCoachBookingRequest } from ${JSON.stringify(path.resolve("js/core/booking-requests.js"))};
+      import { cancelBooking } from ${JSON.stringify(path.resolve("js/core/bookings.js"))};
+      import { resetSchedulingSettingsEditor as renderSchedulingSettings } from ${JSON.stringify(path.resolve("js/coach/availability/planner-render.js"))};
       import { openBookingDetails } from ${JSON.stringify(path.resolve("js/ui/booking-details.js"))};
       import { openBookingDialog, openModifyBookingDialog, syncBookingForSelf } from ${JSON.stringify(path.resolve("js/student/booking-actions.js"))};
+      import { formatCoachWelcome } from ${JSON.stringify(path.resolve("js/coach/welcome.js"))};
       import { renderCoachPage } from ${JSON.stringify(path.resolve("js/coach/render.js"))};
       import { renderDragCalendar } from ${JSON.stringify(path.resolve("js/coach/availability/render.js"))};
       import { renderExceptionDragCalendar } from ${JSON.stringify(path.resolve("js/coach/bookings/calendar-render.js"))};
-      import { renderStudentOwnBookings, renderStudentPage } from ${JSON.stringify(path.resolve("js/student/render.js"))};
-      import { finishCalendarDrag, startCalendarDrag, moveCalendarDrag, cancelCalendarDrag } from ${JSON.stringify(path.resolve("js/coach/availability/actions.js"))};
-      import { captureAvailabilityUndoState } from ${JSON.stringify(path.resolve("js/coach/availability/undo.js"))};
+      import { renderStudentPage } from ${JSON.stringify(path.resolve("js/student/render.js"))};
+      import { renderStudentOwnBookings } from ${JSON.stringify(path.resolve("js/student/history-render.js"))};
+      import { undoAvailabilityChange } from ${JSON.stringify(path.resolve("js/coach/availability/undo.js"))};
+      import { captureAvailabilitySnapshot as captureAvailabilityUndoState, recordAvailabilityUndo as pushAvailabilityUndoState } from ${JSON.stringify(path.resolve("js/core/state.js"))};
       import { shiftScheduleWeek } from ${JSON.stringify(path.resolve("js/coach/bookings/actions.js"))};
       import { prepareCoachBookingCancellation } from ${JSON.stringify(path.resolve("js/coach/bookings/details-actions.js"))};
-      import { getCoachBookingStudentKey } from ${JSON.stringify(path.resolve("js/coach/bookings/render.js"))};
-      import { renderCoachBookingRequests } from ${JSON.stringify(path.resolve("js/coach/bookings/request-render.js"))};
-      import { synchronizeBookingRequestConflicts, synchronizeExpiredBookingRequests } from ${JSON.stringify(path.resolve("js/core/booking-requests.js"))};
+      import { getCoachBookingStudentKey } from ${JSON.stringify(path.resolve("js/coach/bookings/student-identity.js"))};
+      import { receiveCoachBookingRequests as renderCoachBookingRequests } from ${JSON.stringify(path.resolve("js/coach/bookings/request-editor.js"))};
+      import { synchronizeBookingRequestConflictsResult, synchronizeExpiredBookingRequestsResult } from ${JSON.stringify(path.resolve("js/core/booking-requests.js"))};
       import { ensureLocationChangeDemoBookings } from ${JSON.stringify(path.resolve("js/core/demo-data.js"))};
       import { addDaysIso, minutesFromTime, nextWeekdayIso, startOfWeekIso, todayIso, weekdayIndex } from ${JSON.stringify(path.resolve("js/core/utils-data.js"))};
-      Object.defineProperty(globalThis, "slots", { configurable: true, get: () => state.slots, set: replaceSlots });
-      Object.defineProperty(globalThis, "blockedExceptions", { configurable: true, get: () => state.blockedExceptions, set: replaceBlockedExceptions });
-      Object.defineProperty(globalThis, "bookingRequests", { configurable: true, get: () => state.bookingRequests, set: replaceBookingRequests });
-      Object.defineProperty(globalThis, "hasUnsavedProfileChanges", { configurable: true, get: () => state.hasUnsavedProfileChanges });
+      // Fixture replacement establishes published facts; editor changes use real UI actions.
+      const replaceSlots = (slots) => { fixture.installDraftSlots(slots); publishAvailabilityDraft(); };
+      Object.defineProperty(globalThis, "slots", { configurable: true, get: () => fixture.inspect().slots, set: replaceSlots });
+      Object.defineProperty(globalThis, "blockedExceptions", { configurable: true, get: () => fixture.inspect().blockedExceptions, set: fixture.installDraftBlocked });
+      Object.defineProperty(globalThis, "bookingRequests", { configurable: true, get: () => fixture.inspect().bookingRequests, set: fixture.installRequests });
+      Object.defineProperty(globalThis, "hasUnsavedProfileChanges", { configurable: true, get: () => fixture.inspect().hasUnsavedProfileChanges });
       const render = () => document.body.dataset.page === "coach" ? renderCoachPage() : renderStudentPage();
       Object.assign(globalThis, {
-        addDaysIso, getProfile, getSavedProfile, nextWeekdayIso, openBookingDetails, openBookingDialog,
+        formatCoachWelcome, addDaysIso, readProfileState, publishCoachProfileDraft, nextWeekdayIso, openBookingDetails, openBookingDialog,
         openModifyBookingDialog, render, renderCoachBookingRequests, renderDragCalendar, renderExceptionDragCalendar,
         getCoachBookingStudentKey, minutesFromTime, renderStudentOwnBookings, replaceSlots,
-        finishCalendarDrag, startCalendarDrag, moveCalendarDrag, cancelCalendarDrag, captureAvailabilityUndoState, prepareCoachBookingCancellation, setCoachProfileDraft, shiftScheduleWeek, startOfWeekIso,
-        syncBookingForSelf, synchronizeBookingRequestConflicts, synchronizeExpiredBookingRequests, ensureLocationChangeDemoBookings, todayIso, weekdayIndex,
+        captureAvailabilityUndoState, prepareCoachBookingCancellation, shiftScheduleWeek, startOfWeekIso,
+        syncBookingForSelf, synchronizeBookingRequestConflictsResult, synchronizeExpiredBookingRequestsResult, ensureLocationChangeDemoBookings, todayIso, weekdayIndex,
+        createSchedulingConfig, setSchedulingConfig, getSchedulingConfig, publishAvailabilityDraft, publishBookingRequests, renderSchedulingSettings, acceptCoachBookingRequest,
+        cancelBooking, pushAvailabilityUndoState, undoAvailabilityChange,
+        setTestAvailabilityDraft: fixture.installDraftSlots,
+        getTestPublishedSchedule: () => JSON.parse(JSON.stringify({ slots: fixture.inspect().publishedSlots, planning: fixture.inspect().publishedScheduling })),
       });
     ` : `import ${JSON.stringify(entryPoint)};`;
-    const bundled = esbuild.buildSync({
+    const bundled = (await build({
       stdin: {
         contents: testBridge,
         resolveDir: path.dirname(entryPoint),
@@ -57,9 +75,9 @@ async function loadPage(fileName, options = {}) {
       format: "iife",
       platform: "browser",
       write: false,
-    }).outputFiles[0].text.replace(/<\/script/gi, "<\\/script");
-    return `<script>${bundled}</script>`;
-  });
+    })).outputFiles[0].text.replace(/<\/script/gi, "<\\/script");
+    html = html.replace(match[0], () => `<script>${bundled}</script>`);
+  }
   const errors = [];
   const virtualConsole = new VirtualConsole();
 
@@ -78,6 +96,13 @@ async function loadPage(fileName, options = {}) {
     pretendToBeVisual: true,
     virtualConsole,
     beforeParse(window) {
+      if (options.now) {
+        const NativeDate = window.Date;
+        window.Date = class extends NativeDate {
+          constructor(...args) { super(...(args.length ? args : [options.now])); }
+          static now() { return new NativeDate(options.now).getTime(); }
+        };
+      }
       const storage = { ...(options.localStorage || {}) };
       Object.defineProperty(window, "localStorage", {
         value: {
@@ -106,10 +131,12 @@ async function loadPage(fileName, options = {}) {
           this.open = false;
         };
       }
+      window.HTMLElement.prototype.scrollIntoView = () => {};
       window.confirm = () => true;
     },
   });
 
+  testPages.add(dom);
   await new Promise((resolve) => setTimeout(resolve, 900));
   return { dom, errors };
 }
@@ -159,7 +186,7 @@ async function testLoginPages() {
   assertNoRuntimeErrors("student/login/index.html", studentLogin.errors);
   assert(coachLogin.dom.window.document.querySelector('a[href="../index.html"]'), "Coach login page is missing the demo dashboard link.");
   assert(coachLogin.dom.window.document.body.textContent.includes("申请教练账号"), "Coach login page is missing the coach account request action.");
-  assert(studentLogin.dom.window.document.querySelector('a[href="../index.html"]'), "Student login page is missing the public preview link.");
+  assert(studentLogin.dom.window.document.querySelector('a.public-preview-button[href="../index.html?view=public"]'), "Student login must link explicitly to the public-only timetable.");
   assert(studentLogin.dom.window.document.querySelector('a[href="../index.html?access=full"]'), "Student login page is missing the full-access booking link.");
 }
 
@@ -176,11 +203,24 @@ async function testAdminPage() {
 async function testCoachPage() {
   const { dom, errors } = await loadPage("coach/index.html");
   const { document } = dom.window;
+  const window = dom.window;
 
   assertNoRuntimeErrors("coach/index.html", errors);
   assert(document.querySelector(".view.active")?.id === "coachView", "Coach page did not open on the coach view.");
   assert(document.querySelector('.coach-global-home[href="../index.html"]')?.textContent === "切换入口" && document.querySelectorAll(".coach-global-home svg rect").length === 4 && !document.querySelector(".coach-header-identity a"), "Portal switching must keep its destination and use an independent four-grid tool entry.");
-  assert(document.querySelector("#coachHeading")?.textContent === "教练工作台", "Coach workspace title did not use the page-wide meaning.");
+  assert(document.querySelectorAll('.coach-global-home svg').length === 1 && !document.querySelector('.coach-portal-arrow'), "The global entry must retain just its four-grid icon without adding an arrow.");
+  assert(document.querySelector("#coachHeading")?.textContent === dom.window.formatCoachWelcome("Maya Chen", new Date().getHours()), "Coach welcome must greet the current account using local time.");
+  for (const [hour, greeting] of [[0, "Good evening"], [4, "Good evening"], [5, "Good morning"], [11, "Good morning"], [12, "Good afternoon"], [17, "Good afternoon"], [18, "Good evening"], [23, "Good evening"]]) {
+    assert(dom.window.formatCoachWelcome("小明", hour) === `${greeting}, 小明!`, `Wrong greeting at ${hour}:00.`);
+  }
+  const profile = dom.window.readProfileState("maya").saved;
+  dom.window.publishCoachProfileDraft("maya", { ...profile, name: "Taylor Lee" }); dom.window.dispatchEvent(new dom.window.Event("focus"));
+  assert(document.getElementById("coachHeading").textContent === dom.window.formatCoachWelcome("Taylor Lee", new Date().getHours()), "Welcome must read the current saved profile name.");
+  dom.window.publishCoachProfileDraft("maya", profile);
+  dom.window.dispatchEvent(new dom.window.Event("focus"));
+  assert(document.querySelector(".coach-header-identity img")?.getAttribute("src") === "../assets/snowball-welcome.png", "Welcome must use the approved snowball image.");
+  assert(!document.querySelector('#addCoachScheduleLock, #coachPlanningLockDialog, [data-planner-action="new-lock"], [data-planner-action="edit-lock"], [data-planner-action="unlock"]') && !document.getElementById('coachSchedulerConfig').textContent.includes('锁定安排'), "Lock settings, dialogs and actions must not be offered in this version.");
+  assert(document.getElementById('generateCoachSchedule') && document.getElementById('coachSchedulePreview'), "Removing locks must preserve generation and explicit preview application.");
   assert(!document.body.textContent.includes("更新学生在预约页面看到的信息"), "The profile-only subtitle remained on the coach workspace.");
   const workspaceContainer = document.querySelector(".coach-workspace-container");
   assert(document.querySelector(".coach-global-home")?.parentElement === workspaceContainer && workspaceContainer.contains(document.querySelector("#coachView")), "The home entry must anchor to the common frame outside the content view.");
@@ -232,6 +272,7 @@ async function testCoachPage() {
   viewportWidth = 1500;
   dom.window.dispatchEvent(new dom.window.Event("resize"));
   assert(saveToolbar.dataset.layout === "bottom" && !saveToolbar.style.getPropertyValue("--coach-save-side-left"), "Insufficient right-side space must restore the bottom fallback without retaining a side offset.");
+  assert(dom.window.getComputedStyle(saveToolbar).gridTemplateColumns === "minmax(0, 1fr)", "Desktop controls must stay vertically stacked when side space is insufficient, rather than reverting to the old horizontal bar.");
   viewportWidth = 1700;
   dom.window.dispatchEvent(new dom.window.Event("resize"));
   assert(saveToolbar.dataset.layout === "side" && workspaceContainer.getAttribute("style") === frameStyle, "Growing the window must restore side controls without changing the main frame width or position.");
@@ -393,7 +434,9 @@ async function testPublicCoachProfile() {
 
   const login = await loadPage("student/login/index.html?coach=alex");
   assertNoRuntimeErrors("Profile login context", login.errors);
-  for (const link of login.dom.window.document.querySelectorAll(".auth-button")) {
+  assert(login.dom.window.document.querySelectorAll("a.auth-button[href]").length > 0, "Explicit demo booking link must retain the profile context.");
+  assert(login.dom.window.document.querySelector("[data-auth-submit][type=submit]") && login.dom.window.document.querySelector("input[name=email]") && login.dom.window.document.querySelector("input[name=password]"), "Real login must submit credentials rather than navigate a fake authentication link.");
+  for (const link of login.dom.window.document.querySelectorAll("a.auth-button[href]")) {
     assert(new URL(link.href).searchParams.get("coach") === "alex", "Login or signup lost the profile coach.");
   }
   login.dom.window.close();
@@ -471,6 +514,22 @@ async function testDesktopPageContracts() {
   }
 }
 
+function overviewDate(doc, date) {
+  const win = doc.defaultView;
+  const field = doc.getElementById('calendarWeekStart');
+  field.value = date;
+  field.dispatchEvent(new win.Event('change', { bubbles: true }));
+  return doc.querySelector(`#dropdownOpenSlots [data-work-day="${date}"]`);
+}
+function addOverviewRange(doc, date, start, end, location) {
+  if (doc.getElementById('coachWorkTimeDialog').open) doc.getElementById('cancelCoachWorkTime').click();
+  overviewDate(doc, date).querySelector('[data-planner-action="add-work-range"]').click();
+  doc.getElementById('coachWorkTimeStart').value = start;
+  doc.getElementById('coachWorkTimeEnd').value = end;
+  doc.getElementById('coachWorkTimeLocation').value = location;
+  submit(doc.getElementById('coachWorkTimeForm'));
+}
+
 async function testAvailabilityConflictActions() {
   const emptyStorage = {
     "ice-skating-coach-booking-slots-v12": "[]",
@@ -480,40 +539,14 @@ async function testAvailabilityConflictActions() {
   const win = dom.window;
   const doc = win.document;
   const date = nextWeekdayByIndex(win, 6);
-  const form = doc.querySelector("#availabilityForm");
-
   assertNoRuntimeErrors("coach availability conflict setup", errors);
   doc.querySelector('[data-coach-panel="availabilityPanel"]').click();
-  doc.querySelector("#slotDate").value = date;
-  doc.querySelector("#startTime").value = "12:00";
-  doc.querySelector("#startTime").dispatchEvent(new win.Event("change", { bubbles: true }));
-  doc.querySelector("#endTime").value = "13:00";
-  doc.querySelector("#locationType").value = "Polar Ice Rink";
-  submit(form);
+  addOverviewRange(doc, date, '12:00', '13:00', 'Polar Ice Rink');
 
   const beforeConflict = JSON.stringify(win.slots);
-  doc.querySelector("#startTime").value = "12:30";
-  doc.querySelector("#startTime").dispatchEvent(new win.Event("change", { bubbles: true }));
-  doc.querySelector("#endTime").value = "13:30";
-  doc.querySelector("#locationType").value = "Arcadia Ice Arena";
-  submit(form);
-  assert(doc.querySelector("#conflictDialog").open, "Overlapping rink availability did not open the conflict dialog.");
-  assert(doc.querySelector("#confirmConflictOverride").classList.contains("primary-button") && doc.querySelector("#confirmConflictOverride").textContent === "覆盖并添加" && doc.querySelector("#cancelConflictOverride").textContent === "取消", "Availability conflicts must use the shared primary/secondary confirmation actions with clear Chinese labels.");
-  doc.querySelector("#cancelConflictOverride").click();
-  assert(!doc.querySelector("#conflictDialog").open, "Cancel did not close the availability conflict dialog.");
-  assert(JSON.stringify(win.slots) === beforeConflict, "Cancel changed availability despite rejecting the override.");
-
-  submit(form);
-  doc.querySelector("#conflictDialog").dispatchEvent(new win.Event("cancel"));
-  assert(!doc.querySelector("#conflictDialog").open && JSON.stringify(win.slots) === beforeConflict, "Native dialog cancellation must preserve the availability draft.");
-  submit(form);
-  assert(doc.querySelector("#conflictDialog").open, "Conflict dialog did not reopen for the same unresolved overlap.");
-  doc.querySelector("#confirmConflictOverride").click();
-  assert(!doc.querySelector("#conflictDialog").open, "Override did not close the availability conflict dialog.");
-  assert(
-    win.slots.some((slot) => slot.coachId === "maya" && slot.date === date && slot.start === "12:30" && slot.location === "Arcadia Ice Arena"),
-    "Override did not apply the requested rink availability.",
-  );
+  addOverviewRange(doc, date, '12:30', '13:30', 'Arcadia Ice Arena');
+  assert(doc.querySelector('#coachWorkTimeMessage').textContent.includes('冲突'), 'Overview overlaps must use the same atomic rejection as the calendar editor.');
+  assert(JSON.stringify(win.slots) === beforeConflict, 'A rejected overlap must leave the entire draft unchanged.');
   assertNoRuntimeErrors("coach availability conflict actions", errors);
   dom.window.close();
 }
@@ -522,7 +555,7 @@ async function testCoachProfileDraftAndSave() {
   const { dom, errors } = await loadPage("coach/index.html");
   const win = dom.window;
   const doc = win.document;
-  const originalProfile = JSON.parse(JSON.stringify(win.getProfile("maya")));
+  const originalProfile = JSON.parse(JSON.stringify(win.readProfileState("maya").effective));
   const rinkInput = [...doc.querySelectorAll('input[name="servedRinks"]')].find((input) => input.value !== originalProfile.homeRink);
 
   assertNoRuntimeErrors("coach profile draft setup", errors);
@@ -539,7 +572,7 @@ async function testCoachProfileDraftAndSave() {
   assert(["height", "minHeight", "borderRadius", "fontSize", "fontWeight", "lineHeight", "paddingLeft", "paddingRight"].every((property) => previewProfileButtonStyle[property] === saveProfileButtonStyle[property]), "Coach preview and save actions must have matching dimensions, typography and horizontal padding.");
   assert(pendingButton.querySelector("svg") && !pendingButton.closest("#coachSaveToolbar"), "The pending reminder must retain its inbox icon and independent header placement.");
   assert(previewProfileButton.classList.contains("ghost-button") && saveProfileButton.classList.contains("primary-button"), "Coach header actions must retain secondary preview and primary save hierarchy.");
-  assert(doc.querySelectorAll(".coach-action-bar").length === 1 && doc.querySelector("#profileSaveStatus").textContent.trim() === "已保存", "The coach page must expose one initialized sticky action bar.");
+  assert(doc.querySelectorAll(".coach-action-bar").length === 1 && doc.querySelector("#profileSaveStatus").textContent.trim() === "已保存", "The coach page must expose one initialized welcome action bar.");
   assert(doc.querySelector("#previewCoachProfile").target === "_blank" && doc.querySelector("#previewCoachProfile span").textContent === "预览" && !doc.querySelector("#profilePreviewNote"), "Preview must preserve the editing tab and omit its former permanent second line.");
   let cleanPreviewConfirmations = 0;
   const defaultConfirm = win.confirm;
@@ -613,6 +646,9 @@ async function testCoachProfileDraftAndSave() {
     addEventListener(type, listener) {
       this.listeners[type] = listener;
     }
+    removeEventListener(type, listener) {
+      if (this.listeners[type] === listener) delete this.listeners[type];
+    }
     set src(value) {
       this.value = value;
       this.listeners.load?.();
@@ -646,14 +682,14 @@ async function testCoachProfileDraftAndSave() {
   assert(doc.querySelector("#coachPhotoDialogPreview").style.backgroundImage.includes("data:image/jpeg"), "The uploaded photo was not previewed.");
   doc.querySelector("#cancelCoachPhotoDialog").click();
   assert(!photoDialog.open, "Cancel did not close the photo dialog.");
-  assert(win.getProfile("maya").photoUrl === originalPhotoUrl, "Cancel changed the profile photo draft.");
+  assert(win.readProfileState("maya").effective.photoUrl === originalPhotoUrl, "Cancel changed the profile photo draft.");
   assert(doc.activeElement === doc.querySelector("#openCoachPhotoDialog"), "Closing the photo dialog did not restore focus to its opener.");
 
   doc.querySelector("#openCoachPhotoDialog").click();
   await selectPhoto("escaped.png");
   photoDialog.dispatchEvent(new win.Event("cancel", { cancelable: true }));
   photoDialog.close();
-  assert(win.getProfile("maya").photoUrl === originalPhotoUrl, "Esc cancellation changed the profile photo draft.");
+  assert(win.readProfileState("maya").effective.photoUrl === originalPhotoUrl, "Esc cancellation changed the profile photo draft.");
   doc.querySelector("#openCoachPhotoDialog").click();
   assert(doc.querySelector("#confirmCoachPhoto").disabled, "Reopening the photo dialog retained an unconfirmed candidate.");
   assert(doc.querySelector("#chooseCoachPhoto").textContent === "选择照片", "Reopening the photo dialog retained the reselect label.");
@@ -662,11 +698,11 @@ async function testCoachProfileDraftAndSave() {
   doc.querySelector("#openCoachPhotoDialog").click();
   await selectPhoto("confirmed.png");
   doc.querySelector("#confirmCoachPhoto").click();
-  assert(win.getProfile("maya").photoUrl.startsWith("data:image/jpeg"), "Confirming an uploaded photo did not update the profile draft.");
-  assert(win.getSavedProfile("maya").photoUrl === originalPhotoUrl, "Confirming an uploaded photo persisted it before the unified page save.");
+  assert(win.readProfileState("maya").effective.photoUrl.startsWith("data:image/jpeg"), "Confirming an uploaded photo did not update the profile draft.");
+  assert(win.readProfileState("maya").saved.photoUrl === originalPhotoUrl, "Confirming an uploaded photo persisted it before the unified page save.");
   doc.querySelector('[data-coach-panel="bookingsPanel"]').click();
   doc.querySelector('[data-coach-panel="profilePanel"]').click();
-  assert(win.getProfile("maya").photoUrl === originalPhotoUrl, "Discarding an uploaded photo draft changed the saved profile.");
+  assert(win.readProfileState("maya").effective.photoUrl === originalPhotoUrl, "Discarding an uploaded photo draft changed the saved profile.");
   assert(doc.querySelector("#coachRate").value === "60", "Maya's default base price must be $60 per 30 minutes.");
   assert(doc.querySelector("#coachRate").min === "1" && doc.querySelector("#coachRate").step === "1", "Base price input must accept positive integers in increments of one.");
   assert(doc.querySelector("#coachRate").closest(".money-input").textContent.includes("/30分钟"), "Base price unit must be 30 minutes.");
@@ -675,8 +711,8 @@ async function testCoachProfileDraftAndSave() {
   doc.querySelector("#coachBio").dispatchEvent(new win.Event("input", { bubbles: true }));
   doc.querySelector('#coachTeachingDisciplines input[value="pairs"]').click();
   assert(doc.querySelector("#profileSaveStatus").textContent.trim() === "未保存更改", "Editing must show its pending state.");
-  const draftBeforePreview = JSON.stringify(win.getProfile("maya"));
-  const savedBeforePreview = JSON.stringify(win.getSavedProfile("maya"));
+  const draftBeforePreview = JSON.stringify(win.readProfileState("maya").effective);
+  const savedBeforePreview = JSON.stringify(win.readProfileState("maya").saved);
   let previewWarning = "";
   win.confirm = (message) => { previewWarning = message; return false; };
   const cancelledPreview = new win.MouseEvent("click", { bubbles: true, cancelable: true });
@@ -685,47 +721,47 @@ async function testCoachProfileDraftAndSave() {
   win.confirm = () => true;
   const approvedPreview = new win.MouseEvent("click", { bubbles: true, cancelable: true });
   doc.querySelector("#previewCoachProfile").dispatchEvent(approvedPreview);
-  assert(!approvedPreview.defaultPrevented && JSON.stringify(win.getProfile("maya")) === draftBeforePreview && JSON.stringify(win.getSavedProfile("maya")) === savedBeforePreview && win.hasUnsavedProfileChanges, "Continuing preview must preserve both saved data and the unsaved editing draft without silently saving.");
+  assert(!approvedPreview.defaultPrevented && JSON.stringify(win.readProfileState("maya").effective) === draftBeforePreview && JSON.stringify(win.readProfileState("maya").saved) === savedBeforePreview && win.readProfileState("maya").dirty, "Continuing preview must preserve both saved data and the unsaved editing draft without silently saving.");
   const beforeUnload = new win.Event("beforeunload", { cancelable: true });
   win.dispatchEvent(beforeUnload);
   assert(beforeUnload.defaultPrevented, "Leaving with an unsaved profile did not trigger the beforeunload guard.");
   const discardedSpecialty = doc.querySelector('#coachSpecialtyOptions input[value="spins"]');
   discardedSpecialty.closest("label").click();
   assert(discardedSpecialty.checked, "Clicking the preset specialty text did not toggle its square checkbox.");
-  assert(win.getProfile("maya").bio && win.getProfile("maya").specialties.includes("spins") && win.getProfile("maya").teachingDisciplines.includes("pairs"), "Personal identity edits did not enter the profile draft.");
-  assert(!win.getSavedProfile("maya").bio && !win.getSavedProfile("maya").specialties.length && !win.getSavedProfile("maya").teachingDisciplines.length, "Personal detail edits mutated saved data before submit.");
+  assert(win.readProfileState("maya").effective.bio && win.readProfileState("maya").effective.specialties.includes("spins") && win.readProfileState("maya").effective.teachingDisciplines.includes("pairs"), "Personal identity edits did not enter the profile draft.");
+  assert(!win.readProfileState("maya").saved.bio && !win.readProfileState("maya").saved.specialties.length && !win.readProfileState("maya").saved.teachingDisciplines.length, "Personal detail edits mutated saved data before submit.");
   doc.querySelector('[data-coach-panel="bookingsPanel"]').click();
   doc.querySelector('[data-coach-panel="profilePanel"]').click();
   assert(doc.querySelector("#coachBio").value === "" && !doc.querySelector('#coachSpecialtyOptions input[value="spins"]').checked && !doc.querySelector('#coachTeachingDisciplines input[value="pairs"]').checked, "Discarding profile edits did not restore biography, disciplines, and specialties.");
   rinkInput.checked = false;
   rinkInput.dispatchEvent(new win.Event("change", { bubbles: true }));
-  assert(win.hasUnsavedProfileChanges, "Editing teaching rinks did not mark the profile draft as unsaved.");
-  assert(JSON.stringify(win.getSavedProfile("maya")) === JSON.stringify(originalProfile), "Editing a profile draft mutated saved profile data before submit.");
+  assert(win.readProfileState("maya").dirty, "Editing teaching rinks did not mark the profile draft as unsaved.");
+  assert(JSON.stringify(win.readProfileState("maya").saved) === JSON.stringify(originalProfile), "Editing a profile draft mutated saved profile data before submit.");
   doc.querySelector('[data-coach-panel="bookingsPanel"]').click();
-  assert(!win.hasUnsavedProfileChanges, "Leaving the profile after confirming discard kept the dirty state.");
-  assert(JSON.stringify(win.getProfile("maya")) === JSON.stringify(originalProfile), "Discarding profile edits changed saved profile data.");
+  assert(!win.readProfileState("maya").dirty, "Leaving the profile after confirming discard kept the dirty state.");
+  assert(JSON.stringify(win.readProfileState("maya").effective) === JSON.stringify(originalProfile), "Discarding profile edits changed saved profile data.");
 
   doc.querySelector('[data-coach-panel="profilePanel"]').click();
   const rinkInputs = [...doc.querySelectorAll('input[name="servedRinks"]')];
   rinkInputs.forEach((input) => { input.checked = false; });
   submit(doc.querySelector("#coachProfileForm"));
   assert(doc.querySelector("#profileMessage").textContent.includes("至少选择一个"), "The unified save lost the teaching-rink validation.");
-  assert(JSON.stringify(win.getSavedProfile("maya")) === JSON.stringify(originalProfile), "Invalid profile data was saved.");
+  assert(JSON.stringify(win.readProfileState("maya").saved) === JSON.stringify(originalProfile), "Invalid profile data was saved.");
   rinkInputs.forEach((input) => { input.checked = originalProfile.servedRinks.includes(input.value); });
   doc.querySelector("#coachRate").value = "47.5";
   submit(doc.querySelector("#coachProfileForm"));
   assert(doc.querySelector("#profileMessage").textContent.includes("整数"), "Base price validation accepted a decimal value.");
-  assert(JSON.stringify(win.getSavedProfile("maya")) === JSON.stringify(originalProfile), "Invalid base price changed saved profile data.");
+  assert(JSON.stringify(win.readProfileState("maya").saved) === JSON.stringify(originalProfile), "Invalid base price changed saved profile data.");
 
   doc.querySelector("#coachRate").value = "55";
   doc.querySelector("#coachRate").dispatchEvent(new win.Event("input", { bubbles: true }));
-  const lessonCountBeforeCancel = win.getProfile("maya").lessonOptions.length;
+  const lessonCountBeforeCancel = win.readProfileState("maya").effective.lessonOptions.length;
   doc.querySelector("#openLessonOptionEditor").click();
   assert(!doc.querySelector("#lessonOptionEditor").hidden && doc.querySelector("#openLessonOptionEditor").hidden, "Add lesson did not expand an inline table row.");
   doc.querySelector("#lessonName").value = "不应添加的课程";
   doc.querySelector("#cancelLessonOption").click();
   assert(doc.querySelector("#lessonOptionEditor").hidden && !doc.querySelector("#openLessonOptionEditor").hidden && doc.querySelector("#lessonName").value === "", "Cancel did not clear and collapse the uncommitted lesson row.");
-  assert(win.getProfile("maya").lessonOptions.length === lessonCountBeforeCancel, "Cancel changed the lesson draft collection.");
+  assert(win.readProfileState("maya").effective.lessonOptions.length === lessonCountBeforeCancel, "Cancel changed the lesson draft collection.");
   doc.querySelector("#openLessonOptionEditor").click();
   doc.querySelector("#addLessonOption").click();
   assert(doc.querySelector("#lessonDurationError").textContent.includes("时长") && doc.querySelector("#lessonPriceError").textContent.includes("价格"), "Missing lesson fields did not show errors beside their inputs.");
@@ -740,7 +776,7 @@ async function testCoachProfileDraftAndSave() {
   assert(doc.querySelector("#lessonPrice").value === "82.75", "Changing the base price overwrote a manually edited lesson price.");
   doc.querySelector("#lessonName").value = "45 分钟测试课";
   doc.querySelector("#addLessonOption").click();
-  assert(win.getProfile("maya").lessonOptions.some((lesson) => lesson.name === "45 分钟测试课" && lesson.price === 82.75), "A manually edited lesson price was not retained.");
+  assert(win.readProfileState("maya").effective.lessonOptions.some((lesson) => lesson.name === "45 分钟测试课" && lesson.price === 82.75), "A manually edited lesson price was not retained.");
   assert(doc.querySelector("#lessonOptionEditor").hidden && !doc.querySelector("#openLessonOptionEditor").hidden, "Successful lesson addition did not restore the table add entry.");
   assert(doc.querySelector("#coachRate").value === "56", "Adding a lesson reset the unsaved base price.");
 
@@ -762,31 +798,31 @@ async function testCoachProfileDraftAndSave() {
   assert(!doc.querySelector("#customSpecialtyEditor").hidden && doc.querySelector("#toggleCustomSpecialty").getAttribute("aria-expanded") === "true", "Custom specialty editor did not expand.");
   doc.querySelector("#customSpecialtyInput").value = "  成人零基础  ";
   doc.querySelector("#customSpecialtyInput").dispatchEvent(new win.KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
-  assert(win.getProfile("maya").customSpecialties.join("|") === "成人零基础" && doc.querySelector("#coachCustomSpecialties").textContent.includes("成人零基础"), "Enter did not trim and add a custom specialty to the profile draft.");
-  assert(win.getProfile("maya").selectedCustomSpecialties.join("|") === "成人零基础", "New custom specialty was not selected by default.");
+  assert(win.readProfileState("maya").effective.customSpecialties.join("|") === "成人零基础" && doc.querySelector("#coachCustomSpecialties").textContent.includes("成人零基础"), "Enter did not trim and add a custom specialty to the profile draft.");
+  assert(win.readProfileState("maya").effective.selectedCustomSpecialties.join("|") === "成人零基础", "New custom specialty was not selected by default.");
   assert(doc.querySelector("#customSpecialtyEditor").hidden && !doc.querySelector("#toggleCustomSpecialty").hidden, "Adding a custom specialty did not collapse the inline editor.");
   assert(doc.querySelector('#coachCustomSpecialties input[data-action="toggle-custom-specialty"]:checked')?.dataset.specialty === "成人零基础", "Custom specialty did not render as the same selected square checkbox control.");
   doc.querySelector("#toggleCustomSpecialty").click();
   doc.querySelector("#customSpecialtyInput").value = "成人零基础";
   doc.querySelector("#addCustomSpecialty").click();
-  assert(win.getProfile("maya").customSpecialties.length === 1 && doc.querySelector("#customSpecialtyMessage").textContent.includes("已存在"), "Duplicate custom specialty was accepted.");
+  assert(win.readProfileState("maya").effective.customSpecialties.length === 1 && doc.querySelector("#customSpecialtyMessage").textContent.includes("已存在"), "Duplicate custom specialty was accepted.");
   doc.querySelector("#customSpecialtyInput").value = "冰舞";
   doc.querySelector("#addCustomSpecialty").click();
   const iceDanceInput = doc.querySelector('input[data-action="toggle-custom-specialty"][data-specialty="冰舞"]');
   iceDanceInput.click();
-  assert(win.getProfile("maya").customSpecialties.includes("冰舞") && !win.getProfile("maya").selectedCustomSpecialties.includes("冰舞") && !iceDanceInput.checked, "Unchecking a custom specialty removed its option instead of only changing selection.");
+  assert(win.readProfileState("maya").effective.customSpecialties.includes("冰舞") && !win.readProfileState("maya").effective.selectedCustomSpecialties.includes("冰舞") && !iceDanceInput.checked, "Unchecking a custom specialty removed its option instead of only changing selection.");
   iceDanceInput.click();
   doc.querySelector('button[data-action="delete-custom-specialty"][data-specialty="冰舞"]').click();
-  assert(!win.getProfile("maya").customSpecialties.includes("冰舞") && !win.getProfile("maya").selectedCustomSpecialties.includes("冰舞"), "Custom specialty trash action did not delete the option and selection state.");
+  assert(!win.readProfileState("maya").effective.customSpecialties.includes("冰舞") && !win.readProfileState("maya").effective.selectedCustomSpecialties.includes("冰舞"), "Custom specialty trash action did not delete the option and selection state.");
   doc.querySelector("#toggleCustomSpecialty").click();
   doc.querySelector("#customSpecialtyInput").value = "待选专长";
   doc.querySelector("#addCustomSpecialty").click();
   doc.querySelector('input[data-action="toggle-custom-specialty"][data-specialty="待选专长"]').click();
-  assert(win.getProfile("maya").customSpecialties.includes("待选专长") && !win.getProfile("maya").selectedCustomSpecialties.includes("待选专长"), "Unselected custom specialty was not retained in the draft.");
+  assert(win.readProfileState("maya").effective.customSpecialties.includes("待选专长") && !win.readProfileState("maya").effective.selectedCustomSpecialties.includes("待选专长"), "Unselected custom specialty was not retained in the draft.");
   doc.querySelector("#toggleCustomSpecialty").click();
   doc.querySelector("#customSpecialtyInput").value = "不应添加";
   doc.querySelector("#customSpecialtyInput").dispatchEvent(new win.KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
-  assert(doc.querySelector("#customSpecialtyEditor").hidden && !win.getProfile("maya").customSpecialties.includes("不应添加"), "Escape did not cancel and collapse the custom specialty editor.");
+  assert(doc.querySelector("#customSpecialtyEditor").hidden && !win.readProfileState("maya").effective.customSpecialties.includes("不应添加"), "Escape did not cancel and collapse the custom specialty editor.");
   doc.querySelector("#toggleCustomSpecialty").click();
   doc.querySelector("#customSpecialtyInput").value = "同样不应添加";
   doc.querySelector("#cancelCustomSpecialty").click();
@@ -796,23 +832,23 @@ async function testCoachProfileDraftAndSave() {
   assert(!doc.querySelector("#travelConditionsLabel").classList.contains("is-hidden"), "Negotiable travel selection did not reveal the optional conditions field.");
   doc.querySelector("#travelConditions").value = "限市区范围，交通费用另议。";
   doc.querySelector("#travelConditions").dispatchEvent(new win.Event("input", { bubbles: true }));
-  assert(win.getProfile("maya").travelsToOtherRinks && win.getProfile("maya").travelConditions.includes("交通费用"), "Travel preference or conditions did not enter the profile draft.");
+  assert(win.readProfileState("maya").effective.travelsToOtherRinks && win.readProfileState("maya").effective.travelConditions.includes("交通费用"), "Travel preference or conditions did not enter the profile draft.");
   doc.querySelector("#openCoachPhotoDialog").click();
   await selectPhoto("saved.png");
   doc.querySelector("#confirmCoachPhoto").click();
-  assert(win.getProfile("maya").photoUrl === newPhotoUrl, "Confirming the photo did not update the profile draft.");
-  assert(win.getSavedProfile("maya").photoUrl === originalPhotoUrl, "Confirming the photo persisted it before the unified page save.");
+  assert(win.readProfileState("maya").effective.photoUrl === newPhotoUrl, "Confirming the photo did not update the profile draft.");
+  assert(win.readProfileState("maya").saved.photoUrl === originalPhotoUrl, "Confirming the photo persisted it before the unified page save.");
   assert(doc.querySelector("#saveProfileChanges").classList.contains("has-unsaved"), "The header save button did not show the unsaved state.");
   doc.querySelector("#saveProfileChanges").click();
-  assert(win.getProfile("maya").rate === newRate, "Saving the profile did not update the coach rate.");
-  assert(win.getProfile("maya").basePriceUnitMinutes === 30, "Saving the profile lost the 30-minute pricing marker.");
-  assert(win.getProfile("maya").photoUrl === newPhotoUrl, "The unified profile save did not update the coach photo.");
-  assert(win.getProfile("maya").bio === savedBio && JSON.stringify(win.getProfile("maya").specialties) === JSON.stringify(["edges", "footwork"]), "The unified profile save did not retain biography and preset specialties.");
-  assert(JSON.stringify(win.getProfile("maya").teachingDisciplines) === JSON.stringify(["singles", "ice-dance"]), "The unified profile save did not retain teaching disciplines.");
-  assert(JSON.stringify(win.getProfile("maya").customSpecialties) === JSON.stringify(["成人零基础", "待选专长"]), "The unified profile save did not retain selected and unselected custom specialty options.");
-  assert(JSON.stringify(win.getProfile("maya").selectedCustomSpecialties) === JSON.stringify(["成人零基础"]), "The unified profile save did not retain custom specialty selection state.");
-  assert(win.getProfile("maya").travelsToOtherRinks && win.getProfile("maya").travelConditions === "限市区范围，交通费用另议。", "The unified profile save did not retain negotiable travel conditions.");
-  assert(!win.hasUnsavedProfileChanges, "Saving the profile did not clear the dirty state.");
+  assert(win.readProfileState("maya").effective.rate === newRate, "Saving the profile did not update the coach rate.");
+  assert(win.readProfileState("maya").effective.basePriceUnitMinutes === 30, "Saving the profile lost the 30-minute pricing marker.");
+  assert(win.readProfileState("maya").effective.photoUrl === newPhotoUrl, "The unified profile save did not update the coach photo.");
+  assert(win.readProfileState("maya").effective.bio === savedBio && JSON.stringify(win.readProfileState("maya").effective.specialties) === JSON.stringify(["edges", "footwork"]), "The unified profile save did not retain biography and preset specialties.");
+  assert(JSON.stringify(win.readProfileState("maya").effective.teachingDisciplines) === JSON.stringify(["singles", "ice-dance"]), "The unified profile save did not retain teaching disciplines.");
+  assert(JSON.stringify(win.readProfileState("maya").effective.customSpecialties) === JSON.stringify(["成人零基础", "待选专长"]), "The unified profile save did not retain selected and unselected custom specialty options.");
+  assert(JSON.stringify(win.readProfileState("maya").effective.selectedCustomSpecialties) === JSON.stringify(["成人零基础"]), "The unified profile save did not retain custom specialty selection state.");
+  assert(win.readProfileState("maya").effective.travelsToOtherRinks && win.readProfileState("maya").effective.travelConditions === "限市区范围，交通费用另议。", "The unified profile save did not retain negotiable travel conditions.");
+  assert(!win.readProfileState("maya").dirty, "Saving the profile did not clear the dirty state.");
   assert(doc.querySelector("#profileMessage").textContent.trim() === "已保存" && doc.querySelector("#profileSaveStatus").textContent.trim() === "已保存", "The unified profile save did not show success feedback in both status locations.");
   assert(doc.querySelector("#saveProfileChanges").disabled && !doc.querySelector("#saveProfileChanges").hasAttribute("aria-busy"), "Successful saving must disable the clean save action and clear its busy state.");
   assert(JSON.parse(win.localStorage.getItem("ice-skating-coach-profiles-v2")).maya.rate === newRate, "Saved profile data was not persisted.");
@@ -825,9 +861,9 @@ async function testCoachProfileDraftAndSave() {
 
   const reloaded = await loadPage("coach/index.html", { localStorage: savedStorage });
   assertNoRuntimeErrors("coach profile reload", reloaded.errors);
-  assert(reloaded.dom.window.getProfile("maya").rate === newRate, "Saved coach rate was lost after reload.");
-  assert(reloaded.dom.window.getProfile("maya").lessonOptions.some((lesson) => lesson.name === "45 分钟测试课" && lesson.price === 82.75), "Saved lesson price was lost or recalculated after reload.");
-  assert(reloaded.dom.window.getProfile("maya").photoUrl === newPhotoUrl, "Saved coach photo was lost after reload.");
+  assert(reloaded.dom.window.readProfileState("maya").effective.rate === newRate, "Saved coach rate was lost after reload.");
+  assert(reloaded.dom.window.readProfileState("maya").effective.lessonOptions.some((lesson) => lesson.name === "45 分钟测试课" && lesson.price === 82.75), "Saved lesson price was lost or recalculated after reload.");
+  assert(reloaded.dom.window.readProfileState("maya").effective.photoUrl === newPhotoUrl, "Saved coach photo was lost after reload.");
   assert(!reloaded.dom.window.document.querySelector("#coachCity"), "The removed city field returned after reload.");
   assert(reloaded.dom.window.document.querySelector("#coachBio").value === savedBio, "Saved biography was lost after reload.");
   assert([...reloaded.dom.window.document.querySelectorAll('#coachTeachingDisciplines input[name="coachTeachingDisciplines"]:checked')].map((input) => input.value).join(",") === "singles,ice-dance", "Saved teaching disciplines were lost after reload.");
@@ -847,16 +883,16 @@ async function testLegacyBasePriceMigration() {
   };
   const firstLoad = await loadPage("coach/index.html", { localStorage: { "ice-skating-coach-profiles-v2": JSON.stringify(legacyProfiles) } });
   assertNoRuntimeErrors("legacy base price migration", firstLoad.errors);
-  assert(firstLoad.dom.window.getProfile("maya").rate === 60, "Maya's hourly rate did not migrate to a 30-minute base price.");
-  assert(firstLoad.dom.window.getProfile("alex").rate === 47, "Alex's hourly rate did not discard the fractional conversion.");
-  assert(firstLoad.dom.window.getProfile("sam").rate === 55, "Sam's hourly rate did not migrate to a 30-minute base price.");
-  assert(firstLoad.dom.window.getProfile("sam").lessonOptions.find((lesson) => lesson.id === "sam-custom").price === 83, "Migration recalculated an existing lesson price.");
-  assert(firstLoad.dom.window.getProfile("maya").travelFee === 25 && firstLoad.dom.window.getProfile("maya").travelConditions.includes("额外出行费 $25/次"), "Legacy travel fee meaning was not preserved in the negotiable conditions migration.");
-  assert(firstLoad.dom.window.getProfile("maya").selectedCustomSpecialties.join("|") === "旧自定义专长", "Legacy custom specialties were not selected during migration.");
-  assert(!firstLoad.dom.window.getProfile("maya").teachingDisciplines.length && firstLoad.dom.window.getProfile("maya").skatingStartYear === null, "Legacy profiles fabricated missing skating identity details during migration.");
-  assert(firstLoad.dom.window.getProfile("maya").coachingStartYear === 2015, "A legacy year without a visibility flag was not preserved.");
-  assert(firstLoad.dom.window.getProfile("alex").skatingStartYear === 2012, "A formerly private retained year was discarded during migration.");
-  assert(firstLoad.dom.window.getProfile("sam").coachingStartYear === 2014, "A formerly public year was lost during migration.");
+  assert(firstLoad.dom.window.readProfileState("maya").effective.rate === 60, "Maya's hourly rate did not migrate to a 30-minute base price.");
+  assert(firstLoad.dom.window.readProfileState("alex").effective.rate === 47, "Alex's hourly rate did not discard the fractional conversion.");
+  assert(firstLoad.dom.window.readProfileState("sam").effective.rate === 55, "Sam's hourly rate did not migrate to a 30-minute base price.");
+  assert(firstLoad.dom.window.readProfileState("sam").effective.lessonOptions.find((lesson) => lesson.id === "sam-custom").price === 83, "Migration recalculated an existing lesson price.");
+  assert(firstLoad.dom.window.readProfileState("maya").effective.travelFee === 25 && firstLoad.dom.window.readProfileState("maya").effective.travelConditions.includes("额外出行费 $25/次"), "Legacy travel fee meaning was not preserved in the negotiable conditions migration.");
+  assert(firstLoad.dom.window.readProfileState("maya").effective.selectedCustomSpecialties.join("|") === "旧自定义专长", "Legacy custom specialties were not selected during migration.");
+  assert(!firstLoad.dom.window.readProfileState("maya").effective.teachingDisciplines.length && firstLoad.dom.window.readProfileState("maya").effective.skatingStartYear === null, "Legacy profiles fabricated missing skating identity details during migration.");
+  assert(firstLoad.dom.window.readProfileState("maya").effective.coachingStartYear === 2015, "A legacy year without a visibility flag was not preserved.");
+  assert(firstLoad.dom.window.readProfileState("alex").effective.skatingStartYear === 2012, "A formerly private retained year was discarded during migration.");
+  assert(firstLoad.dom.window.readProfileState("sam").effective.coachingStartYear === 2014, "A formerly public year was lost during migration.");
   assert(firstLoad.dom.window.document.querySelector("#travelsToOtherRinks").value === "negotiable", "Legacy other-rink acceptance did not map to negotiable.");
   const migratedStorage = dumpLocalStorage(firstLoad.dom.window);
   const storedProfiles = JSON.parse(migratedStorage["ice-skating-coach-profiles-v2"]);
@@ -867,8 +903,8 @@ async function testLegacyBasePriceMigration() {
 
   const secondLoad = await loadPage("coach/index.html", { localStorage: migratedStorage });
   assertNoRuntimeErrors("migrated base price reload", secondLoad.errors);
-  assert(secondLoad.dom.window.getProfile("alex").rate === 47, "The migrated base price was converted a second time after reload.");
-  assert(secondLoad.dom.window.getProfile("sam").lessonOptions.find((lesson) => lesson.id === "sam-custom").price === 83, "Reload changed an existing lesson price.");
+  assert(secondLoad.dom.window.readProfileState("alex").effective.rate === 47, "The migrated base price was converted a second time after reload.");
+  assert(secondLoad.dom.window.readProfileState("sam").effective.lessonOptions.find((lesson) => lesson.id === "sam-custom").price === 83, "Reload changed an existing lesson price.");
   secondLoad.dom.window.close();
 }
 
@@ -879,41 +915,41 @@ async function testLessonDeletionDraftAndSave() {
   const lessonName = "45 分钟私教";
   const initialButtons = [...doc.querySelectorAll('button[data-action="remove-lesson"]')];
 
-  assert(initialButtons.length === win.getProfile("maya").lessonOptions.length, "Each lesson row must expose one delete action.");
+  assert(initialButtons.length === win.readProfileState("maya").effective.lessonOptions.length, "Each lesson row must expose one delete action.");
   assert(initialButtons.every((button) => button.querySelector("svg") && !button.textContent.trim() && button.dataset.tooltip === "删除课程"), "Lesson delete actions must render a trash icon with a visible hover/focus tooltip.");
   assert(initialButtons.every((button) => button.getAttribute("aria-label") === `删除 ${button.closest(".lesson-option-row").querySelector(".lesson-name-input").value}`), "Lesson delete actions must include the course name in their accessible labels.");
   const findDeleteButton = () => [...doc.querySelectorAll(".lesson-option-row")]
     .find((row) => row.querySelector(".lesson-name-input").value === lessonName)
     ?.querySelector('button[data-action="remove-lesson"]');
-  const savedLesson = JSON.parse(JSON.stringify(win.getSavedProfile("maya").lessonOptions.find((lesson) => lesson.name.includes("45"))));
-  const savedIndex = win.getSavedProfile("maya").lessonOptions.findIndex((lesson) => lesson.id === savedLesson.id);
+  const savedLesson = JSON.parse(JSON.stringify(win.readProfileState("maya").saved.lessonOptions.find((lesson) => lesson.name.includes("45"))));
+  const savedIndex = win.readProfileState("maya").saved.lessonOptions.findIndex((lesson) => lesson.id === savedLesson.id);
 
   findDeleteButton().click();
-  assert(!win.getProfile("maya").lessonOptions.some((lesson) => lesson.id === savedLesson.id), "Deleting a lesson did not remove it immediately from the profile draft.");
-  assert(win.getSavedProfile("maya").lessonOptions.some((lesson) => lesson.id === savedLesson.id), "Deleting a lesson persisted before the unified save.");
+  assert(!win.readProfileState("maya").effective.lessonOptions.some((lesson) => lesson.id === savedLesson.id), "Deleting a lesson did not remove it immediately from the profile draft.");
+  assert(win.readProfileState("maya").saved.lessonOptions.some((lesson) => lesson.id === savedLesson.id), "Deleting a lesson persisted before the unified save.");
   assert(doc.querySelector("#profileMessage").textContent.trim() === "已移除课程，保存后生效" && !doc.querySelector("#undoProfileChange").hidden, "Draft deletion did not expose the required pending-save feedback and undo action.");
   assert(doc.querySelector("#profileSaveStatus").textContent.trim() === "未保存更改", "Draft deletion did not update the floating unsaved state.");
 
   doc.querySelector("#undoProfileChange").click();
-  assert(JSON.stringify(win.getProfile("maya").lessonOptions[savedIndex]) === JSON.stringify(savedLesson), "Undo did not restore the removed lesson content and original position.");
+  assert(JSON.stringify(win.readProfileState("maya").effective.lessonOptions[savedIndex]) === JSON.stringify(savedLesson), "Undo did not restore the removed lesson content and original position.");
   assert(doc.querySelector("#profileMessage").textContent.trim() === "已恢复课程" && doc.querySelector("#undoProfileChange").hidden, "Undo feedback did not replace the removal action.");
 
   findDeleteButton().click();
   win.confirm = () => true;
   doc.querySelector('[data-coach-panel="bookingsPanel"]').click();
   doc.querySelector('[data-coach-panel="profilePanel"]').click();
-  assert(win.getProfile("maya").lessonOptions.some((lesson) => lesson.id === savedLesson.id) && findDeleteButton(), "Discarding lesson deletion did not restore the saved course.");
+  assert(win.readProfileState("maya").effective.lessonOptions.some((lesson) => lesson.id === savedLesson.id) && findDeleteButton(), "Discarding lesson deletion did not restore the saved course.");
 
   findDeleteButton().click();
   doc.querySelector("#saveProfileChanges").click();
-  assert(!win.getSavedProfile("maya").lessonOptions.some((lesson) => lesson.id === savedLesson.id), "Unified save did not persist lesson deletion.");
+  assert(!win.readProfileState("maya").saved.lessonOptions.some((lesson) => lesson.id === savedLesson.id), "Unified save did not persist lesson deletion.");
   assert(!JSON.parse(win.localStorage.getItem("ice-skating-coach-profiles-v2")).maya.lessonOptions.some((lesson) => lesson.id === savedLesson.id), "Persisted profile storage retained the deleted lesson.");
   const savedStorage = dumpLocalStorage(win);
   assertNoRuntimeErrors("lesson deletion draft and save", errors);
   dom.window.close();
 
   const reloaded = await loadPage("coach/index.html", { localStorage: savedStorage });
-  assert(!reloaded.dom.window.getProfile("maya").lessonOptions.some((lesson) => lesson.id === savedLesson.id), "Refreshing restored a course that was formally deleted and saved.");
+  assert(!reloaded.dom.window.readProfileState("maya").effective.lessonOptions.some((lesson) => lesson.id === savedLesson.id), "Refreshing restored a course that was formally deleted and saved.");
   assertNoRuntimeErrors("saved lesson deletion reload", reloaded.errors);
   reloaded.dom.window.close();
 }
@@ -922,7 +958,7 @@ async function testProfileSaveFailureKeepsDraft() {
   const { dom, errors } = await loadPage("coach/index.html");
   const win = dom.window;
   const doc = win.document;
-  const originalBio = win.getSavedProfile("maya").bio;
+  const originalBio = win.readProfileState("maya").saved.bio;
   const nativeSetItem = win.localStorage.setItem;
 
   doc.querySelector("#coachBio").value = "保存失败时必须保留的草稿";
@@ -930,15 +966,15 @@ async function testProfileSaveFailureKeepsDraft() {
   win.localStorage.setItem = () => { throw new win.DOMException("Storage unavailable", "QuotaExceededError"); };
   doc.querySelector("#saveProfileChanges").click();
 
-  assert(win.getSavedProfile("maya").bio === originalBio, "A failed save changed the saved profile.");
-  assert(win.getProfile("maya").bio === "保存失败时必须保留的草稿" && win.hasUnsavedProfileChanges, "A failed save discarded the profile draft or dirty state.");
+  assert(win.readProfileState("maya").saved.bio === originalBio, "A failed save changed the saved profile.");
+  assert(win.readProfileState("maya").effective.bio === "保存失败时必须保留的草稿" && win.readProfileState("maya").dirty, "A failed save discarded the profile draft or dirty state.");
   assert(doc.querySelector("#profileSaveStatus").textContent.trim() === "保存失败" && doc.querySelector("#profileMessage").textContent.includes("存储"), "A failed save did not explain the storage failure.");
   assert(!doc.querySelector("#coachSaveError").hidden && doc.querySelector("#coachSaveError").textContent.includes("存储"), "The floating save area must explain a failed save beside the retry action.");
   assert(!doc.querySelector("#saveProfileChanges").disabled && !doc.querySelector("#saveProfileChanges").hasAttribute("aria-busy"), "The save action remained locked after failure.");
 
   win.localStorage.setItem = nativeSetItem;
   doc.querySelector("#saveProfileChanges").click();
-  assert(win.getSavedProfile("maya").bio === "保存失败时必须保留的草稿" && doc.querySelector("#saveProfileChanges").disabled && doc.querySelector("#coachSaveError").hidden && doc.querySelector("#profileSaveStatus").textContent === "已保存", "Retrying from the floating action area must save the retained profile draft and clear its error.");
+  assert(win.readProfileState("maya").saved.bio === "保存失败时必须保留的草稿" && doc.querySelector("#saveProfileChanges").disabled && doc.querySelector("#coachSaveError").hidden && doc.querySelector("#profileSaveStatus").textContent === "已保存", "Retrying from the floating action area must save the retained profile draft and clear its error.");
   assertNoRuntimeErrors("profile save failure", errors);
   dom.window.close();
 }
@@ -948,9 +984,9 @@ async function testSafeDynamicRendering() {
   const win = dom.window;
   const doc = win.document;
   const unsafe = '<img src=x onerror="alert(1)">Unsafe';
-  const profile = JSON.parse(JSON.stringify(win.getSavedProfile("maya")));
+  const profile = JSON.parse(JSON.stringify(win.readProfileState("maya").saved));
   profile.lessonOptions = [{ id: 'lesson" unsafe', name: unsafe, duration: 30, price: 60 }];
-  win.setCoachProfileDraft(profile);
+  win.replaceCoachProfileDraft("maya", profile);
   win.render();
   assert(!doc.querySelector("#lessonOptionsList img"), "Editable lesson names were interpreted as HTML.");
   assert(doc.querySelector("#lessonOptionsList .lesson-name-input").value === unsafe, "Escaped lesson text did not round-trip through the form.");
@@ -984,24 +1020,22 @@ async function testRecurringAvailabilityAcceptance() {
   };
   const coachPage = await loadPage("coach/index.html", { localStorage: emptyStorage });
   const { document, Event } = coachPage.dom.window;
+  document.querySelector("#coachPlannerScope").value = "weekly";
+  document.querySelector("#coachPlannerScope").dispatchEvent(new Event("change", { bubbles: true }));
 
   assertNoRuntimeErrors("coach/index.html recurring availability setup", coachPage.errors);
   const saturday = nextWeekdayByIndex(coachPage.dom.window, 6);
   const nextSaturday = coachPage.dom.window.addDaysIso(saturday, 7);
+  document.querySelector('#coachPlannerTo').value = coachPage.dom.window.addDaysIso(saturday, 28);
+  document.querySelector('#coachPlannerTo').dispatchEvent(new Event('change', { bubbles: true }));
 
   document.querySelector('[data-coach-panel="availabilityPanel"]').click();
-  document.querySelector("#slotDate").value = saturday;
-  document.querySelector("#slotDate").dispatchEvent(new Event("change", { bubbles: true }));
-  document.querySelector("#startTime").value = "17:00";
-  document.querySelector("#startTime").dispatchEvent(new Event("change", { bubbles: true }));
-  document.querySelector("#endTime").value = "18:00";
-  document.querySelector("#locationType").value = "Polar Ice Rink";
-  submit(document.querySelector("#availabilityForm"));
+  addOverviewRange(document, saturday, '17:00', '18:00', 'Polar Ice Rink');
 
   let createdSlots = coachPage.dom.window.slots.filter((slot) => slot.coachId === "maya" && slot.date === saturday && slot.start >= "17:00" && slot.end <= "18:00");
   let repeatedSlots = coachPage.dom.window.slots.filter((slot) => slot.coachId === "maya" && slot.date === nextSaturday && slot.start >= "17:00" && slot.end <= "18:00");
-  assert(createdSlots.length === 2, "Recurring availability create did not add the selected date slots.");
-  assert(repeatedSlots.length === 2, "Recurring availability create did not repeat on the following week.");
+  assert(createdSlots.length === 1, "Recurring availability create did not add the selected date slots.");
+  assert(repeatedSlots.length === 1, "Recurring availability create did not repeat on the following week.");
   assert(document.querySelector("#availabilitySaveMessage").textContent.includes("未保存"), "Create should mark availability as unsaved.");
   assert(!document.querySelector("#saveProfileChanges").disabled && document.querySelector("#profileSaveStatus").dataset.tone === "dirty", "Availability edits must enable the header save action and show its dirty state.");
   const scheduleBeforeUnload = new coachPage.dom.window.Event("beforeunload", { cancelable: true });
@@ -1022,23 +1056,25 @@ async function testRecurringAvailabilityAcceptance() {
 
   const savedAfterCreate = dumpLocalStorage(coachPage.dom.window);
   const reloadedCoachPage = await loadPage("coach/index.html", { localStorage: savedAfterCreate });
+  reloadedCoachPage.dom.window.document.querySelector('#coachPlannerTo').value = coachPage.dom.window.addDaysIso(saturday, 28);
+  reloadedCoachPage.dom.window.document.querySelector('#coachPlannerTo').dispatchEvent(new reloadedCoachPage.dom.window.Event('change', { bubbles: true }));
   assertNoRuntimeErrors("coach/index.html recurring availability reload", reloadedCoachPage.errors);
   createdSlots = reloadedCoachPage.dom.window.slots.filter((slot) => slot.coachId === "maya" && slot.date === saturday && slot.start >= "17:00" && slot.end <= "18:00");
   repeatedSlots = reloadedCoachPage.dom.window.slots.filter((slot) => slot.coachId === "maya" && slot.date === nextSaturday && slot.start >= "17:00" && slot.end <= "18:00");
-  assert(createdSlots.length === 2 && repeatedSlots.length === 2, "Saved recurring availability did not persist after reload.");
+  assert(createdSlots.length === 1 && repeatedSlots.length === 1, "Saved recurring availability did not persist after reload.");
 
   const editDocument = reloadedCoachPage.dom.window.document;
-  editDocument.querySelector("#slotDate").value = saturday;
-  editDocument.querySelector("#slotDate").dispatchEvent(new reloadedCoachPage.dom.window.Event("change", { bubbles: true }));
-  editDocument.querySelector("#startTime").value = "17:00";
-  editDocument.querySelector("#startTime").dispatchEvent(new reloadedCoachPage.dom.window.Event("change", { bubbles: true }));
-  editDocument.querySelector("#endTime").value = "18:00";
-  editDocument.querySelector("#locationType").value = "Zoom";
-  submit(editDocument.querySelector("#availabilityForm"));
+  editDocument.querySelector("#coachPlannerScope").value = "weekly";
+  editDocument.querySelector("#coachPlannerScope").dispatchEvent(new reloadedCoachPage.dom.window.Event("change", { bubbles: true }));
+  overviewDate(editDocument, saturday);
+  const editRow = [...editDocument.querySelectorAll('#dropdownOpenSlots [data-work-day]')].find((node) => node.dataset.workDay === saturday);
+  editRow.querySelector('[data-planner-action="edit-work-range"]').click();
+  editDocument.querySelector('#coachWorkTimeLocation').value = 'Zoom';
+  submit(editDocument.querySelector('#coachWorkTimeForm'));
   editDocument.querySelector("#saveAvailability").click();
 
   const editedSlots = reloadedCoachPage.dom.window.slots.filter((slot) => slot.coachId === "maya" && [saturday, nextSaturday].includes(slot.date) && slot.start >= "17:00" && slot.end <= "18:00");
-  assert(editedSlots.length === 4 && editedSlots.every((slot) => slot.location === "Zoom"), "Recurring availability edit did not update existing weekly slots.");
+  assert(editedSlots.length === 2 && editedSlots.every((slot) => slot.location === "Zoom"), "Recurring availability edit did not update existing weekly slots.");
 
   const studentPage = await loadPage("student/index.html?access=full", { localStorage: dumpLocalStorage(reloadedCoachPage.dom.window) });
   assertNoRuntimeErrors("student/index.html recurring availability", studentPage.errors);
@@ -1059,13 +1095,17 @@ async function testRecurringAvailabilityAcceptance() {
   assert(futureRuleSlot && !futureRuleSlot.booked && futureRuleSlot.location === "Zoom", "Booking a single date changed the following weekly availability.");
 
   const deletePage = await loadPage("coach/index.html", { localStorage: dumpLocalStorage(studentPage.dom.window) });
+  deletePage.dom.window.document.querySelector('#coachPlannerTo').value = coachPage.dom.window.addDaysIso(saturday, 28);
+  deletePage.dom.window.document.querySelector('#coachPlannerTo').dispatchEvent(new deletePage.dom.window.Event('change', { bubbles: true }));
   assertNoRuntimeErrors("coach/index.html recurring availability delete", deletePage.errors);
   const deleteDocument = deletePage.dom.window.document;
-  deleteDocument.querySelector("#slotDate").value = saturday;
-  deleteDocument.querySelector("#slotDate").dispatchEvent(new deletePage.dom.window.Event("change", { bubbles: true }));
-  const deleteButton = [...deleteDocument.querySelectorAll('#dropdownOpenSlots [data-action="delete-many"]')].find((button) => button.dataset.start === "17:00" && button.dataset.end === "18:00");
-  assert(deleteButton, "Recurring availability delete action was not available.");
+  deleteDocument.querySelector("#coachPlannerScope").value = "weekly";
+  deleteDocument.querySelector("#coachPlannerScope").dispatchEvent(new deletePage.dom.window.Event("change", { bubbles: true }));
+  overviewDate(deleteDocument, saturday);
+  const deleteButton = deleteDocument.querySelector(`#dropdownOpenSlots [data-work-day="${saturday}"] [data-planner-action="edit-work-range"]`);
+  assert(deleteButton, 'Recurring availability delete action must be available.');
   deleteButton.click();
+  deleteDocument.querySelector('#deleteCoachWorkTime').click();
   deleteDocument.querySelector("#saveAvailability").click();
 
   const afterDelete = deletePage.dom.window.slots.filter((slot) => slot.coachId === "maya" && slot.date >= saturday && deletePage.dom.window.weekdayIndex(slot.date) === 6 && slot.start >= "17:00" && slot.end <= "18:00");
@@ -1074,20 +1114,33 @@ async function testRecurringAvailabilityAcceptance() {
 
 async function testTicketAcceptanceCoverage() {
   const findings = [];
+  const ticketNow = "2026-11-18T05:00:00-07:00";
   const addFinding = (ticket, message) => findings.push(`${ticket}: ${message}`);
   const hasText = (document, text) => document.body.textContent.includes(text);
-  const studentPage = await loadPage("student/index.html?access=full");
-  const coachPage = await loadPage("coach/index.html");
-  const adminPage = await loadPage("admin/index.html");
+  const studentPage = await loadPage("student/index.html?access=full", { now: ticketNow });
+  const coachPage = await loadPage("coach/index.html", { now: ticketNow });
+  const adminPage = await loadPage("admin/index.html", { now: ticketNow });
   const { document: studentDocument } = studentPage.dom.window;
   const { document: coachDocument } = coachPage.dom.window;
   const { document: adminDocument } = adminPage.dom.window;
 
-  if (!studentDocument.querySelector("form[action], form#studentSignupForm, input[type='password']")) {
-    addFinding("学生注册、登录并保持会话", "No real student signup/login form or persisted session control is implemented; login is only an access=full link.");
-  }
+  const studentLoginLink = studentDocument.querySelector("#studentLoginPrompt");
+  assert(studentLoginLink && new URL(studentLoginLink.href).pathname.endsWith("/student/login/index.html"), "Student entry must link to the real login page.");
+  assert(!studentDocument.querySelector("#studentSignupForm"), "Student home must not retain a fake authentication form.");
+  const studentLogin = await loadPage("student/login/index.html", { now: ticketNow });
+  assertNoRuntimeErrors("student/login/index.html ticket auth contract", studentLogin.errors);
+  const studentLoginDocument = studentLogin.dom.window.document;
+  const studentAuthForm = studentLoginDocument.querySelector("form#studentSignupForm[data-auth-form]");
+  assert(studentAuthForm && studentAuthForm.getAttribute("method").toLowerCase() === "post" && studentAuthForm.getAttribute("action") === "/api/auth/login", "Student authentication must use the real POST login contract.");
+  assert(studentAuthForm.querySelector('input[name="email"][type="email"][required]') && studentAuthForm.querySelector('input[name="password"][type="password"][required][autocomplete="current-password"]'), "Real student login must retain required named credentials.");
+  assert(studentAuthForm.querySelector('button[type="submit"][data-auth-submit]') && studentAuthForm.querySelector('[data-auth-register]') && studentAuthForm.querySelector('input[name="remember"][type="checkbox"]'), "Real student auth must retain login, registration and persisted-session controls.");
+  assert(fs.readFileSync("student/login/index.html", "utf8").includes('<script type="module" src="../../js/student-login-entry.js"></script>'), "Real student login must load its authentication entry module.");
+  assert(studentAuthForm.querySelector("[data-auth-submit]").disabled && !studentAuthForm.querySelector("[data-demo-only]").hidden, "The real auth controller must initialize honest static-demo mode without claiming an authenticated session.");
 
-  const coachLogin = await loadPage("coach/login/index.html");
+  studentLogin.dom.window.close();
+  testPages.delete(studentLogin.dom);
+
+  const coachLogin = await loadPage("coach/login/index.html", { now: ticketNow });
   const coachLoginDocument = coachLogin.dom.window.document;
   if (!coachLoginDocument.querySelector("form[action], form#coachLoginForm, input[type='password']")) {
     addFinding("准备可测试的教练账号与教练资料", "No real coach test-account sign-in form is implemented; coach access is only a demo link.");
@@ -1100,7 +1153,7 @@ async function testTicketAcceptanceCoverage() {
   }
 
   const firstOpenSlot = studentPage.dom.window.slots.find((slot) => {
-    return slot.coachId === "maya" && !slot.booked && new Date(`${slot.date}T${slot.end}`) > new Date();
+    return slot.coachId === "maya" && !slot.booked && new Date(`${slot.date}T${slot.end}`) > new Date(ticketNow);
   });
   studentPage.dom.window.openBookingDialog(firstOpenSlot.id);
   if (!studentDocument.querySelector("#bookingForSelf")) {
@@ -1137,12 +1190,12 @@ async function testTicketAcceptanceCoverage() {
     addFinding("学生查看、修改和取消预约", "My Bookings does not show the attending student name after booking.");
   }
   const persistedStudentState = dumpLocalStorage(studentPage.dom.window);
-  const studentNavReload = await loadPage("student/index.html?access=full", { localStorage: persistedStudentState });
+  const studentNavReload = await loadPage("student/index.html?access=full", { now: ticketNow, localStorage: persistedStudentState });
   if (!studentNavReload.dom.window.document.querySelector('[data-student-content="studentBookingsPanel"]')?.classList.contains("active")) {
     addFinding("学生端导航状态持久化", "Student tab navigation does not persist the last selected booking panel.");
   }
   persistedStudentState["ice-skating-student-active-panel-v1"] = "missingPanel";
-  const invalidNavReload = await loadPage("student/index.html?access=full", { localStorage: persistedStudentState });
+  const invalidNavReload = await loadPage("student/index.html?access=full", { now: ticketNow, localStorage: persistedStudentState });
   if (!invalidNavReload.dom.window.document.querySelector('[data-student-content="studentBookPanel"]')?.classList.contains("active")) {
     addFinding("学生端导航状态持久化", "Invalid persisted student tab state does not fall back to the default booking panel.");
   }
@@ -1158,7 +1211,7 @@ async function testTicketAcceptanceCoverage() {
   if (!coachBookingsText.includes("QA Student") || !coachBookingsText.includes(bookedSlot.location) || !coachBookingsText.includes(String(bookedSlot.lessonDuration))) {
     addFinding("教练端查看已确认预约", "Coach bookings list does not show confirmed booking student, rink, and duration.");
   }
-  const bookingStatusNow = new Date();
+  const bookingStatusNow = new Date(ticketNow);
   const bookingEnded = new Date(`${bookedSlot.date}T${bookedSlot.end}`) < bookingStatusNow;
   if (bookingEnded && !coachBookingsText.includes("已结束")) {
     addFinding("教练端查看预约", "Coach bookings list does not display the ended status.");
@@ -1167,7 +1220,7 @@ async function testTicketAcceptanceCoverage() {
     addFinding("教练端查看预约", "Upcoming normal bookings do not show the explicit successful-booking status.");
   }
 
-  const profile = coachPage.dom.window.getProfile("maya");
+  const profile = coachPage.dom.window.readProfileState("maya").effective;
   if (!profile.servedRinks?.length || !profile.lessonOptions?.length) {
     addFinding("准备可测试的教练账号与教练资料", "Default coach profile is missing teaching rinks or lesson pricing.");
   }
@@ -1180,32 +1233,24 @@ async function testTicketAcceptanceCoverage() {
   }
 
   coachDocument.querySelector('[data-coach-panel="availabilityPanel"]').click();
-  if (!coachDocument.querySelector("#locationType") || !coachDocument.querySelector("#startTime") || !coachDocument.querySelector("#endTime")) {
-    addFinding("可用时间手动输入", "Manual availability form is missing rink/start/end fields.");
+  if (!coachDocument.querySelector("#coachWorkTimeLocation") || !coachDocument.querySelector("#coachWorkTimeStart") || !coachDocument.querySelector("#coachWorkTimeEnd")) {
+    addFinding("可用时间手动输入", "Overview editor is missing rink/start/end fields.");
   }
-  coachDocument.querySelector("#startTime").value = "10:00";
-  coachDocument.querySelector("#startTime").dispatchEvent(new coachPage.dom.window.Event("change", { bubbles: true }));
-  coachDocument.querySelector("#endTime").value = "09:30";
-  submit(coachDocument.querySelector("#availabilityForm"));
-  if (!coachDocument.querySelector("#formMessage")?.textContent.includes("结束时间需要晚于开始时间")) {
+  const date = coachPage.dom.window.nextWeekdayIso();
+  addOverviewRange(coachDocument, date, '10:00', '09:30', 'Polar Ice Rink');
+  if (!coachDocument.querySelector("#coachWorkTimeMessage")?.textContent.includes("结束时间需晚于开始时间")) {
     addFinding("可用时间手动输入", "Invalid manual time range does not show clear validation feedback.");
   }
-
   const beforeOverlap = coachPage.dom.window.slots.length;
-  const date = coachPage.dom.window.nextWeekdayIso();
-  coachDocument.querySelector("#slotDate").value = date;
-  coachDocument.querySelector("#startTime").value = "12:00";
-  coachDocument.querySelector("#startTime").dispatchEvent(new coachPage.dom.window.Event("change", { bubbles: true }));
-  coachDocument.querySelector("#endTime").value = "13:00";
-  coachDocument.querySelector("#locationType").value = "Polar Ice Rink";
-  submit(coachDocument.querySelector("#availabilityForm"));
-  coachDocument.querySelector("#locationType").value = "Arcadia Ice Arena";
-  submit(coachDocument.querySelector("#availabilityForm"));
-  if (!coachDocument.querySelector("dialog#conflictDialog, [data-conflict-dialog]")) {
-    addFinding("可用时间冲突处理", "Cross-rink overlapping availability is overwritten without a conflict dialog offering Override and Cancel.");
+  addOverviewRange(coachDocument, date, '12:00', '13:00', 'Polar Ice Rink');
+  const beforeConflict = JSON.stringify(coachPage.dom.window.slots);
+  addOverviewRange(coachDocument, date, '12:00', '13:00', 'Arcadia Ice Arena');
+  if (!coachDocument.querySelector('#coachWorkTimeMessage').textContent.includes('冲突') || JSON.stringify(coachPage.dom.window.slots) !== beforeConflict) {
+    addFinding("可用时间冲突处理", "Cross-rink overlap must be rejected atomically with clear feedback.");
   }
+  coachDocument.getElementById('cancelCoachWorkTime').click();
   if (coachPage.dom.window.slots.length < beforeOverlap) {
-    addFinding("可用时间冲突处理", "Overlap handling is not an explicit atomic trim flow.");
+    addFinding("可用时间冲突处理", "Overlap handling removed existing slots.");
   }
 
   if (!coachDocument.querySelector("#dragCalendar .calendar-cell")) {
@@ -1293,7 +1338,7 @@ async function testTicketAcceptanceCoverage() {
 }
 
 async function testCoachScheduleFilters() {
-  const { dom, errors } = await loadPage("coach/index.html");
+  const { dom, errors } = await loadPage("coach/index.html", { now: "2026-11-16T12:00:00-07:00" });
   const win = dom.window;
   const doc = win.document;
   doc.querySelector('[data-coach-panel="bookingsPanel"]').click();
@@ -1714,8 +1759,8 @@ async function testCoachPendingRequestFlow() {
     { id: "request-change", type: "booking-change", bookingId: booked.id, coachId: "maya", student: { name: "Existing Student" }, status: "negotiating", waitingFor: "student", proposerRole: "coach", acceptedBy: ["coach"], proposal: { ...proposal(1, "10:00", "10:30"), location: "Arcadia Ice Arena" }, expiresAt, createdAt, events: [] },
     { id: "request-expired", type: "new-booking", coachId: "maya", student: { name: "Past" }, status: "negotiating", waitingFor: "coach", proposerRole: "student", acceptedBy: ["student"], proposal: proposal(1, "15:00", "15:30"), expiresAt: new Date(Date.now() - 60_000).toISOString(), createdAt, events: [] },
   ];
-  win.synchronizeExpiredBookingRequests();
-  win.synchronizeBookingRequestConflicts();
+  win.synchronizeExpiredBookingRequestsResult();
+  win.synchronizeBookingRequestConflictsResult();
   win.renderCoachBookingRequests();
   win.render();
   const changeBookingRow = doc.querySelector('#coachSlots [data-slot-id="request-conflict-booking"]');
@@ -1734,7 +1779,7 @@ async function testCoachPendingRequestFlow() {
   assert(doc.querySelector(".bookings-panel").dataset.bookingView === "requests", "Special requests must be a peer booking view rather than a list category.");
   const requestEntryStyle = win.getComputedStyle(doc.querySelector("#coachRequestSectionTrigger"));
   assert(doc.querySelectorAll(".coach-booking-side-nav > button").length === 2 && requestEntryStyle.borderTopWidth === "0px", "Two independent side entries must replace the former top-level view row.");
-  const requestControlCss = fs.readFileSync(path.resolve("css/design-system.css"), "utf8");
+  const requestControlCss = fs.readFileSync(path.resolve("css/coach-workspace.css"), "utf8");
   assert(/\.coach-request-section-trigger\.active\s*\{[^}]*background:\s*linear-gradient/s.test(requestControlCss) && /\.coach-request-filter\.active\s*\{[^}]*background:\s*var\(--brand-soft\)/s.test(requestControlCss), "The primary request entry must use its soft sage gradient while active secondary filters remain quieter.");
   assert(doc.querySelectorAll('#coachRequestRecords [data-request-id]').length === 4 && !doc.querySelector('#coachRequestRecords [data-request-id="request-expired"]'), "The special-request workspace must contain only active negotiations.");
   doc.querySelector('[data-booking-section="bookingListSection"]').click();
@@ -1850,8 +1895,7 @@ async function testCoachPendingRequestFlow() {
   doc.querySelector("#extendCoachRequest").click();
   assert(`${booked.date}|${booked.start}|${booked.end}|${booked.location}|${booked.lessonPrice}` === originalSchedule, "Reading or extending an unagreed change request must not mutate the original booking.");
   const changeRequest = win.bookingRequests.find((request) => request.id === "request-change");
-  changeRequest.waitingFor = "coach";
-  changeRequest.acceptedBy = ["student"];
+  win.publishBookingRequests(win.bookingRequests.map(request => request === changeRequest ? { ...request, waitingFor: "coach", acceptedBy: ["student"] } : request));
   win.render();
   doc.querySelector('[data-booking-section="bookingListSection"]').click();
   doc.querySelector('[data-coach-booking-period="upcoming"]').click();
@@ -1859,7 +1903,7 @@ async function testCoachPendingRequestFlow() {
   doc.querySelector("#coachRequestSectionTrigger").click();
   doc.querySelector('#coachRequestRecords [data-request-id="request-change"]').click();
   doc.querySelector("#acceptCoachRequest").click();
-  assert(win.bookingRequests.find((request) => request.id === "request-change").status === "agreed" && booked.location === "Arcadia Ice Arena" && booked.availabilityLocation === "Polar Ice Rink", "An agreed same-time location change must update the actual rink only after acceptance while preserving the original availability rink for calendar comparison.");
+  assert(win.bookingRequests.find((request) => request.id === "request-change").status === "agreed" && win.slots.find((slot) => slot.id === booked.id).location === "Arcadia Ice Arena" && win.slots.find((slot) => slot.id === booked.id).availabilityLocation === "Polar Ice Rink", "An agreed same-time location change must update the actual rink only after acceptance while preserving the original availability rink for calendar comparison.");
 
   doc.querySelector('[data-booking-section="bookingListSection"]').click();
   doc.querySelector('[data-coach-booking-period="upcoming"]').click();
@@ -1908,8 +1952,8 @@ async function testCoachScheduleCalendarGrid() {
   const win = dom.window;
   const doc = win.document;
   const weekStart = win.startOfWeekIso(win.nextWeekdayIso(1));
-  const designSystemCss = fs.readFileSync(path.resolve("css/design-system.css"), "utf8");
-  assert(/\.coach-week-calendar\s*\{[^}]*overscroll-behavior-y:\s*auto;[^}]*touch-action:\s*pan-x pan-y;/s.test(designSystemCss), "Coach calendars must restore native wheel and touchpad scroll chaining at their boundaries.");
+  const calendarCss = fs.readFileSync(path.resolve("css/calendar.css"), "utf8");
+  assert(/\.coach-week-calendar\s*\{[^}]*overscroll-behavior-y:\s*auto;[^}]*touch-action:\s*pan-x pan-y;/s.test(calendarCss), "Coach calendars must restore native wheel and touchpad scroll chaining at their boundaries.");
   const booking = (id, day, start, end, location, studentName, extra = {}) => ({
     id,
     coachId: "maya",
@@ -1964,7 +2008,8 @@ async function testCoachScheduleCalendarGrid() {
   assert(availability45?.classList.contains("is-availability-booking") && availability45.style.gridRow.endsWith("span 45"), "Availability calendar bookings must use the same exact minute scale.");
   assert(availability45.style.getPropertyValue("--booking-accent") === block45.style.getPropertyValue("--booking-accent"), "The same rink must use the same booking color in both calendars.");
   assert(doc.querySelector("#dragCalendar .calendar-time").style.gridRow === doc.querySelector("#exceptionDragCalendar .calendar-time").style.gridRow, "Both calendars must align time-axis rows identically.");
-  assert(doc.querySelector("#dragCalendar .calendar-day").innerHTML === doc.querySelector("#exceptionDragCalendar .calendar-day").innerHTML, "Both calendars must share weekday and date header rendering.");
+  const headerLabel = (selector) => [...doc.querySelector(selector).querySelectorAll(':scope > strong, :scope > span')].map((node) => node.textContent).join(' ');
+  assert(headerLabel('#dragCalendar .calendar-day') === headerLabel('#exceptionDragCalendar .calendar-day'), "Both calendars must share weekday and date labels while availability adds its day-operation control.");
   assert(block45.textContent.includes("Forty Five Student") && block45.textContent.includes("09:15–10:00") && block45.textContent.includes("Arcadia") && block45.title.includes("Arcadia Ice Arena"), "Appointment blocks must show the maintained rink abbreviation while retaining the full rink name in details.");
   assert(block60.textContent.includes("Oceanside") && block60.title.includes("Oceanside Ice Arena"), "Long rink names must use an explicit abbreviation without losing the full accessible label.");
   assert(block30.style.getPropertyValue("--booking-accent") !== block45.style.getPropertyValue("--booking-accent") && block45.style.getPropertyValue("--booking-accent") !== block60.style.getPropertyValue("--booking-accent"), "Different rinks must retain distinct booking colors.");
@@ -1999,104 +2044,895 @@ async function testCoachScheduleCalendarGrid() {
   assert(doc.querySelector('.coach-calendar-booking[data-slot-id="lesson-45"]').style.gridRow.endsWith("span 45"), "Full-day mode must preserve exact appointment duration.");
 
   const dragDate = win.addDaysIso(weekStart, 6);
-  const dragCell = doc.querySelector(`#dragCalendar [data-day-index="6"][data-minutes="840"]`);
-  dragCell.setPointerCapture = () => {};
-  doc.querySelector("#calendarLocationType").value = "Polar Ice Rink";
-  win.startCalendarDrag({ target: dragCell, pointerId: 1 });
-  win.finishCalendarDrag();
-  assert(win.slots.some((slot) => slot.date === dragDate && slot.start === "14:00" && !slot.booked), "Availability drag must retain its existing create behavior.");
-  assert(doc.querySelector("#availabilitySaveMessage").textContent.includes("未保存"), "Calendar drag changes must remain clearly unsaved.");
-  doc.querySelector("#saveAvailability").click();
-  assert(doc.querySelector("#availabilitySaveMessage").textContent.includes("已保存"), "Dragged availability must retain the existing save behavior.");
-  const savedDragCell = doc.querySelector(`#dragCalendar [data-day-index="6"][data-minutes="840"]`);
-  savedDragCell.setPointerCapture = () => {};
-  doc.querySelector("#calendarLocationType").value = "Unavailable";
-  win.startCalendarDrag({ target: savedDragCell, pointerId: 2 });
-  win.finishCalendarDrag();
-  assert(!win.slots.some((slot) => slot.date === dragDate && slot.start === "14:00" && !slot.booked), "Availability drag must retain its existing delete behavior.");
-  assert(doc.querySelector("#availabilitySaveMessage").textContent.includes("未保存"), "Dragged deletion must remain pending until saved.");
-  doc.querySelector("#saveAvailability").click();
-  assert(doc.querySelector("#availabilitySaveMessage").textContent.includes("已保存"), "Dragged deletion must retain the existing save behavior.");
+  for (const [id, value] of [['coachPlannerScope', 'dates'], ['coachPlannerFrom', weekStart], ['coachPlannerTo', dragDate]]) { const field = doc.getElementById(id); field.value = value; field.dispatchEvent(new win.Event('change', { bubbles: true })); }
+  const context = (node) => node.dispatchEvent(new win.MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
+  const command = (label) => { const button = [...doc.querySelectorAll('#coachOpenContextMenu button')].find((item) => calendarMenuLabel(item) === label); assert(button && !button.disabled, `Missing calendar command: ${label}`); button.click(); };
+  const dragCell = () => doc.querySelector('#dragCalendar .calendar-cell[data-day-index="6"][data-minutes="840"]');
+  const beforeSelect = JSON.stringify(win.slots); dragCell().click();
+  assert(JSON.stringify(win.slots) === beforeSelect, 'Cell selection must not paint or save availability.');
+  doc.querySelector('#calendarRinkOptions [data-rink="Polar Ice Rink"]').click(); dragCell().click();
+  doc.querySelector('#calendarRinkOptions [data-rink="Polar Ice Rink"]').click();
+  assert(win.slots.some((slot) => slot.date === dragDate && slot.start === '14:00' && !slot.booked), 'Explicit selection commands must create draft availability.');
+  doc.querySelector('#saveAvailability').click();
+  assert(doc.querySelector('#availabilitySaveMessage').textContent.includes('已保存'), 'Selection commands must retain the established save behavior.');
+  context(dragCell()); command('删除选中开放时段');
+  assert(!win.slots.some((slot) => slot.date === dragDate && slot.start === '14:00' && !slot.booked), 'Delete must only remove the selected range.');
+  doc.querySelector('#saveAvailability').click();
   assertNoRuntimeErrors("Coach calendar grid", errors);
   dom.window.close();
 }
 
 async function testAvailabilityDragRetraction() {
-  const { dom, errors } = await loadPage("coach/index.html");
+  const { dom, errors } = await loadPage('coach/index.html');
   const win = dom.window, doc = win.document;
   doc.querySelector('[data-coach-panel="availabilityPanel"]').click();
-  const weekStart = win.startOfWeekIso(win.addDaysIso(win.todayIso(), 14));
-  const date = win.addDaysIso(weekStart, 2);
-  const makeSlot = (id, start, end, location, booked = false) => ({
-    id, coachId: "maya", date, start, end, location, availabilityLocation: location,
-    booked, student: booked ? { name: "Keep booking", email: "keep@example.com" } : null,
-    lessonName: "Private lesson", lessonDuration: 30, lessonPrice: 60,
-  });
-  const booking = makeSlot("keep-booking", "08:00", "08:30", "Zoom", true);
-  win.slots = [
-    makeSlot("original-purple", "06:00", "06:30", "Any served rink"),
-    makeSlot("original-green", "06:30", "07:00", "Polar Ice Rink"),
-    makeSlot("original-purple-later", "07:00", "07:30", "Any served rink"),
-    makeSlot("draft-base", "07:30", "08:00", "Arcadia Ice Arena"), booking,
-    makeSlot("reverse-start", "08:30", "09:00", "Any served rink"),
+  const week = win.startOfWeekIso(win.addDaysIso(win.todayIso(), 14)), date = win.addDaysIso(week, 2);
+  win.slots = [{ id: 'selection-base', coachId: 'maya', date, start: '06:00', end: '09:00', location: 'Any served rink', booked: false }];
+  doc.getElementById('calendarWeekStart').value = week; win.renderDragCalendar();
+  const calendar = doc.getElementById('dragCalendar'), cell = (minute) => calendar.querySelector(`.calendar-cell[data-day-index="2"][data-minutes="${minute}"]`);
+  let hit = cell(360); doc.elementsFromPoint = () => [hit];
+  const pointer = (node, type, y) => { const event = new win.MouseEvent(type, { bubbles: true, cancelable: true, clientX: 100, clientY: y, button: 0 }); Object.defineProperty(event, 'pointerId', { value: 1 }); node.dispatchEvent(event); };
+  const before = JSON.stringify(win.captureAvailabilityUndoState()), originalGrid = [...calendar.querySelectorAll('.calendar-cell')].map((node) => node.outerHTML).join('');
+  pointer(hit, 'pointerdown', 10); hit = cell(510); pointer(calendar, 'pointermove', 90); hit = cell(390); pointer(calendar, 'pointermove', 30);
+  assert(calendar.querySelector('.calendar-open-selection').getAttribute('aria-label').endsWith('06:00–07:00'), 'Retracting selection must retain only the final range.');
+  doc.dispatchEvent(new win.KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+  assert(!calendar.querySelector('.calendar-open-selection') && JSON.stringify(win.captureAvailabilityUndoState()) === before, 'Escape must cancel selection without editing the draft or undo history.');
+  hit = cell(510); pointer(hit, 'pointerdown', 90); hit = cell(360); pointer(calendar, 'pointermove', 10); hit = cell(450); pointer(calendar, 'pointermove', 50);
+  assert(calendar.querySelector('.calendar-open-selection').getAttribute('aria-label').endsWith('07:30–09:00'), 'Reverse selection must retract without changing its data.');
+  calendar.dispatchEvent(new win.Event('pointercancel', { bubbles: true }));
+  assert([...calendar.querySelectorAll('.calendar-cell')].map((node) => node.outerHTML).join('') === originalGrid && JSON.stringify(win.captureAvailabilityUndoState()) === before, 'Pointer cancellation must leave original colors, exact times and draft markers intact.');
+  assertNoRuntimeErrors('Availability range selection retraction', errors); dom.window.close();
+}
+
+async function testAutomaticSchedulingBookingTransactions() {
+  const { dom, errors } = await loadPage("coach/index.html");
+  const win = dom.window, doc = win.document;
+  const date = win.addDaysIso(win.todayIso(), 14);
+  const make = (id, start, end, location, booked = false) => ({ id, coachId: "maya", date, start, end, location, availabilityLocation: location, booked, status: booked ? "Booked" : undefined, student: booked ? { name: id, email: `${id}@example.com` } : null, lessonName: "私教课", lessonDuration: 30, lessonPrice: 60 });
+  const original = make("planner-fixed-A", "09:00", "09:30", "Polar Ice Rink", true);
+  win.slots = [original, ...[["09:30", "10:00"], ["10:00", "10:30"], ["10:30", "11:00"], ["11:00", "11:30"], ["11:30", "12:00"]].map(([start, end], index) => make(`planner-open-${index}`, start, end, "Polar Ice Rink"))];
+  const config = win.createSchedulingConfig(win.readProfileState("maya").saved.servedRinks);
+  config.enabled = true;
+  config.workDays = Array.from({ length: 7 }, () => ({ enabled: true, start: "06:00", end: "17:30" }));
+  for (const location of config.locations) {
+    location.included = location.name !== "Oceanside Ice Arena";
+    location.windows = location.included ? [{ days: [0, 1, 2, 3, 4, 5, 6], start: "06:00", end: "17:30" }] : [];
+  }
+  config.travelRules = [
+    { id: "A-B", from: "Polar Ice Rink", to: "Arcadia Ice Arena", days: [0, 1, 2, 3, 4, 5, 6], start: "00:00", end: "24:00", minutes: 30 },
+    { id: "B-A", from: "Arcadia Ice Arena", to: "Polar Ice Rink", days: [0, 1, 2, 3, 4, 5, 6], start: "00:00", end: "24:00", minutes: 30 },
   ];
-  doc.querySelector("#calendarWeekStart").value = weekStart;
-  win.renderDragCalendar();
-  const cell = (minutes) => doc.querySelector(`#dragCalendar .calendar-cell[data-day-index="2"][data-minutes="${minutes}"]`);
-  const begin = (minutes, location, pointerId = 1) => {
-    doc.querySelector("#calendarLocationType").value = location;
-    win.startCalendarDrag({ target: cell(minutes), pointerId });
-  };
-  const move = (minutes) => {
-    doc.elementFromPoint = () => cell(minutes);
-    win.moveCalendarDrag({ clientX: 1, clientY: 1 });
-  };
-  const view = (minutes) => {
-    const node = cell(minutes);
-    return [node.className, node.dataset.calendarLocation, node.title, node.getAttribute("aria-label"), node.style.cssText].join("|");
-  };
-  begin(450, "Oceanside Ice Arena");
-  win.finishCalendarDrag();
-  assert(cell(450).classList.contains("is-editing") && cell(450).dataset.calendarLocation === "Oceanside Ice Arena", "The regression setup must include an earlier unsaved location edit.");
-  const before = JSON.stringify(win.captureAvailabilityUndoState());
-  const minutes = [360, 390, 420, 450, 480, 510, 540];
-  const originals = new Map(minutes.map((minute) => [minute, view(minute)]));
-  const bookingBefore = JSON.stringify(win.slots.find((slot) => slot.id === booking.id));
-  begin(360, "Arcadia Ice Arena");
-  move(540);
-  assert(cell(420).style.getPropertyValue("--selection-color") === "#bfdbfe" && cell(420).dataset.calendarLocation === "Arcadia Ice Arena", "The live drag range must show the selected location color and name.");
-  assert(view(480) === originals.get(480) && JSON.stringify(win.captureAvailabilityUndoState()) === before, "Drag preview must not change occupied cells, business data, or earlier unsaved edits.");
-  move(390);
-  for (const minute of [420, 450, 480, 510, 540]) assert(view(minute) === originals.get(minute), `Retraction must restore the pre-gesture state at ${minute}, including unsaved colors and originally blocked time.`);
-  doc.dispatchEvent(new win.KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }));
-  for (const minute of minutes) assert(view(minute) === originals.get(minute), "Escape must restore every original cell, label and unsaved marker.");
-  assert(JSON.stringify(win.captureAvailabilityUndoState()) === before, "Cancelling preview must not restore a saved baseline over an existing draft.");
-  begin(510, "Arcadia Ice Arena", 2);
-  move(360);
-  move(450);
-  for (const minute of [360, 390, 420]) assert(view(minute) === originals.get(minute), "Reverse retraction must restore each original location rather than turning it grey.");
-  doc.querySelector("#dragCalendar").dispatchEvent(new win.Event("pointercancel", { bubbles: true }));
-  for (const minute of minutes) assert(view(minute) === originals.get(minute), "Pointer cancellation must restore the full pre-gesture view.");
-  begin(450, "Oceanside Ice Arena", 3);
-  assert(!cell(450).classList.contains("reverting") && cell(450).style.getPropertyValue("--selection-color") === "#fde68a", "Starting on the same unsaved location must remain a paint operation instead of implicitly reverting to grey.");
-  win.cancelCalendarDrag();
-  begin(360, "Arcadia Ice Arena", 4);
-  move(540);
-  move(390);
-  win.finishCalendarDrag();
-  assert(!doc.querySelector("#conflictDialog").open && cell(360).dataset.calendarLocation === "Arcadia Ice Arena" && cell(390).dataset.calendarLocation === "Arcadia Ice Arena", "Pointer-up must commit only the final shortened range.");
-  for (const minute of [420, 450, 480, 510, 540]) assert(view(minute) === originals.get(minute), "Committed drag must not change cells withdrawn from its final range.");
-  begin(450, "Unavailable", 5);
-  move(510);
-  win.finishCalendarDrag();
-  assert(JSON.stringify(win.slots.find((slot) => slot.id === booking.id)) === bookingBefore, "Both opening and blocking recurring availability must preserve the complete existing booking record.");
-  assert(doc.querySelector('.availability-panel .heading-note').textContent === "设置每周重复的可预约时间" && doc.querySelector('[data-method="dropdownPanel"]').textContent.trim() === "表单", "Availability heading and edit-method labels must describe their actual purpose.");
-  assert(!doc.querySelector('#calendarRinkOptions [data-rink="Unavailable"]') && doc.querySelector("#calendarUnavailableTool"), "Unavailable time must be a separate editing operation rather than a location option.");
-  assertNoRuntimeErrors("Availability drag retraction", errors);
+  win.setSchedulingConfig("maya", config);
+  const request = (id, start, end) => ({ id, coachId: "maya", type: "new-booking", student: { name: id, email: `${id}@example.com` }, status: "negotiating", waitingFor: "coach", proposerRole: "student", acceptedBy: ["student"], createdAt: new Date().toISOString(), expiresAt: new Date(`${date}T09:00:00`).toISOString(), proposal: { version: 1, date, start, end, location: "Arcadia Ice Arena", lessonName: "私教课", duration: 30, price: 60 }, events: [] });
+  win.bookingRequests = [request("planner-accepted", "10:00", "10:30"), request("planner-failure", "12:00", "12:30")];
+  assert(win.publishAvailabilityDraft().ok, "The planner transaction fixture must start from a published configuration and schedule.");
+  doc.querySelector('[data-coach-panel="availabilityPanel"]').click();
+  win.renderSchedulingSettings();
+  win.pushAvailabilityUndoState();
+  const gap = doc.querySelector('[data-config="sameRinkGap"]');
+  gap.value = "5"; gap.dispatchEvent(new win.Event("input", { bubbles: true }));
+  win.blockedExceptions = [...win.blockedExceptions, { id: "private-rest-draft", coachId: "maya", date, start: "11:00", end: "11:30" }];
+  assert(win.getSchedulingConfig("maya").sameRinkGap === 5 && win.getTestPublishedSchedule().planning.configs.maya.sameRinkGap === 0, "Editing a scheduling rule must not publish it immediately.");
+  const accepted = win.acceptCoachBookingRequest("planner-accepted");
+  assert(accepted.accepted, `A feasible request must be accepted: ${JSON.stringify(accepted)}`);
+  const published = win.getTestPublishedSchedule();
+  assert(!JSON.parse(win.localStorage.getItem("ice-skating-coach-booking-slots-v12")).blockedExceptions.some((block) => block.id === "private-rest-draft") && win.blockedExceptions.some((block) => block.id === "private-rest-draft"), "Accepting a request must retain a private rest draft without publishing it.");
+  assert(published.slots.some((slot) => slot.specialRequestId === "planner-accepted" && slot.booked), "Accepted requests must publish their booking.");
+  assert(published.planning.configs.maya.sameRinkGap === 0 && win.getSchedulingConfig("maya").sameRinkGap === 5 && !doc.querySelector("#saveProfileChanges").disabled, "An immediate request must preserve the unrelated editing draft without publishing its rule changes.");
+  assert(published.slots.some((slot) => !slot.booked && slot.location === "Polar Ice Rink" && slot.start === "09:30") && !published.planning.blocks.some((block) => block.date === date), "Accepting a feasible request must preserve other published supply and avoid publishing an unreviewed optimization.");
+  assert(published.planning.suggestions.some((item) => item.date === date), "The affected date must receive an optimization suggestion.");
+  win.undoAvailabilityChange();
+  assert(win.slots.some((slot) => slot.specialRequestId === "planner-accepted" && slot.booked), "Undoing the old draft must never remove a booking accepted after that draft snapshot.");
+  const savedBeforeFailure = win.localStorage.getItem("ice-skating-coach-booking-slots-v12");
+  const setItem = win.localStorage.setItem;
+  win.localStorage.setItem = () => { throw new win.DOMException("test failure", "QuotaExceededError"); };
+  const failed = win.acceptCoachBookingRequest("planner-failure");
+  win.localStorage.setItem = setItem;
+  assert(!failed.accepted && failed.reason === "storage" && win.bookingRequests.find((item) => item.id === "planner-failure").status === "negotiating" && !win.slots.some((slot) => slot.specialRequestId === "planner-failure"), "A failed atomic save must restore both the request and booking state.");
+  assert(win.localStorage.getItem("ice-skating-coach-booking-slots-v12") === savedBeforeFailure, "Failure must leave the published schedule unchanged.");
+  assert(JSON.stringify(win.slots.find((slot) => slot.id === original.id)) === JSON.stringify(original), "Scheduling transactions must preserve unrelated fixed bookings byte-for-byte.");
+  assertNoRuntimeErrors("Automatic scheduling transactions", errors);
   dom.window.close();
 }
 
+async function testCompactCommutePlanner() {
+  const { dom, errors } = await loadPage('coach/index.html', { now: '2035-01-01T06:00:00' });
+  const win = dom.window, doc = win.document;
+  const date = win.addDaysIso(win.todayIso(), 1), [from, to] = win.readProfileState('maya').saved.servedRinks;
+  const make = (id, start, end, location, booked = false) => ({ id, coachId: 'maya', date, start, end, location, availabilityLocation: location, booked, status: booked ? 'Booked' : 'Open', lessonName: '私教课', lessonDuration: 30, lessonPrice: 60 });
+  const booking = make('commute-reference', '09:00', '09:30', from, true);
+  win.slots = [make('travel-open-a', '08:00', '09:00', from), booking, make('travel-open-b', '10:00', '12:00', to)];
+  doc.querySelector('[data-coach-panel="availabilityPanel"]').click();
+  const field = (id, value) => { const node = doc.getElementById(id); node.value = value; node.dispatchEvent(new win.Event('change', { bubbles: true })); };
+  field('coachPlannerScope', 'dates'); field('coachPlannerFrom', date); field('coachPlannerTo', date); field('calendarWeekStart', date);
+  doc.querySelector('[data-optimize-scope="tomorrow"]').click();
+  win.renderSchedulingSettings(); win.renderDragCalendar();
+  const root = doc.getElementById('coachSchedulerConfig'), details = () => root.querySelector('[data-travel-details]');
+  assert(root.querySelectorAll('[data-travel-direction]').length === 2 && !root.querySelector('[data-preference], [data-config="mandatoryOrder"]') && !root.textContent.includes('地点偏好'), 'Only the two calendar venues should produce routes, with no preference controls.');
+  assert(!details().open && root.querySelector('[data-config="sameRinkGap"]').value === '0', 'Default commute UI must be compact with a zero-minute break.');
+  assert(!root.textContent.includes('Google') && !root.querySelector('[data-field="address"], [data-field="mapDate"], [data-planner-action="estimate"], [data-travel-rule], [data-config="travelBuffer"]'), 'Coach generation must not expose map or per-weekday route setup.');
+  doc.querySelector('[data-optimize-scope="today"]').click();
+  assert(!root.querySelector('[data-travel-direction]') && root.textContent.includes('没有需要跨冰场'), 'Moving the scope to an empty date must clear the route list immediately.');
+  doc.querySelector('[data-optimize-scope="tomorrow"]').click();
+  assert(root.querySelectorAll('[data-travel-direction]').length === 2, 'Returning to the populated scope must restore both directions.');
+  const originalSupply = [...win.slots], third = win.readProfileState('maya').saved.servedRinks[2];
+  win.slots = [...originalSupply, make('third-booking', '14:00', '14:30', third, true), { ...make('outside-range', '15:00', '16:00', 'Outside rink'), date: win.addDaysIso(date, 1) }];
+  win.renderSchedulingSettings();
+  assert(root.querySelectorAll('[data-travel-direction]').length === 6 && ![...root.querySelectorAll('[data-travel-direction]')].some((row) => row.dataset.from === 'Outside rink' || row.dataset.to === 'Outside rink'), 'Bookings supply route endpoints; outside-range venues do not.');
+  win.slots = [...originalSupply, make('any-route-block', '14:00', '15:00', 'Any served rink')]; win.renderSchedulingSettings();
+  assert(root.querySelectorAll('[data-travel-direction]').length === 6 && ![...root.querySelectorAll('[data-travel-direction]')].some((row) => row.dataset.from === 'Any served rink' || row.dataset.to === 'Any served rink'), 'Unrestricted blocks expand to profile candidates, never a fictitious route endpoint.');
+  win.slots = originalSupply; win.renderSchedulingSettings();
+  const original = JSON.stringify(win.slots), published = JSON.stringify(win.getTestPublishedSchedule());
+  doc.getElementById('generateCoachSchedule').click(); await new Promise((resolve) => setTimeout(resolve, 50));
+  const previewTrip = () => doc.querySelector('.planning-calendar-block--commute[data-preview-block]');
+  assert(previewTrip() && previewTrip().textContent.includes('30 分钟') && previewTrip().textContent.includes('草稿') && previewTrip().title.includes('09:30–10:00'), 'A generated preview must display its precise preset commute directly in the calendar.');
+  assert(JSON.stringify(win.slots) === original && JSON.stringify(win.getTestPublishedSchedule()) === published, 'Previewing commute blocks must not apply or publish the plan.');
+  previewTrip().click();
+  assert(details().open && !doc.getElementById('coachPlanningLockDialog'), `Clicking an unlocked commute must open the matching compact direction settings. Runtime: ${JSON.stringify(errors)}`);
+  const row = () => [...root.querySelectorAll('[data-travel-direction]')].find((node) => node.dataset.from === from && node.dataset.to === to);
+  const reverse = () => [...root.querySelectorAll('[data-travel-direction]')].find((node) => node.dataset.from === to && node.dataset.to === from);
+  row().querySelector('input').value = '45'; row().querySelector('input').dispatchEvent(new win.Event('input', { bubbles: true }));
+  assert(!previewTrip() && doc.querySelector('[data-apply-schedule]').disabled && row().textContent.includes('个人调整') && reverse().querySelector('input').value === '30', 'A directional override must leave the reverse preset intact and invalidate the old calendar preview.');
+  row().querySelector('[data-planner-action="reset-travel"]').click();
+  assert(details().open && row().querySelector('input').value === '30' && row().textContent.includes('系统预设'), 'Reset must restore the system rule while keeping the compact table open.');
+  doc.getElementById('generateCoachSchedule').click(); await new Promise((resolve) => setTimeout(resolve, 50));
+  assert(previewTrip(), 'Restored defaults must generate without manual route entry or a map service.');
+  doc.querySelector('[data-apply-schedule]').click();
+  const applied = doc.querySelector('.planning-calendar-block--commute[data-planning-block]');
+  assert(applied && !previewTrip() && applied.textContent.includes('30 分钟') && !applied.textContent.includes('草稿'), 'Applying a proposal must retain the same computed commute in the shared calendar.');
+  assert(JSON.stringify(win.slots.find((slot) => slot.id === booking.id)) === JSON.stringify(booking) && JSON.stringify(win.getTestPublishedSchedule()) === published, 'Applying commute changes preserves appointments and remains unpublished.');
+  doc.getElementById('saveProfileChanges').click();
+  assert(win.getTestPublishedSchedule().planning.blocks.some((block) => block.kind === 'commute' && block.from === from && block.to === to && block.start === '09:30' && block.end === '10:00'), `Save changes must persist the same preset-based commute. ${JSON.stringify({ blocks: win.getTestPublishedSchedule().planning.blocks, message: doc.getElementById('profileMessage')?.textContent, errors })}`);
+  assertNoRuntimeErrors('Compact commute planner', errors); dom.window.close();
+}
+
+async function testLunchSettingModes() {
+  const { dom, errors } = await loadPage('coach/index.html');
+  const win = dom.window, doc = win.document;
+  doc.querySelector('[data-coach-panel="availabilityPanel"]').click();
+  win.renderSchedulingSettings();
+  const root = doc.getElementById('coachSchedulerConfig');
+  const modes = () => [...root.querySelectorAll('[data-lunch="mode"]')];
+  const fields = () => root.querySelector('[data-lunch-fields]');
+  const note = () => root.querySelector('[data-lunch-note]');
+  const change = (value) => { modes().find((input) => input.value === value).click(); };
+  const set = (key, value) => { const input = root.querySelector(`[data-lunch="${key}"]`); input.value = value; input.dispatchEvent(new win.Event('input', { bubbles: true })); };
+  const published = JSON.stringify(win.getTestPublishedSchedule());
+  assert(modes().length === 3 && modes()[0].checked && !root.querySelector('select[data-lunch="mode"]') && fields().hidden && !fields().querySelector('input'), 'Self-managed lunch must show no irrelevant time or duration fields.');
+  assert(note().hidden, 'Self-managed lunch hides the automatic lunch explanation.');
+  change('flexible');
+  assert(!note().hidden && note().textContent === '系统将在指定范围内，根据课程与通勤安排一段连续午休。' && note().nextElementSibling === fields(), 'Automatic lunch shows its muted explanation above the time fields.');
+  assert(!fields().hidden && fields().querySelector('legend').textContent === '可安排范围' && fields().textContent.includes('休息时长') && fields().querySelectorAll('input[type="time"]').length === 2 && fields().querySelectorAll('input[type="number"]').length === 1, 'Flexible lunch must expose a range and a separate continuous break duration.');
+  set('start', '12:00'); set('end', '14:00'); set('duration', '30');
+  assert(win.getSchedulingConfig().lunch.duration === 30 && win.getSchedulingConfig().lunch.end === '14:00', 'Flexible range and break length must stay separate in shared settings.');
+  change('fixed'); assert(note().hidden, 'Fixed lunch hides the automatic lunch explanation.'); set('start', '12:15'); set('end', '13:45');
+  assert(fields().querySelectorAll('input').length === 2 && !fields().querySelector('[data-lunch="duration"]') && !fields().querySelector('fieldset') && fields().querySelectorAll('label')[0].textContent === '开始时间' && fields().querySelectorAll('label')[1].textContent === '结束时间', 'Fixed lunch must show only unambiguous start/end fields.');
+  assert(win.getSchedulingConfig().lunch.duration === 90, 'Fixed lunch duration must update automatically from both endpoint inputs.');
+  change('none');
+  assert(fields().hidden && !fields().querySelector('input') && win.getSchedulingConfig().lunch.mode === 'none' && !root.textContent.includes('开始 / 窗口起点'), 'Returning to self-managed lunch must remove irrelevant controls and mixed labels.');
+  const gap = root.querySelector('[data-config="sameRinkGap"]'); gap.value = '5'; gap.dispatchEvent(new win.Event('input', { bubbles: true }));
+  assert(win.getSchedulingConfig().lunch.mode === 'none' && win.getSchedulingConfig().sameRinkGap === 5, 'Editing another setting must not reactivate hidden lunch values.');
+  win.renderSchedulingSettings(); assert(root.querySelector('[data-lunch-fields]').hidden, 'Re-rendering shared settings must retain the selected lunch mode.');
+  assert(JSON.stringify(win.getTestPublishedSchedule()) === published, 'Mode changes must retain the existing draft/save boundary.');
+  assertNoRuntimeErrors('Conditional lunch fields', errors); dom.window.close();
+}
+
+async function testCalendarSettingTools() {
+  const { dom, errors } = await loadPage('coach/index.html');
+  const win = dom.window, doc = win.document;
+  doc.querySelector('[data-coach-panel="availabilityPanel"]').click();
+  const week = win.startOfWeekIso(win.addDaysIso(win.todayIso(), 7)), date = (day) => win.addDaysIso(week, day);
+  const [location, other] = win.readProfileState('maya').saved.servedRinks;
+  const slot = (id, day, start, end, place = location, booked = false) => ({ id, coachId: 'maya', date: date(day), start, end, location: place, availabilityLocation: place, booked, status: booked ? 'Booked' : 'Open', lessonName: '私教课', lessonDuration: 30, lessonPrice: 60 });
+  const booking = { ...slot('tool-reference', 0, '10:00', '10:30', other, true), availabilityLocation: location };
+  win.slots = [slot('tool-before', 0, '09:47', '10:00'), booking, slot('tool-after', 0, '10:30', '11:12'), slot('tool-gap-after', 0, '12:00', '13:00')];
+  assert(win.publishAvailabilityDraft().ok, 'The isolated contour fixture must start from matching saved and draft layers.');
+  const published = JSON.stringify(win.getTestPublishedSchedule());
+  const field = (id, value) => { const node = doc.getElementById(id); node.value = value; node.dispatchEvent(new win.Event('change', { bubbles: true })); };
+  field('coachPlannerScope', 'dates'); field('coachPlannerFrom', week); field('coachPlannerTo', date(13)); field('calendarWeekStart', week); win.renderDragCalendar(); win.renderSchedulingSettings();
+  const calendar = doc.getElementById('dragCalendar'), tool = () => doc.getElementById('calendarLocationType');
+  const button = (value) => doc.querySelector(`.coach-availability-paint-tools [data-rink="${value}"][aria-pressed]`);
+  const cell = (day, minute) => calendar.querySelector(`.calendar-cell[data-day-index="${day}"][data-minutes="${minute}"]`);
+  const blocks = (day) => [...calendar.querySelectorAll('.calendar-open-block')].filter((node) => node.getAttribute('aria-label').startsWith(date(day)));
+  const at = (day, start) => blocks(day).find((node) => node.getAttribute('aria-label').startsWith(`${date(day)} ${start}`))?.getAttribute('aria-label') || '';
+  let hit;
+  doc.elementsFromPoint = () => hit ? [hit] : [];
+  const pointer = (node, type, y) => { const event = new win.MouseEvent(type, { bubbles: true, cancelable: true, button: 0, clientX: 100, clientY: y }); Object.defineProperty(event, 'pointerId', { value: 55 }); node.dispatchEvent(event); };
+  const start = (day, minute) => { hit = cell(day, minute); pointer(hit, 'pointerdown', 100); };
+  const extend = (day, minute) => { hit = cell(day, minute); pointer(calendar, 'pointermove', 160); };
+  const finish = () => { pointer(calendar, 'pointerup', 160); calendar.dispatchEvent(new win.MouseEvent('click', { bubbles: true })); };
+  const esc = (target = calendar) => target.dispatchEvent(new win.KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
+  assert(tool().value === '' && !doc.querySelector('[data-rink][aria-pressed="true"]') && doc.getElementById('calendarPaintHint').textContent === '' && doc.querySelector('[data-open-action="select"]').getAttribute('aria-pressed') === 'true', 'The calendar must initialize without a painting option.');
+  const pristine = JSON.stringify(win.captureAvailabilityUndoState());
+  cell(0, 600).click(); start(0, 600); extend(0, 630); finish();
+  assert(JSON.stringify(win.captureAvailabilityUndoState()) === pristine && calendar.querySelector('[data-open-move]'), 'Default clicks and range drags must only select, including beneath a reference booking.');
+  button(other).click();
+  assert(tool().value === other && button(other).getAttribute('aria-pressed') === 'true' && !calendar.querySelector('.calendar-open-selection') && doc.getElementById('calendarPaintHint').textContent.startsWith('点击或拖选目标范围，设为 '), 'A selected rink must activate direct setting and clear an old selection.');
+  start(0, 600); pointer(calendar, 'pointerup', 100); calendar.dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
+  assert(doc.getElementById('coachOpenOperationMessage').hidden && !doc.getElementById('formMessage').textContent && !doc.getElementById('saveProfileChanges').disabled, 'Ordinary calendar changes must rely on the calendar and existing unsaved status, without success messages.');
+  assert(at(0, '09:47').includes('10:00') && at(0, '10:00').includes('10:30') && at(0, '10:30').includes('11:12') && at(0, '10:00').includes(other.split(' ')[0]), 'A setting click must replace just one cell, preserve minute-exact neighbors and update the booked underlay.');
+  assert(JSON.stringify(win.slots.find((item) => item.id === booking.id)) === JSON.stringify(booking), 'Setting under a lesson must never mutate that appointment.');
+  overviewDate(doc, date(0)); assert([...doc.querySelectorAll('#dropdownOpenSlots [data-rink]')].some((node) => node.dataset.rink === other), 'Direct setting must synchronize the existing list.');
+  win.undoAvailabilityChange(); assert(at(0, '09:47').includes('11:12'), 'One click must undo in one step.');
+  assert(doc.getElementById('coachOpenOperationMessage').textContent === '已撤销' && !doc.getElementById('formMessage').textContent, 'Undo feedback must stay short and clear the old form message.');
+  start(0, 630); extend(0, 720);
+  assert(JSON.stringify(win.captureAvailabilityUndoState()) === pristine && !calendar.querySelector('[data-open-move]'), 'Setting drag previews must remain data-free until release and not expose a move handle.');
+  finish();
+  assert(calendar.querySelectorAll('.calendar-edit-contours path').length === 1 && [...calendar.querySelectorAll('.calendar-cell.is-editing')].every((node) => win.getComputedStyle(node).boxShadow === 'none'), 'Confirmed settings must use one connected contour instead of thick per-cell draft boxes.');
+  assert(at(0, '09:47').includes('10:30') && at(0, '10:30').includes('12:30') && at(0, '10:30').includes(other.split(' ')[0]) && at(0, '12:30').includes('13:00'), 'Setting a dragged envelope must fill closed gaps and only replace the chosen range.');
+  win.undoAvailabilityChange();
+  button('Unavailable').click(); assert(tool().value === 'Unavailable' && button(other).getAttribute('aria-pressed') === 'false' && doc.getElementById('calendarPaintHint').textContent === '点击或拖选目标范围，设为不可预约；已有预约不变。', 'Rink and unavailable tools must be mutually exclusive.');
+  cell(0, 600).click(); assert(!at(0, '10:00') && at(0, '09:47').includes('10:00') && at(0, '10:30').includes('11:12'), 'Unavailable click must close just one cell under the booking.'); win.undoAvailabilityChange();
+  start(0, 600); extend(0, 720); finish(); assert(at(0, '09:47').includes('10:00') && at(0, '12:30').includes('13:00') && !at(0, '10:30'), 'Unavailable drag must close the complete envelope and preserve exterior fragments.'); win.undoAvailabilityChange();
+  button('Unavailable').click(); assert(tool().value === '' && !doc.querySelector('[data-rink][aria-pressed="true"]'), 'Clicking the current tool again must return to selection.');
+  button(location).click(); start(0, 600); extend(0, 660); esc(); calendar.dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
+  assert(tool().value === '' && !calendar.hasAttribute('data-open-gesture') && JSON.stringify(win.captureAvailabilityUndoState()) === pristine, 'Escape must cancel an active setting drag and tool without changing data.');
+  button(location).click(); esc(button(location)); assert(tool().value === '', 'Escape from a focused tool must also return to selection.');
+  button(location).click(); field('coachPlannerScope', 'weekly');
+  cell(1, 600).click(); assert(win.slots.some((item) => item.date === date(8) && item.start === '10:00' && item.end === '10:30' && item.location === location), `Direct setting must follow the same bounded weekly editing scope: ${doc.getElementById('coachOpenOperationMessage').textContent}; ${doc.getElementById('calendarWeekStart').value}; ${doc.getElementById('coachPlannerFrom').value}-${doc.getElementById('coachPlannerTo').value}`); win.undoAvailabilityChange();
+  // Isolated fixture: neighboring dates retain different venues inside one concave outline.
+  field('coachPlannerScope', 'dates'); button('Zoom').click(); start(1, 600); extend(1, 630); finish();
+  button(other).click(); start(2, 630); extend(2, 660); finish();
+  const concave = calendar.querySelectorAll('.calendar-edit-contours path');
+  assert(concave.length === 1 && (concave[0].getAttribute('d').match(/L/g) || []).length === 7, 'Adjacent dates with offset ranges must form one stepped outline, excluding both unselected corners.');
+  assert(at(1, '10:00').includes('Zoom') && at(2, '10:30').includes(other.split(' ')[0]), 'Visual union must preserve both underlying venues and ranges.');
+  win.undoAvailabilityChange(); win.undoAvailabilityChange();
+  assert(JSON.stringify(win.getTestPublishedSchedule()) === published && JSON.stringify(win.slots.find((item) => item.id === booking.id)) === JSON.stringify(booking), 'Setting tools must remain unpublished and keep appointments unchanged.');
+  assertNoRuntimeErrors('Calendar setting tools', errors); dom.window.close();
+}
+
+async function testCalendarClipboardShortcuts() {
+  for (const mac of [false, true]) {
+    const { dom, errors } = await loadPage('coach/index.html');
+    const win = dom.window, doc = win.document;
+    Object.defineProperty(win.navigator, 'platform', { configurable: true, value: mac ? 'MacIntel' : 'Win32' });
+    const week = win.startOfWeekIso(win.addDaysIso(win.todayIso(), 7)), date = (day) => win.addDaysIso(week, day);
+    const [location, other] = win.readProfileState('maya').saved.servedRinks;
+    const slot = (id, day, start, end, place = location, booked = false) => ({ id, coachId: 'maya', date: date(day), start, end, location: place, availabilityLocation: place, booked, status: booked ? 'Booked' : 'Open', lessonName: '私教课', lessonDuration: 30, lessonPrice: 60 });
+    const booking = { ...slot('shortcut-booking', 1, '10:00', '10:30', other, true), availabilityLocation: 'Zoom' };
+    win.slots = [slot('shortcut-source', 0, '09:47', '11:12'), slot('shortcut-second', 0, '11:30', '12:05', 'Zoom'), slot('shortcut-target', 1, '08:00', '14:00', 'Zoom'), booking, slot('shortcut-day-target', 2, '06:00', '18:00', 'Any served rink')];
+    const published = JSON.stringify(win.getTestPublishedSchedule());
+    doc.querySelector('[data-coach-panel="availabilityPanel"]').click();
+    const field = (id, value) => { const node = doc.getElementById(id); node.value = value; node.dispatchEvent(new win.Event('change', { bubbles: true })); };
+    field('coachPlannerScope', 'dates'); field('coachPlannerFrom', week); field('coachPlannerTo', date(6)); field('calendarWeekStart', week);
+    win.renderDragCalendar(); win.renderSchedulingSettings();
+    const calendar = doc.getElementById('dragCalendar');
+    const cell = (day, minute) => calendar.querySelector(`.calendar-cell[data-day-index="${day}"][data-minutes="${minute}"]`);
+    const header = (day) => calendar.querySelector(`.calendar-day[data-date="${date(day)}"]`);
+    const block = (day, start) => [...calendar.querySelectorAll('.calendar-open-block')].find((node) => node.getAttribute('aria-label').startsWith(`${date(day)} ${start}`));
+    const key = (letter, target = calendar, extra = {}) => { const event = new win.KeyboardEvent('keydown', { key: letter, ctrlKey: !mac, metaKey: mac, bubbles: true, cancelable: true, ...extra }); target.dispatchEvent(event); return event; };
+    const context = (node) => node.dispatchEvent(new win.MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
+    const command = (label) => { const button = [...doc.querySelectorAll('#coachOpenContextMenu button')].find((node) => calendarMenuLabel(node) === label); assert(button && !button.disabled, `Missing shortcut menu command: ${label}`); button.click(); };
+    cell(0, 600).click(); assert(key('c').defaultPrevented, 'Calendar copy must handle its platform modifier.');
+    const beforeEditing = JSON.stringify(win.captureAvailabilityUndoState());
+    for (const tag of ['input', 'textarea', 'select', 'div']) {
+      const editor = doc.createElement(tag); if (tag === 'div') editor.setAttribute('contenteditable', 'true'); calendar.append(editor);
+      const nested = tag === 'div' ? editor.appendChild(doc.createElement('span')) : editor;
+      assert(!key('c', nested).defaultPrevented && !key('v', nested).defaultPrevented, 'Text/time editors must keep native copying and pasting, even inside the calendar.'); editor.remove();
+    }
+    assert(!key('v', doc.body).defaultPrevented && !key('c', calendar, { shiftKey: true }).defaultPrevented, 'Outside/calendar-external shortcuts must retain normal browser behavior.');
+    assert(JSON.stringify(win.captureAvailabilityUndoState()) === beforeEditing, 'Text shortcuts must not change calendar drafts or undo history.');
+    // Clicking within a large block records the precise destination cell, not the block start.
+    cell(1, 570).click(); assert(key('v').defaultPrevented, 'Calendar paste must use the same platform modifier.');
+    assert(block(1, '08:00')?.getAttribute('aria-label').includes('09:30') && block(1, '09:30')?.getAttribute('aria-label').includes('10:55') && block(1, '10:55')?.getAttribute('aria-label').includes('14:00'), 'Shortcut paste must target 09:30, preserve 85 minutes and retain target prefix/suffix.');
+    assert(JSON.stringify(win.slots.find((item) => item.id === booking.id)) === JSON.stringify(booking), 'Pasting across a reference appointment must never alter its record.');
+    win.undoAvailabilityChange();
+    // Mouse copy interoperates with keyboard paste, with platform-specific hints.
+    context(cell(0, 600));
+    const copyItem = [...doc.querySelectorAll('#coachOpenContextMenu button')].find((node) => calendarMenuLabel(node) === '复制');
+    assert(copyItem.querySelector('kbd').textContent === (mac ? '⌘C' : 'Ctrl+C') && copyItem.getAttribute('aria-keyshortcuts') === (mac ? 'Meta+C' : 'Control+C'), 'Right-click copy must display the platform shortcut and expose it accessibly.');
+    command('复制'); cell(3, 600).click(); key('v');
+    assert(block(3, '10:00')?.getAttribute('aria-label').includes('11:25'), 'Menu copy and shortcut paste must share the exact same clipboard.'); win.undoAvailabilityChange();
+    // Keyboard copy interoperates with direct replacing paste from the mouse menu.
+    cell(0, 600).click(); key('c'); context(cell(1, 570));
+    const pasteItem = [...doc.querySelectorAll('#coachOpenContextMenu button')].find((node) => calendarMenuLabel(node) === `粘贴到${date(1)} 周二 09:30`);
+    assert(pasteItem.querySelector('kbd').textContent === (mac ? '⌘V' : 'Ctrl+V'), 'Paste menu must show the matching platform shortcut.');
+    command(`粘贴到${date(1)} 周二 09:30`); assert(block(1, '09:30')?.getAttribute('aria-label').includes('10:55'), 'Right-click and shortcut paste must share replacement semantics.'); win.undoAvailabilityChange();
+    header(0).click();
+    assert(calendar.querySelectorAll('.calendar-selection-contours path').length === 2, 'Whole-day selection must outline disconnected open ranges separately without enclosing the closed gap.');
+    key('c'); header(2).click(); key('v');
+    assert(block(2, '09:47')?.getAttribute('aria-label').includes('11:12') && block(2, '11:30')?.getAttribute('aria-label').includes('12:05') && !block(2, '06:00'), 'Whole-day keyboard paste must preserve all precise times, venues and gaps while replacing the target day.');
+    win.undoAvailabilityChange(); assert(block(2, '06:00')?.getAttribute('aria-label').includes('18:00'), 'Whole-day replacement must undo as one action.');
+    assert(JSON.stringify(win.getTestPublishedSchedule()) === published, 'Clipboard operations must remain unpublished drafts.');
+    assertNoRuntimeErrors(mac ? 'Mac calendar clipboard' : 'Windows calendar clipboard', errors); dom.window.close();
+  }
+}
+
+async function testOpenCalendarButtons() {
+  const { dom, errors } = await loadPage('coach/index.html');
+  const win = dom.window, doc = win.document;
+  const week = win.startOfWeekIso(win.addDaysIso(win.todayIso(), 7)), date = (offset) => win.addDaysIso(week, offset);
+  const location = win.readProfileState('maya').saved.servedRinks[0];
+  const booking = { id: 'button-booking', coachId: 'maya', date: date(0), start: '10:00', end: '10:30', location: 'Zoom', availabilityLocation: location, booked: true, status: 'Booked', student: { name: 'Reference' } };
+  win.slots = [
+    { id: 'button-source', coachId: 'maya', date: date(0), start: '09:47', end: '10:00', location, booked: false },
+    booking,
+    { id: 'button-after', coachId: 'maya', date: date(0), start: '10:30', end: '11:12', location, booked: false },
+    { id: 'button-target', coachId: 'maya', date: date(2), start: '08:00', end: '14:00', location: 'Any served rink', booked: false }
+  ];
+  const published = JSON.stringify(win.getTestPublishedSchedule()), bookingBefore = JSON.stringify(booking);
+  doc.querySelector('[data-coach-panel="availabilityPanel"]').click();
+  doc.querySelector('[data-method="calendarPanel"]').click();
+  const field = (id, value) => { doc.getElementById(id).value = value; doc.getElementById(id).dispatchEvent(new win.Event('change', { bubbles: true })); };
+  field('coachPlannerScope', 'dates'); field('coachPlannerFrom', week); field('coachPlannerTo', date(13)); field('calendarWeekStart', week);
+  const action = (name) => doc.querySelector(`[data-open-action="${name}"]`);
+  const cell = (day, minute) => doc.querySelector(`#dragCalendar .calendar-cell[data-day-index="${day}"][data-minutes="${minute}"]`);
+  const block = (day, start) => [...doc.querySelectorAll('#dragCalendar .calendar-open-block')].find((node) => node.getAttribute('aria-label').startsWith(`${date(day)} ${start}`));
+  assert(!doc.querySelector('.coach-availability-help') && !action('add').disabled && action('edit').disabled && action('paste').disabled, 'Calendar must expose ordinary actions without a help disclosure.');
+  action('add').click(); assert(doc.activeElement === doc.querySelector('#dropdownOpenSlots [data-planner-action="add-work-range"]') && !doc.getElementById('dropdownPanel').classList.contains('is-hidden') && !doc.getElementById('coachWorkTimeDialog').open, 'Add must switch to the overview and focus a daily plus without choosing a date or opening fields.');
+  cell(0, 600).click();
+  assert(!action('edit').disabled && !action('copy').disabled && !action('delete').disabled && doc.getElementById('coachOpenSelectionStatus').textContent.includes('09:47–11:12'), 'Single click must expose precise selected-block actions, including booking underlay.');
+  action('edit').click(); field('coachWorkTimeEnd', '11:17'); doc.getElementById('cancelCoachWorkTime').click();
+  assert(block(0, '09:47').getAttribute('aria-label').includes('11:12') && JSON.stringify(win.getTestPublishedSchedule()) === published, 'Cancel must discard the editor fields.');
+  action('edit').click(); field('coachWorkTimeEnd', '11:17'); submit(doc.getElementById('coachWorkTimeForm'));
+  assert(block(0, '09:47').getAttribute('aria-label').includes('11:17'), 'Ordinary edit uses the existing draft editor.');
+  win.undoAvailabilityChange(); cell(0, 600).click(); action('copy').click();
+  field('calendarWeekStart', date(7));
+  assert(action('paste').disabled && action('edit').disabled, 'Changing week must clear the old source/target while retaining the clipboard.');
+  cell(0, 600).click();
+  let warning = ''; win.confirm = (message) => { warning = message; return false; };
+  const beforePaste = JSON.stringify(win.captureAvailabilityUndoState()); action('paste').click();
+  assert(warning.includes(date(7)) && warning.includes('10:00–11:25') && warning.includes('覆盖目标范围') && warning.includes('已有预约保持不变') && JSON.stringify(win.captureAvailabilityUndoState()) === beforePaste, 'Declining paste must retain the draft and disclose current-week destination, exact envelope and booking protection.');
+  win.confirm = () => true; action('paste').click();
+  assert([...doc.querySelectorAll('.calendar-open-block')].some((node) => node.getAttribute('aria-label').startsWith(`${date(7)} 10:00–11:25`)), 'Cross-week copy must paste at the clicked current-week destination.');
+  win.undoAvailabilityChange(); field('calendarWeekStart', week);
+  cell(0, 600).click(); action('copy').click(); cell(2, 600).click(); action('paste').click();
+  assert(block(2, '08:00')?.getAttribute('aria-label').includes('10:00') && block(2, '11:25')?.getAttribute('aria-label').includes('14:00') && block(2, '10:00'), 'Paste must replace only the target envelope and keep its surrounding ranges.');
+  win.undoAvailabilityChange();
+  doc.querySelector(`#dragCalendar .calendar-day[data-date="${date(0)}"]`).click(); action('copy').click();
+  assert(action('edit').disabled, 'A full day is not a single-range edit.');
+  doc.querySelector(`#dragCalendar .calendar-day[data-date="${date(3)}"]`).click(); action('paste').click();
+  assert(block(3, '09:47')?.getAttribute('aria-label').includes('11:12'), 'Ordinary day copy must preserve precise times.');
+  win.undoAvailabilityChange();
+  cell(0, 600).click(); win.confirm = () => false; action('delete').click(); assert(block(0, '09:47'), 'Declining deletion keeps availability.');
+  win.confirm = () => true; action('delete').click();
+  assert(!block(0, '09:47') && JSON.stringify(win.slots.find((item) => item.id === booking.id)) === bookingBefore && JSON.stringify(win.getTestPublishedSchedule()) === published, 'Delete must remove only draft availability while leaving the established appointment and published facts intact.');
+  win.undoAvailabilityChange();
+  doc.getElementById('calendarUnavailableTool').click(); assert(action('select').getAttribute('aria-pressed') === 'false' && action('paste').disabled, 'Painting mode must not present selection actions as active.');
+  action('select').click(); cell(0, 600).click(); action('edit').click(); field('coachWorkTimeEnd', '11:19'); submit(doc.getElementById('coachWorkTimeForm'));
+  doc.getElementById('saveProfileChanges').click();
+  assert(win.getTestPublishedSchedule().planning.dateOverrides.some((range) => range.date === date(0) && range.end === '11:19') && JSON.stringify(win.slots.find((item) => item.id === booking.id)) === bookingBefore, 'Saving ordinary edits must persist the dated override and preserve the appointment.');
+  assertNoRuntimeErrors('Ordinary calendar buttons', errors); dom.window.close();
+}
+
+async function testOpenCalendarOperations() {
+  const { dom, errors } = await loadPage('coach/index.html');
+  const win = dom.window, doc = win.document;
+  const week = win.startOfWeekIso(win.addDaysIso(win.todayIso(), 7)), date = (offset) => win.addDaysIso(week, offset);
+  const location = win.readProfileState('maya').saved.servedRinks[0], other = win.readProfileState('maya').saved.servedRinks[1];
+  const slot = (id, day, start, end, place = location, booked = false) => ({ id, coachId: 'maya', date: date(day), start, end, location: place, availabilityLocation: place, booked, status: booked ? 'Booked' : 'Open', lessonName: '私教课', lessonDuration: 30, lessonPrice: 60 });
+  const booking = { ...slot('reference', 0, '10:00', '10:30', other, true), availabilityLocation: location, student: { name: 'Reference student', email: 'reference@example.com' } };
+  win.slots = [slot('before', 0, '09:00', '10:00'), booking, slot('after', 0, '10:30', '11:00'), slot('second-place', 0, '11:00', '12:00', 'Zoom'), slot('target', 2, '08:00', '14:00', 'Any served rink'), slot('precise', 4, '09:47', '11:12'), slot('base', 5, '10:00', '12:00', 'Any served rink')];
+  const published = JSON.stringify(win.getTestPublishedSchedule()), bookingBefore = JSON.stringify(booking);
+  doc.querySelector('[data-coach-panel="availabilityPanel"]').click();
+  const field = (id, value) => { doc.getElementById(id).value = value; doc.getElementById(id).dispatchEvent(new win.Event('change', { bubbles: true })); };
+  field('coachPlannerScope', 'dates'); field('coachPlannerFrom', week); field('coachPlannerTo', date(6)); field('calendarWeekStart', week);
+  win.renderDragCalendar(); win.renderSchedulingSettings();
+  const calendar = doc.getElementById('dragCalendar');
+  const cell = (day, minute) => calendar.querySelector(`.calendar-cell[data-day-index="${day}"][data-minutes="${minute}"]`);
+  const block = (day, start) => [...calendar.querySelectorAll('.calendar-open-block')].find((node) => node.getAttribute('aria-label').startsWith(`${date(day)} ${start}`));
+  const context = (node) => node.dispatchEvent(new win.MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 300, clientY: 250 }));
+  const command = (text) => { const button = [...doc.querySelectorAll('#coachOpenContextMenu button')].find((node) => calendarMenuLabel(node) === text); assert(button && !button.disabled, `Missing menu action: ${text}`); button.click(); };
+  let hit = null;
+  doc.elementsFromPoint = () => hit ? [hit] : [];
+  const pointer = (node, type, x, y) => { const event = new win.MouseEvent(type, { bubbles: true, cancelable: true, clientX: x, clientY: y, button: 0 }); Object.defineProperty(event, 'pointerId', { value: 17 }); node.dispatchEvent(event); };
+  const choose = (day, from, until) => { hit = cell(day, from); pointer(hit, 'pointerdown', 100, 100); hit = cell(day, until); pointer(calendar, 'pointermove', 100, until === from ? 110 : 180); pointer(calendar, 'pointerup', 100, until === from ? 110 : 180); calendar.dispatchEvent(new win.MouseEvent('click', { bubbles: true })); };
+  const move = (day, minute) => { const handle = calendar.querySelector('[data-open-move]'); assert(handle, 'Selection must expose an explicit move handle.'); pointer(handle, 'pointerdown', 100, 100); hit = cell(day, minute); pointer(calendar, 'pointermove', 200, 160); };
+  assert(block(0, '09:00')?.style.gridRow.endsWith('span 120'), 'Reference bookings must not split the underlying continuous open block.');
+  assert(block(4, '09:47')?.style.gridRow.endsWith('span 85'), 'Minute-exact blocks must retain their real proportions.');
+  assert(!block(0, '09:00').querySelector('.calendar-open-name, .calendar-open-time') && win.getComputedStyle(block(0, '09:00')).backgroundColor === 'rgba(0, 0, 0, 0)', 'Idle UI must retain transparent hit targets and original calendar styling.');
+  const pristine = JSON.stringify(win.captureAvailabilityUndoState());
+  hit = cell(0, 570); pointer(hit, 'pointerdown', 100, 100); pointer(calendar, 'pointerup', 101, 101); calendar.dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
+  assert(calendar.querySelector('.calendar-open-selection').getAttribute('aria-label').endsWith('09:00–11:00') && !doc.getElementById('coachWorkTimeDialog').open, 'A click with only slight pointer jitter must select the complete same-location block, including the supply under bookings, stopping at the venue change.');
+  cell(0, 600).click();
+  assert(calendar.querySelector('.calendar-open-selection').getAttribute('aria-label').endsWith('09:00–11:00'), 'An accessible cell click on a reference appointment must also select the whole underlying rink block.');
+  cell(4, 600).click();
+  assert(calendar.querySelector('.calendar-open-selection').getAttribute('aria-label').endsWith('09:47–11:12'), 'Click selection must preserve exact minute endpoints rather than grid boundaries.');
+  choose(0, 570, 570);
+  assert(calendar.querySelector('.calendar-open-selection').getAttribute('aria-label').endsWith('09:30–10:00') && !doc.getElementById('coachWorkTimeDialog').open, 'Dragging within a single cell must still allow selecting just that cell.');
+  assert(JSON.stringify(win.captureAvailabilityUndoState()) === pristine, 'Selection alone must not change availability or undo history.');
+  assert(win.getComputedStyle(cell(0, 570)).boxShadow === 'none' && win.getComputedStyle(calendar.querySelector('.calendar-open-selection')).outline === 'none', 'Individual cells and the handle wrapper must not add repeated selection outlines.');
+  assert(calendar.querySelectorAll('.calendar-open-selection').length === 1 && calendar.querySelectorAll('.calendar-selection-contours path').length === 1 && !calendar.querySelector('[data-open-selection-more], [data-open-day-more]'), 'A selection must have one perimeter and no in-grid menu buttons.');
+  const grip = calendar.querySelector('[data-open-move]');
+  assert(grip && !grip.textContent.trim() && grip.querySelector('svg') && grip.getAttribute('aria-label').includes('移动选区'), 'Moving must remain available through an accessible icon grip without a text button.');
+  calendar.dispatchEvent(new win.KeyboardEvent('keydown', { key: 'F10', shiftKey: true, bubbles: true, cancelable: true }));
+  assert(!doc.getElementById('coachOpenContextMenu').hidden && [...doc.querySelectorAll('#coachOpenContextMenu button')].some((button) => calendarMenuLabel(button) === '复制'), 'The right-click menu must remain keyboard-accessible after removing the in-grid menu button.');
+  doc.dispatchEvent(new win.KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+  const geometry = doc.elementsFromPoint;
+  doc.elementsFromPoint = (x, y) => { assert(Number.isFinite(x) && Number.isFinite(y), 'Keyboard operations must never hit-test undefined pointer coordinates.'); return geometry(x, y); };
+  calendar.dispatchEvent(new win.KeyboardEvent('keydown', { key: 'c', ctrlKey: true, bubbles: true, cancelable: true }));
+  assert(doc.getElementById('coachOpenOperationMessage').textContent === '已复制开放安排，已有预约不会被复制。', 'A focused selection must support the existing copy shortcut.');
+  assert(win.getComputedStyle(doc.getElementById('coachOpenOperationMessage')).position === 'static' && doc.getElementById('coachOpenOperationMessage').parentElement.contains(doc.getElementById('calendarPaintHint')), 'Copy feedback must be inline above the calendar, never an overlay.');
+  await new Promise((resolve) => setTimeout(resolve, 2100));
+  assert(doc.getElementById('coachOpenOperationMessage').hidden && !doc.getElementById('coachOpenOperationMessage').textContent, 'Copy feedback must disappear after a short interval.');
+  context(cell(0, 570)); command('复制'); context(cell(1, 570)); command(`粘贴到${date(1)} 周二 09:30`);
+  assert(block(1, '09:30')?.style.gridRow.endsWith('span 30') && block(0, '09:00'), 'Partial copy to empty space must retain the source and just the selected duration.');
+  win.undoAvailabilityChange();
+  choose(0, 570, 660);
+  assert(calendar.querySelector('.calendar-open-selection').getAttribute('aria-label').endsWith('09:30–11:30'), 'Dragging across the reference booking must extend selection through all underlying locations.');
+  context(cell(0, 600)); command('复制'); context(cell(1, 540)); command(`粘贴到${date(1)} 周二 09:00`);
+  assert(block(1, '09:00')?.getAttribute('aria-label').includes('10:30') && block(1, '10:30')?.getAttribute('aria-label').includes('Zoom'), 'Mixed-venue paste must use original availability (not the booked location) and preserve relative offsets.');
+  assert(!win.slots.some((item) => item.date === date(1) && item.location === other), 'The reference lesson location must never become copied availability.');
+  context(cell(2, 570));
+  assert([...doc.querySelectorAll('#coachOpenContextMenu button')].some((button) => calendarMenuLabel(button) === `粘贴到${date(2)} 周三 09:30` && !button.disabled), 'Occupied targets must still expose paste.');
+  command(`粘贴到${date(2)} 周三 09:30`);
+  assert(block(2, '08:00')?.getAttribute('aria-label').includes('09:30') && block(2, '11:30')?.getAttribute('aria-label').includes('14:00') && block(2, '09:30')?.getAttribute('aria-label').includes('11:00') && block(2, '11:00')?.getAttribute('aria-label').includes('Zoom'), 'Ordinary paste must replace only its target envelope, preserving the target prefix/suffix and copied internal locations.');
+  win.undoAvailabilityChange(); assert(block(2, '08:00')?.getAttribute('aria-label').includes('14:00'), 'Replacement must undo atomically.');
+  // Move only via the handle; exact minute offsets survive a grid-based shift.
+  choose(4, 570, 660); hit = cell(4, 570); move(3, 600);
+  assert(calendar.querySelector('.calendar-open-drop').getAttribute('aria-label').includes('10:17–11:42'), 'Move must apply a relative 30-minute offset without rounding the precise source.');
+  assert(doc.getElementById('coachOpenOperationMessage').hidden && ![...calendar.querySelectorAll('[title]')].some((node) => node.title) && !calendar.querySelector('.calendar-open-drop').textContent.trim(), 'Moving must suppress toast/native time tooltips and floating text without losing precise target coordinates.');
+  assert(doc.getElementById('calendarPaintHint').textContent.includes('10:17–11:42'), 'The existing calendar hint must retain accurate target times outside the grid.');
+  pointer(calendar, 'pointerup', 200, 160); calendar.dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
+  assert(!block(4, '09:47') && block(3, '10:17'), 'Only the handle drop may move selected supply.');
+  win.undoAvailabilityChange();
+  choose(4, 570, 660); const beforeEscape = JSON.stringify(win.captureAvailabilityUndoState()); hit = cell(4, 570); move(3, 600); doc.dispatchEvent(new win.KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); calendar.dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
+  assert(!calendar.querySelector('.calendar-open-drop') && JSON.stringify(win.captureAvailabilityUndoState()) === beforeEscape, 'Escape must cancel a move without touching the draft.');
+  assert(!calendar.hasAttribute('data-open-gesture') && [...calendar.querySelectorAll('[title]')].some((node) => node.title), 'Cancel must restore ordinary hover information and remove transient gesture state.');
+  // Closing the supply below an established appointment changes only its underlay.
+  choose(0, 600, 600); context(cell(0, 600)); command('删除选中开放时段');
+  assert(!block(0, '09:00').getAttribute('aria-label').includes('11:00') && doc.querySelector('.coach-calendar-booking.is-availability-booking'), 'Closing a booked period must split availability while retaining the reference card.');
+  assert(JSON.stringify(win.slots.find((item) => item.id === 'reference')) === bookingBefore, 'Established appointment records must remain byte-for-byte unchanged.');
+  overviewDate(doc, date(0));
+  assert(doc.getElementById('dropdownOpenSlots').textContent.includes('09:00–10:00') && doc.getElementById('dropdownOpenSlots').textContent.includes('10:30–11:00'), 'The list must reflect the same edited underlay.');
+  win.undoAvailabilityChange();
+  // A moved draft overlay reveals its earlier location only inside the source selection.
+  choose(5, 600, 690); cell(5, 600).dispatchEvent(new win.MouseEvent('dblclick', { bubbles: true }));
+  assert(doc.getElementById('coachWorkTimeDialog').open, 'Double clicking a selected calendar cell must open the shared partial-range editor.');
+  field('coachWorkTimeLocation', location); submit(doc.getElementById('coachWorkTimeForm'));
+  assert(block(5, '10:00')?.getAttribute('aria-label').includes('Polar'), 'Editing a selected range must update its actual shared location.');
+  choose(5, 600, 690); hit = cell(5, 600); move(6, 600); pointer(calendar, 'pointerup', 200, 160); calendar.dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
+  assert(block(5, '10:00')?.getAttribute('aria-label').includes('不限冰场') && block(6, '10:00'), `Moving a changed overlay must restore the real earlier source location, rather than always closing it: ${block(5, '10:00')?.getAttribute('aria-label')}; destination ${block(6, '10:00')?.getAttribute('aria-label')}; message ${doc.getElementById('coachOpenOperationMessage').textContent}; edit ${doc.getElementById('coachWorkTimeMessage').textContent}`);
+  win.undoAvailabilityChange(); win.undoAvailabilityChange();
+  const header = (day) => calendar.querySelector(`.calendar-day[data-date="${date(day)}"]`);
+  context(header(0)); command('复制当天安排'); context(header(6)); command(`粘贴当天安排到${date(6)} 周日`);
+  assert(block(6, '09:00')?.getAttribute('aria-label').includes('11:00') && block(6, '11:00')?.getAttribute('aria-label').includes('Zoom') && !win.slots.some((item) => item.date === date(6) && item.booked), 'Day copy must include the underlying supply without copying bookings.');
+  assert(JSON.stringify(win.getTestPublishedSchedule()) === published && JSON.stringify(win.slots.find((item) => item.id === 'reference')) === bookingBefore, 'All changes must remain draft-only and preserve the appointment.');
+  // Save uses the same persistence and keeps the closing override beneath the booking.
+  choose(0, 600, 600); context(cell(0, 600)); command('删除选中开放时段'); doc.getElementById('saveProfileChanges').click();
+  const saved = win.getTestPublishedSchedule();
+  assert(JSON.stringify(saved.slots.find((item) => item.id === 'reference')) === bookingBefore && saved.planning.dateOverrides.some((item) => item.date === date(0) && item.start === '10:00' && item.end === '10:30' && item.kind === 'rest'), 'Save must persist the underlying closure and preserve the original booking.');
+  assertNoRuntimeErrors('Partial open calendar operations', errors); dom.window.close();
+}
+
+async function testPreciseAvailabilitySave() {
+  const { dom, errors } = await loadPage('coach/index.html');
+  const win = dom.window, doc = win.document;
+  const date = win.addDaysIso(win.todayIso(), 3), location = win.readProfileState('maya').saved.servedRinks[0];
+  const config = win.createSchedulingConfig(win.readProfileState('maya').saved.servedRinks);
+  config.enabled = true; config.workHoursSource = 'availability';
+  config.locations.forEach((place) => { place.included = place.name === location; });
+  win.setSchedulingConfig('maya', config);
+  win.slots = [{ id: 'precise-save', coachId: 'maya', date, start: '09:47', end: '11:12', location, booked: false }];
+  doc.querySelector('[data-coach-panel="availabilityPanel"]').click();
+  const field = (id, value) => { doc.getElementById(id).value = value; doc.getElementById(id).dispatchEvent(new win.Event('change', { bubbles: true })); };
+  field('coachPlannerScope', 'dates'); field('coachPlannerFrom', date); field('coachPlannerTo', date); win.renderSchedulingSettings();
+  doc.querySelector('#dropdownOpenSlots .availability-range-card').click(); field('coachWorkTimeEnd', '11:13'); submit(doc.getElementById('coachWorkTimeForm'));
+  doc.getElementById('saveProfileChanges').click();
+  assert(win.getTestPublishedSchedule().slots.some((slot) => slot.start === '09:47' && slot.end === '11:13'), 'Save changes must publish precise endpoints without rounding or losing trailing minutes.');
+  assertNoRuntimeErrors('Precise availability save', errors); dom.window.close();
+}
+
+async function testLunchAlternativesPreview() {
+  const { dom, errors } = await loadPage('coach/index.html', { now: '2035-01-01T06:00:00' });
+  const win = dom.window, doc = win.document, date = win.addDaysIso(win.todayIso(), 1);
+  const [a, b] = win.readProfileState('maya').saved.servedRinks;
+  const make = (id, start, end, location, booked = false) => ({ id, coachId: 'maya', date, start, end, location, availabilityLocation: location, booked, status: booked ? 'Booked' : 'Open', lessonName: '私教课', lessonDuration: 30, lessonPrice: 60 });
+  win.slots = [make('morning', '09:00', '11:30', a), make('fixed-a', '11:30', '12:00', a, true), make('fixed-b', '12:50', '14:00', b, true), make('afternoon', '14:00', '17:00', b)];
+  doc.querySelector('[data-coach-panel="availabilityPanel"]').click();
+  doc.querySelector('[data-optimize-scope="tomorrow"]').click();
+  doc.querySelector('[data-lunch="mode"][value="flexible"]').click();
+  const published = JSON.stringify(win.getTestPublishedSchedule()), bookings = JSON.stringify(win.slots.filter((slot) => slot.booked));
+  const generate = async () => { doc.getElementById('generateCoachSchedule').click(); await new Promise((resolve) => setTimeout(resolve, 50)); };
+  await generate();
+  const preview = doc.getElementById('coachSchedulePreview');
+  assert(preview.textContent.includes(date) && preview.textContent.includes('无法容纳连续 30 分钟') && preview.querySelector('[data-apply-schedule]').disabled, 'An infeasible lunch is concentrated in the preview and blocks unchosen application.');
+  const shorter = preview.querySelector('[data-lunch-choice="shorter"]');
+  assert(shorter && shorter.textContent.includes('20 分钟') && preview.querySelector('[data-lunch-choice="self"]'), 'Only computed feasible lunch alternatives are selectable.');
+  shorter.click();
+  assert(!preview.querySelector('[data-apply-schedule]').disabled && preview.textContent.includes('已选择'), 'A coach choice unlocks the reviewed date.');
+  assert(win.getSchedulingConfig().lunch.duration === 30 && JSON.stringify(win.getTestPublishedSchedule()) === published, 'Selecting a per-date alternative does not change the default lunch policy or publish.');
+  preview.querySelector('[data-apply-schedule]').click();
+  const draft = win.captureAvailabilityUndoState().scheduling;
+  assert(draft.dateOverrides.some((item) => item.date === date && item.kind === 'lunch-policy' && item.lunch.duration === 20), 'The selected alternative is owned by that date.');
+  assert(draft.blocks.some((item) => item.date === date && item.kind === 'commute' && item.start >= '12:00' && item.end <= '12:50' && win.minutesFromTime(item.end) - win.minutesFromTime(item.start) === 30), 'The selected alternative preserves all thirty travel minutes.');
+  const lunch = draft.blocks.find((item) => item.date === date && item.source === 'lunch');
+  assert(lunch.start >= '12:00' && lunch.end <= '12:50' && win.minutesFromTime(lunch.end) - win.minutesFromTime(lunch.start) === 20 && !draft.blocks.some((block) => block.kind === 'commute' && block.start < lunch.end && block.end > lunch.start), 'Lunch uses twenty separate minutes after accounting for commute.');
+  assert(JSON.stringify(win.slots.filter((slot) => slot.booked)) === bookings && JSON.stringify(win.getTestPublishedSchedule()) === published, 'Applying preserves bookings and still does not publish.');
+  doc.getElementById('saveProfileChanges').click();
+  assert(win.getTestPublishedSchedule().planning.dateOverrides.some((item) => item.kind === 'lunch-policy' && item.lunch.duration === 20), 'Save publishes the explicitly selected date policy.');
+  assertNoRuntimeErrors('Lunch alternatives preview and publication', errors); dom.window.close();
+}
+
+async function testUnifiedPlannerRangeAndPicker() {
+  const { dom, errors } = await loadPage('coach/index.html', { now: '2035-01-01T06:00:00' });
+  const win = dom.window, doc = win.document, today = win.todayIso(), next = win.addDaysIso(today, 7);
+  const location = win.readProfileState('maya').saved.servedRinks[0];
+  const make = (id, date, start = '09:00', end = '12:00', booked = false) => ({ id, coachId: 'maya', date, start, end, location, availabilityLocation: location, booked, status: booked ? 'Booked' : 'Open', lessonName: '私教课', lessonDuration: 30, lessonPrice: 60 });
+  win.slots = [make('today-base', today), make('next-week-base', next), make('past-open', today, '05:00', '05:30'), make('fixed-reference', today, '13:00', '13:30', true)];
+  const original = JSON.parse(JSON.stringify(win.slots)), published = JSON.stringify(win.getTestPublishedSchedule());
+  doc.querySelector('[data-coach-panel="availabilityPanel"]').click();
+  const field = (id, value) => { const node = doc.getElementById(id); node.value = value; node.dispatchEvent(new win.Event('change', { bubbles: true })); };
+  const scheduler = doc.getElementById('coachSchedulerPanel'), base = doc.getElementById('coachBaseAvailabilitySettings');
+  const ids = [...doc.querySelectorAll('[id]')].map(node => node.id);
+  assert(new Set(ids).size === ids.length, 'Coach page must expose one control per ID so visible date fields bind to the shared draft.');
+  assert(base.contains(doc.getElementById('coachPlannerScope')) && base.contains(doc.getElementById('coachPlannerFrom')) && base.contains(doc.getElementById('coachPlannerTo')) && base.hidden, 'Foundation mode and dates belong to the collapsed editing-range panel.');
+  assert(!scheduler.querySelector('#coachPlannerScope, #coachPlannerFrom, #coachPlannerTo, #coachAddOpenForm') && scheduler.querySelectorAll('[data-optimize-scope]').length === 3, 'Optimization exposes only Today/Tomorrow/This week as its date controls.');
+  assert(doc.getElementById('coachOptimizationDates').textContent === today, 'Today shows its concrete date.');
+  // The existing range remains the scope for editing the foundation, independently of optimization.
+  field('coachPlannerFrom', next); field('coachPlannerTo', win.addDaysIso(next, 6));
+  doc.getElementById('coachPlannerToTrigger').click();
+  const picker = doc.getElementById('coachPlannerToPopover');
+  assert(!picker.hidden && picker.querySelectorAll('[data-date]').length === 42, 'Foundation editing retains the existing themed date picker.');
+  doc.dispatchEvent(new win.KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+  assert(picker.hidden, 'Escape closes the foundation date picker.');
+  const before = JSON.stringify(win.captureAvailabilityUndoState());
+  doc.getElementById('generateCoachSchedule').click();
+  await new Promise((resolve) => setTimeout(resolve, 30));
+  assert(doc.querySelectorAll('#coachSchedulePreview .planner-timetable-day').length === 1 && doc.querySelector('#coachSchedulePreview .planner-timetable-day strong').textContent === today, 'Today optimization ignores the independent weekly editing range.');
+  assert(JSON.stringify(win.captureAvailabilityUndoState()) === before, 'Preview never mutates the shared draft or published data.');
+  const startField = doc.querySelector('#coachSchedulePreview [data-preview-kind="open"] [data-preview-field="start"]');
+  startField.value = '09:15'; startField.dispatchEvent(new win.Event('change', { bubbles: true }));
+  assert(!doc.querySelector('[data-apply-schedule]').disabled, 'A valid manual trim is reviewable before applying.');
+  doc.querySelector('[data-apply-schedule]').click();
+  assert(JSON.stringify(win.getTestPublishedSchedule()) === published, 'Applying remains a draft until Save.');
+  const after = win.captureAvailabilityUndoState();
+  assert(JSON.stringify(after.scheduling.templates) === JSON.stringify(JSON.parse(before).scheduling.templates), 'Date optimization never rewrites weekly templates.');
+  for (const slot of original.filter((slot) => slot.id !== 'today-base')) assert(JSON.stringify(win.slots.find((item) => item.id === slot.id)) === JSON.stringify(slot), 'Future weekly supply, started supply and fixed bookings remain exact.');
+  assert(win.slots.filter((slot) => !slot.booked && slot.date === today && slot.start >= '06:00').every((slot) => slot.start >= '09:15'), 'The manually reviewed trim is applied.');
+  doc.querySelector('[data-optimize-scope="week"]').click();
+  doc.getElementById('generateCoachSchedule').click(); await new Promise((resolve) => setTimeout(resolve, 60));
+  assert(doc.querySelectorAll('#coachSchedulePreview .planner-timetable-day').length === 7, 'This week produces only the concrete remaining dates of the current week.');
+  assert(doc.getElementById('coachOptimizationDates').textContent === `${today} — ${win.addDaysIso(today, 6)}`, 'This week shows its concrete remaining range.');
+  doc.querySelector('[data-optimize-scope="tomorrow"]').click();
+  assert(doc.getElementById('coachSchedulePreview').hidden && !doc.querySelector('[data-apply-schedule]') && !doc.querySelector('[data-preview-block]'), 'Changing scope removes the old preview and calendar overlays immediately.');
+  assert(doc.getElementById('coachOptimizationDates').textContent === win.addDaysIso(today, 1), 'Tomorrow shows its concrete date.');
+  doc.getElementById('generateCoachSchedule').click(); await new Promise((resolve) => setTimeout(resolve, 30));
+  assert(doc.querySelectorAll('#coachSchedulePreview .planner-timetable-day').length === 1 && doc.querySelector('#coachSchedulePreview .planner-timetable-day strong').textContent === win.addDaysIso(today, 1), 'Regeneration uses only Tomorrow.');
+  doc.querySelector('[data-optimize-scope="week"]').click();
+  doc.getElementById('generateCoachSchedule').click();
+  assert(doc.getElementById('generateCoachSchedule').getAttribute('aria-busy') === 'true', 'Multi-day generation yields while busy.');
+  doc.querySelector('[data-optimize-scope="today"]').click();
+  doc.querySelector('[data-optimize-scope="week"]').click();
+  await new Promise((resolve) => setTimeout(resolve, 60));
+  assert(doc.getElementById('coachSchedulePreview').hidden && !doc.querySelector('[data-apply-schedule]') && doc.getElementById('coachSchedulerMessage').textContent.includes('重新生成'), 'Changing scope away and back during generation cannot restore the abandoned preview.');
+  assertNoRuntimeErrors('Independent optimization and foundation ranges', errors); dom.window.close();
+}
+
+async function testPlannerDateRange() {
+  const { dom, errors } = await loadPage("coach/index.html");
+  const win = dom.window, doc = win.document;
+  const from = doc.getElementById('coachPlannerFrom'), to = doc.getElementById('coachPlannerTo');
+  const button = doc.getElementById('generateCoachSchedule');
+  const error = doc.getElementById('coachPlannerToError');
+  const date = win.addDaysIso(win.todayIso(), 2);
+  const location = win.readProfileState('maya').saved.servedRinks[0];
+  const config = win.createSchedulingConfig(win.readProfileState('maya').saved.servedRinks);
+  config.locations.forEach((place) => { place.included = place.name === location; });
+  win.setSchedulingConfig('maya', config);
+  win.slots = [{ id: 'range-open', coachId: 'maya', date, start: '09:00', end: '10:00', location, booked: false }];
+  doc.querySelector('[data-coach-panel="availabilityPanel"]').click();
+  doc.getElementById('coachPlannerScope').value = 'dates';
+  doc.getElementById('coachPlannerScope').dispatchEvent(new win.Event('change', { bubbles: true }));
+  const change = (input, value, type = 'change') => { input.value = value; input.dispatchEvent(new win.Event(type, { bubbles: true })); };
+  change(from, date); change(to, date);
+  win.renderSchedulingSettings();
+  assert(to.min === date && !button.disabled && error.hidden, 'Same-day ranges must be valid, including the picker minimum.');
+  button.click();
+  await new Promise((resolve) => setTimeout(resolve, 25));
+  assert(doc.querySelectorAll('#coachSchedulePreview .planner-timetable-day').length === 1, 'A same-day range must generate exactly one day in its preview.');
+  const crossWeek = win.addDaysIso(win.startOfWeekIso(win.addDaysIso(win.todayIso(), 7)), 6);
+  const nextMonth = new Date(`${win.todayIso()}T12:00:00Z`);
+  nextMonth.setUTCDate(1); nextMonth.setUTCMonth(nextMonth.getUTCMonth() + 1);
+  const monthFirst = nextMonth.toISOString().slice(0, 10);
+  for (const [start, end] of [[crossWeek, win.addDaysIso(crossWeek, 1)], [win.addDaysIso(monthFirst, -1), monthFirst]]) {
+    change(from, start); change(to, end, 'input'); change(to, end);
+    assert(!button.disabled && error.hidden && to.min === start, 'Valid cross-week and cross-month input must remain enabled.');
+  }
+  const later = win.addDaysIso(to.value, 2);
+  change(from, later);
+  assert(to.value === later && to.min === later && !doc.getElementById('coachPlannerRangeHint').hidden && !button.disabled, 'Advancing the start past the old end must move the end to the same day and show a lightweight hint.');
+  const snapshot = JSON.stringify(win.captureAvailabilityUndoState());
+  change(to, win.addDaysIso(from.value, -1), 'input');
+  assert(!button.disabled && error.textContent === '结束日期不能早于开始日期' && !error.hidden && !to.checkValidity(), 'Invalid foundation dates must show their error without disabling independent Today optimization.');
+  change(to, '', 'input');
+  assert(!button.disabled && !error.hidden, 'Incomplete foundation dates do not change optimization scope.');
+  change(to, from.value);
+  assert(error.hidden && JSON.stringify(win.captureAvailabilityUndoState()) === snapshot, 'Fixing the editing range never changes scheduling business data.');
+  assertNoRuntimeErrors('Planner date range', errors);
+  dom.window.close();
+}
+
+async function testWeeklyWorkTimeOperations() {
+  const { dom, errors } = await loadPage("coach/index.html");
+  const win = dom.window, doc = win.document;
+  assert(doc.getElementById('coachPlannerScope').value === 'weekly', 'Work hours must open as a general weekly schedule by default.');
+  assert(!doc.getElementById('coachAddOpenForm') && doc.querySelector('#dropdownOpenSlots [data-planner-action="add-work-range"]'), 'Daily add controls must replace the permanent form.');
+  doc.getElementById('coachPlannerScope').value = 'dates';
+  doc.getElementById('coachPlannerScope').dispatchEvent(new win.Event('change', { bubbles: true }));
+  const monday = nextWeekdayByIndex(win, 1);
+  const [location, other] = win.readProfileState('maya').saved.servedRinks;
+  const make = (date, start, end, location, booked = false) => ({ id: `week-${date}-${start}`, coachId: 'maya', date, start, end, location, booked, status: booked ? 'Booked' : 'Open', lessonName: '私教课', lessonDuration: 30, lessonPrice: 60 });
+  win.slots = [0, 7, 14, 21].map((offset) => make(win.addDaysIso(monday, offset), '09:00', '10:00', location));
+  win.slots = [...win.slots, make(monday, '10:00', '10:30', location, true)];
+  const booking = JSON.stringify(win.slots.find((slot) => slot.booked));
+  doc.querySelector('[data-coach-panel="availabilityPanel"]').click();
+  const field = (id, value) => { doc.getElementById(id).value = value; doc.getElementById(id).dispatchEvent(new win.Event('change', { bubbles: true })); };
+  field('coachPlannerFrom', monday); field('coachPlannerTo', win.addDaysIso(monday, 27));
+  field('calendarWeekStart', win.startOfWeekIso(win.addDaysIso(monday, 7)));
+  // Create an actual single-date exception through the existing overview.
+  doc.querySelector(`#dropdownOpenSlots [data-work-day="${win.addDaysIso(monday, 7)}"] [data-planner-action="edit-work-range"]`).click();
+  field('coachWorkTimeLocation', other); submit(doc.getElementById('coachWorkTimeForm'));
+  field('coachPlannerScope', 'weekly');
+  field('calendarWeekStart', win.startOfWeekIso(monday));
+  const table = () => doc.querySelector('#dropdownOpenSlots');
+  assert(table().querySelectorAll('[data-work-day]').length === 7, 'The overview must retain seven days.');
+  assert(table().querySelector(`[data-work-day="${monday}"] .availability-range-card`).dataset.rink === location && table().querySelector(`[data-work-day="${monday}"]`).textContent.includes('09:00–10:30'), 'The dated overview must show the original weekly venue and booking underlay; a different date exception must not replace it.');
+  const saturday = () => table().querySelector(`[data-work-day="${win.addDaysIso(monday, 5)}"]`);
+  assert(saturday().textContent.includes('暂无安排'), 'Closed weekends must remain visible.');
+  saturday().querySelector('[data-planner-action="add-work-range"]').click();
+  field('coachWorkTimeStart', '12:00'); field('coachWorkTimeEnd', '13:00'); field('coachWorkTimeLocation', location);
+  doc.getElementById('cancelCoachWorkTime').click();
+  assert(saturday().textContent.includes('暂无安排'), 'Cancelling an addition must preserve closure.');
+  saturday().querySelector('[data-planner-action="add-work-range"]').click();
+  field('coachWorkTimeStart', '12:00'); field('coachWorkTimeEnd', '13:00'); field('coachWorkTimeLocation', location);
+  submit(doc.getElementById('coachWorkTimeForm'));
+  assert(saturday().textContent.includes('12:00–13:00'), 'A closed weekend must accept a new recurring range.');
+  const firstSaturday = win.addDaysIso(monday, 5);
+  assert([0, 7, 14, 21].every((offset) => win.slots.some((slot) => slot.date === win.addDaysIso(firstSaturday, offset) && slot.start === '12:00')), 'Adding must update every occurrence through the explicit repeat end.');
+  const originalColor = saturday().querySelector('.availability-range-card').style.getPropertyValue('--rink-color');
+  doc.querySelector('#dragCalendar .calendar-cell[data-day-index="5"][data-minutes="720"]').click();
+  doc.querySelector('[data-open-action="edit"]').click();
+  field('coachWorkTimeLocation', other);
+  submit(doc.getElementById('coachWorkTimeForm'));
+  doc.getElementById('calendarWeekStart').value = win.startOfWeekIso(monday);
+  win.renderDragCalendar();
+  const updatedTag = saturday().querySelector('.availability-range-card');
+  const calendarCell = doc.querySelector('#dragCalendar .calendar-cell[data-day-index="5"][data-minutes="720"]');
+  assert(updatedTag.dataset.rink === other && updatedTag.style.getPropertyValue('--rink-color') !== originalColor && updatedTag.style.getPropertyValue('--rink-color') === calendarCell.style.getPropertyValue('--rink-color'), 'Changing a venue must update its label and calendar color together.');
+  table().querySelector(`[data-work-day="${monday}"] [data-planner-action="edit-work-range"]`).click();
+  assert(doc.getElementById('coachWorkTimeEnd').value === '10:00', 'Weekly card editing must target the base rule rather than the merged booking underlay.');
+  field('coachWorkTimeEnd', '11:00');
+  submit(doc.getElementById('coachWorkTimeForm'));
+  assert(!doc.getElementById('coachWorkTimeDialog').open, `Weekly editing must succeed while preserving booked portions: ${doc.getElementById('coachWorkTimeMessage').textContent}`);
+  assert(win.slots.some((slot) => slot.date === win.addDaysIso(monday, 7) && slot.start === '09:00' && slot.location === other), 'Weekly edits must preserve single-date exceptions even on the first edited occurrence.');
+  assert(JSON.stringify(win.slots.find((slot) => slot.booked)) === booking, 'Established bookings must remain byte-for-byte unchanged.');
+  doc.querySelector('#dragCalendar .calendar-cell[data-day-index="5"][data-minutes="720"]').click();
+  doc.querySelector('[data-open-action="delete"]').click();
+  assert(saturday().textContent.includes('暂无安排') && !win.slots.some((slot) => slot.date === firstSaturday), 'Deletion must update both weekly rules and calendar occurrences.');
+  field('coachPlannerScope', 'dates');
+  assert(doc.getElementById('coachEditingRangeSummary').textContent.includes('指定日期'), 'Date mode must be reflected in the shared range summary.');
+  assertNoRuntimeErrors('Weekly work time operations', errors);
+  dom.window.close();
+}
+
+async function testWorkTimeTimetable() {
+  const { dom, errors } = await loadPage("coach/index.html", { now: "2035-01-01T06:00:00" });
+  const win = dom.window, doc = win.document;
+  doc.getElementById('coachPlannerScope').value = 'dates';
+  doc.getElementById('coachPlannerScope').dispatchEvent(new win.Event('change', { bubbles: true }));
+  const date = win.addDaysIso(win.todayIso(), 2);
+  const location = win.readProfileState("maya").saved.servedRinks[0];
+  const make = (id, start, end, booked = false) => ({ id, coachId: "maya", date, start, end, location, booked, status: booked ? "Booked" : "Open", lessonName: "私教课", lessonDuration: 30, lessonPrice: 60 });
+  win.slots = [make("table-a", "09:00", "09:30"), make("table-b", "09:30", "10:00"), make("table-booked", "11:00", "11:30", true)];
+  const config = win.createSchedulingConfig(win.readProfileState("maya").saved.servedRinks);
+  config.locations.forEach((place) => { place.included = false; place.windows = [{ days: [], start: 'bad', end: '' }]; });
+  win.setSchedulingConfig("maya", config);
+  doc.querySelector('[data-coach-panel="availabilityPanel"]').click();
+  for (const id of ["coachPlannerFrom", "coachPlannerTo"]) {
+    doc.getElementById(id).value = date;
+    doc.getElementById(id).dispatchEvent(new win.Event("change", { bubbles: true }));
+  }
+  win.renderSchedulingSettings();
+  assert(!doc.getElementById('coachSchedulerConfig').textContent.includes('参与地点与可授课窗口') && !doc.getElementById('coachSchedulerConfig').querySelector('[data-location], [data-planner-action="use-work-hours"], [data-planner-action="add-window"]'), 'Planner must not ask for duplicate venue confirmations or windows.');
+  const table = () => doc.querySelector('#dropdownOpenSlots');
+  assert(table().textContent.includes("09:00–10:00") && table().textContent.includes("11:00–11:30"), "Adjacent availability must merge and booking underlay must remain independently editable.");
+  assert(!doc.querySelector('[data-workday]') && !table().querySelector('input'), "Work hours must be read-only until a range is opened.");
+  assert(table().querySelector('.availability-range-card small').textContent === '共 1 小时', 'Duration must be calculated beside the merged time range without adding a column.');
+  const before = JSON.stringify(win.slots), saved = JSON.stringify(win.getTestPublishedSchedule());
+  table().querySelector('.availability-range-card').click();
+  doc.getElementById('coachWorkTimeEnd').value = '10:30';
+  doc.getElementById('cancelCoachWorkTime').click();
+  assert(JSON.stringify(win.slots) === before, "Cancel must leave the shared draft unchanged.");
+  table().querySelector('.availability-range-card').click();
+  doc.getElementById('coachWorkTimeEnd').value = '11:30';
+  submit(doc.getElementById('coachWorkTimeForm'));
+  assert(doc.getElementById('coachWorkTimeMessage').textContent.includes('开放安排冲突') && JSON.stringify(win.slots) === before, "Extending into another underlying availability range must reject the edit atomically.");
+  doc.getElementById('coachWorkTimeEnd').value = '10:30';
+  submit(doc.getElementById('coachWorkTimeForm'));
+  assert(table().textContent.includes('09:00–10:30') && !doc.getElementById('coachWorkTimeDialog').open, "Confirm must update the shared draft and timetable.");
+  assert(table().querySelector('.availability-range-card small').textContent === '共 1 小时 30 分钟', 'The secondary duration must update immediately after confirming a time edit.');
+  assert(JSON.stringify(win.getTestPublishedSchedule()) === saved, "Editing must not publish availability.");
+  doc.querySelector('[data-optimize-scope="week"]').click();
+  const edited = JSON.stringify(win.slots);
+  doc.getElementById('generateCoachSchedule').click();
+  await new Promise((resolve) => setTimeout(resolve, 50));
+  assert(JSON.stringify(win.slots) === edited && !doc.getElementById('coachSchedulePreview').hidden, "Generation must only show a separate preview.");
+  assert(doc.querySelector('[data-apply-schedule]') && !doc.querySelector('[data-apply-schedule]').disabled, "A fresh preview must be applicable.");
+  addOverviewRange(doc, date, '14:00', '15:00', location);
+  assert(table().textContent.includes('14:00–15:00') && doc.querySelector('[data-apply-schedule]').disabled, "Existing form edits must update the timetable and invalidate the old preview.");
+  const revised = JSON.stringify(win.slots);
+  doc.getElementById('generateCoachSchedule').click();
+  await new Promise((resolve) => setTimeout(resolve, 50));
+  assert(JSON.stringify(win.slots) === revised && doc.getElementById('coachSchedulePreview').textContent.includes('14:00'), "Regeneration must use the latest shared draft without replacing it.");
+  doc.querySelector('[data-apply-schedule]').click();
+  assert(doc.getElementById('coachSchedulePreview').hidden && JSON.stringify(win.getTestPublishedSchedule()) === saved, "Apply must update the editing draft without publishing.");
+  assert(win.slots.some((slot) => slot.id === 'table-booked' && slot.start === '11:00'), "The booking must remain untouched.");
+  assertNoRuntimeErrors("Work timetable", errors);
+  dom.window.close();
+}
+
+async function testStudentPublishedAvailability() {
+  const { dom, errors } = await loadPage("student/index.html?access=full");
+  const win = dom.window, doc = win.document;
+  const date = win.nextWeekdayIso();
+  win.slots = [{ id: "published-student-slot", coachId: "maya", date, start: "10:00", end: "11:00", location: "Polar Ice Rink", availabilityLocation: "Polar Ice Rink", booked: false }];
+  win.setTestAvailabilityDraft([]);
+  win.render();
+  const available = [...doc.querySelectorAll('button[data-action="choose-time"]')].find((button) => button.dataset.ids?.includes("published-student-slot"));
+  assert(available, "Unpublished deletion in the coach editor must not hide published student availability.");
+  win.openBookingDialog("published-student-slot");
+  doc.querySelector("#studentEmail").value = "student@example.com";
+  submit(doc.querySelector("#bookingForm"));
+  assert(!doc.querySelector("#bookingDialog").open && win.getTestPublishedSchedule().slots.some((slot) => slot.booked), "Student booking must use published supply even when the editing draft differs.");
+  assertNoRuntimeErrors("Student published availability", errors);
+  dom.window.close();
+}
+
+async function testEditingRangePopover() {
+  const { dom, errors } = await loadPage('coach/index.html', { now: '2035-01-01T06:00:00' });
+  const win = dom.window, doc = win.document;
+  doc.querySelector('[data-coach-panel="availabilityPanel"]').click();
+  const trigger = doc.getElementById('coachEditingRangeTrigger'), panel = doc.getElementById('coachBaseAvailabilitySettings');
+  const summary = doc.getElementById('coachEditingRangeSummary');
+  const from = doc.getElementById('coachPlannerFrom'), to = doc.getElementById('coachPlannerTo');
+  const before = JSON.stringify(win.captureAvailabilityUndoState()), storage = JSON.stringify(dumpLocalStorage(win));
+  const change = (input, value) => { input.value = value; input.dispatchEvent(new win.Event('change', { bubbles: true })); };
+  const escape = () => doc.activeElement.dispatchEvent(new win.KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
+  assert(panel.hidden && trigger.getAttribute('aria-expanded') === 'false' && summary.textContent.includes(from.value), 'Range starts collapsed with the actual scope summary.');
+  trigger.click(); await Promise.resolve();
+  assert(!panel.hidden && doc.activeElement === doc.getElementById('coachPlannerScope'), 'Opening must expose the original controls and focus the mode.');
+  const start = win.addDaysIso(win.todayIso(), 7), end = win.addDaysIso(start, 13);
+  change(from, start); change(to, end);
+  assert(summary.textContent.includes(start) && summary.textContent.includes(end) && summary.textContent.includes('每周安排'), 'Valid changes immediately update the actual range summary.');
+  from.click();
+  const popup = doc.getElementById('coachPlannerFromPopover');
+  assert(!popup.hidden && !panel.hidden, 'Nested date picker must stay inside the range layer.');
+  const month = popup.querySelector('[data-date-month]'); month.focus(); month.dispatchEvent(new win.Event('change', { bubbles: true }));
+  assert(!popup.hidden && !panel.hidden, 'Month selection must not close the outer layer.');
+  escape();
+  assert(popup.hidden && !panel.hidden && doc.activeElement === doc.getElementById('coachPlannerFromTrigger'), 'First Escape closes only the nested calendar and returns its focus.');
+  escape();
+  assert(panel.hidden && doc.activeElement === trigger, 'Second Escape closes the range and returns trigger focus.');
+  trigger.click(); await Promise.resolve(); from.click();
+  doc.getElementById('closeCoachEditingRange').click();
+  assert(panel.hidden && popup.hidden && doc.activeElement === trigger, 'Explicit close cleans the inner picker without reverting range.');
+  trigger.click(); await Promise.resolve(); from.click();
+  const outside = doc.getElementById('todayCalendarWeek'); outside.focus();
+  assert(panel.hidden && popup.hidden && doc.activeElement === outside, 'Tab or focus outside closes both layers without stealing external focus.');
+  trigger.click(); await Promise.resolve(); from.click(); doc.body.click();
+  assert(panel.hidden && popup.hidden && doc.activeElement === trigger, 'Outside background click closes both layers and restores trigger focus.');
+  trigger.click(); await Promise.resolve(); change(to, ''); doc.getElementById('closeCoachEditingRange').click();
+  assert(!doc.getElementById('coachEditingRangeError').hidden && trigger.getAttribute('aria-invalid') === 'true' && summary.textContent.includes(end), 'Invalid fields retain the actual scope summary with a visible correction entry.');
+  doc.querySelector('#dropdownOpenSlots [data-planner-action="add-work-range"]').click(); await Promise.resolve();
+  assert(!panel.hidden && doc.activeElement === to && !doc.getElementById('coachWorkTimeDialog').open, 'Adding with invalid range opens and focuses correction instead of using stale scope.');
+  assert(!doc.getElementById('generateCoachSchedule').disabled, 'Independent Today optimization must stay available.');
+  change(to, end); change(doc.getElementById('coachPlannerScope'), 'dates');
+  assert(doc.getElementById('coachEditingRangeError').hidden && summary.textContent.includes('指定日期'), 'Correction clears the error and mode changes immediately update the summary.');
+  doc.getElementById('closeCoachEditingRange').click();
+  doc.querySelector('[data-method="dropdownPanel"]').click(); trigger.click(); await Promise.resolve();
+  assert(!panel.hidden && summary.textContent.includes(start) && summary.textContent.includes(end), 'Both views share the same range controls and summary.');
+  doc.getElementById('closeCoachEditingRange').click();
+  assert(JSON.stringify(win.captureAvailabilityUndoState()) === before && JSON.stringify(dumpLocalStorage(win)) === storage, 'Range UI and picker actions must not mutate schedule, bookings, drafts or storage.');
+  assertNoRuntimeErrors('Editing range', errors); dom.window.close();
+}
+
+async function testOnDemandOpenEditor() {
+  const { dom, errors } = await loadPage('coach/index.html', { now: '2035-01-01T06:00:00' });
+  const win = dom.window, doc = win.document;
+  const field = (id, value) => { const node = doc.getElementById(id); node.value = value; node.dispatchEvent(new win.Event('change', { bubbles: true })); };
+  doc.querySelector('[data-coach-panel="availabilityPanel"]').click();
+  assert(!doc.querySelector('[id^="coachAdd"]') && !doc.getElementById('coachWorkTimeDialog').open, 'No permanent add fields remain.');
+  const monday = win.startOfWeekIso(win.addDaysIso(win.todayIso(), 7)), sunday = win.addDaysIso(monday, 6);
+  field('calendarWeekStart', monday); field('coachPlannerFrom', monday); field('coachPlannerTo', win.addDaysIso(sunday, 7));
+  const booking = { id: 'front-booking', coachId: 'maya', date: sunday, start: '14:30', end: '15:00', location: 'Zoom', booked: true, status: 'Booked' };
+  win.slots = [booking]; win.render();
+  const published = JSON.stringify(win.getTestPublishedSchedule());
+  doc.querySelector('[data-method="dropdownPanel"]').click();
+  const add = (date) => doc.querySelector(`#dropdownOpenSlots [data-work-day="${date}"] [data-planner-action="add-work-range"]`).click();
+  add(sunday);
+  const form = doc.getElementById('coachWorkTimeForm');
+  assert(doc.getElementById('coachWorkTimeDialog').open, 'Daily plus opens the existing editor.');
+  field('coachWorkTimeStart', '14:07'); field('coachWorkTimeEnd', '15:13'); field('coachWorkTimeLocation', 'Zoom'); field('coachWorkTimeMemo', '新入口备注');
+  submit(form);
+  assert(!doc.getElementById('coachWorkTimeDialog').open, 'Confirm adds to the draft and closes the editor.');
+  assert([sunday, win.addDaysIso(sunday, 7)].every(date => win.slots.some(slot => !slot.booked && slot.date === date && slot.start === '14:07')), 'The existing weekly rule must add each occurrence with exact minutes.');
+  assert(JSON.stringify(win.slots.find(slot => slot.id === booking.id)) === JSON.stringify(booking), 'Adding across a booking must preserve it byte for byte.');
+  assert(JSON.stringify(win.getTestPublishedSchedule()) === published, 'An addition must stay in the draft until saved.');
+  doc.querySelector('[data-method="dropdownPanel"]').click();
+  assert(doc.querySelector('#dropdownOpenSlots').textContent.includes('14:07') && doc.querySelector('.calendar-open-block[aria-label*="14:07"]'), 'An addition must synchronize both views.');
+  doc.querySelector(`#dropdownOpenSlots [data-work-day="${sunday}"] .availability-range-card`).click();
+  assert(doc.getElementById('coachWorkTimeMemo').value === '新入口备注', 'Reopening retains the precise draft note.');
+  doc.getElementById('cancelCoachWorkTime').click();
+  field('coachPlannerScope', 'dates'); add(monday);
+  field('coachWorkTimeStart', '16:11'); field('coachWorkTimeEnd', '17:19'); submit(form);
+  assert(win.slots.filter(slot => slot.start === '16:11').length === 1 && win.slots.some(slot => slot.date === monday && slot.end === '17:19'), 'Date mode must add only the selected day.');
+  const before = JSON.stringify(win.slots);
+  add(monday); field('coachWorkTimeStart', '18:00'); field('coachWorkTimeEnd', '15:00'); submit(form);
+  assert(JSON.stringify(win.slots) === before && doc.getElementById('coachWorkTimeDialog').open && doc.getElementById('coachWorkTimeMessage').textContent, 'Invalid times must be rejected atomically.');
+  field('coachWorkTimeEnd', '19:00'); field('coachPlannerFrom', 'invalid'); submit(form);
+  assert(JSON.stringify(win.slots) === before && doc.getElementById('coachWorkTimeMessage').textContent.includes('编辑范围'), 'Confirm must also reject invalid range without committing through stale scope.');
+  doc.getElementById('cancelCoachWorkTime').click();
+  field('coachPlannerFrom', 'invalid'); add(monday);
+  assert(JSON.stringify(win.slots) === before && !doc.getElementById('coachWorkTimeDialog').open && !doc.getElementById('coachBaseAvailabilitySettings').hidden && !doc.getElementById('coachEditingRangeError').hidden, 'Invalid scope must reveal the correction entry and block addition through stale scope.');
+  doc.querySelector(`#dropdownOpenSlots [data-work-day="${sunday}"] .availability-range-card`).click();
+  assert(!doc.getElementById('coachWorkTimeDialog').open && JSON.stringify(win.slots) === before, 'Invalid scope must also block editing.');
+  field('coachPlannerFrom', monday); doc.getElementById('closeCoachEditingRange').click();
+  doc.getElementById('saveProfileChanges').click();
+  const saved = dumpLocalStorage(win);
+  const reloaded = await loadPage('coach/index.html', { now: '2035-01-01T06:00:00', localStorage: saved });
+  assert(reloaded.dom.window.slots.some(slot => slot.date === monday && slot.start === '16:11' && slot.end === '17:19'), 'Saving and reloading must retain precise additions.');
+  assert(Object.entries(booking).every(([key, value]) => reloaded.dom.window.slots.find(slot => slot.id === booking.id)?.[key] === value), 'Reloading must preserve the booking.');
+  assertNoRuntimeErrors('On-demand editor', errors); assertNoRuntimeErrors('On-demand reload', reloaded.errors);
+  dom.window.close(); reloaded.dom.window.close();
+}
+
+async function testAvailabilityWeekOverview() {
+  const { dom, errors } = await loadPage('coach/index.html', { now: '2035-01-01T06:00:00' });
+  const win = dom.window, doc = win.document;
+  const field = (id, value) => { const node = doc.getElementById(id); node.value = value; node.dispatchEvent(new win.Event('change', { bubbles: true })); };
+  doc.querySelector('[data-coach-panel="availabilityPanel"]').click();
+  const monday = win.startOfWeekIso(win.addDaysIso(win.todayIso(), 7));
+  const sunday = win.addDaysIso(monday, 6);
+  field('calendarWeekStart', monday);
+  field('coachPlannerFrom', monday); field('coachPlannerTo', sunday); field('coachPlannerScope', 'dates');
+  const booking = { id: 'overview-booking', coachId: 'maya', date: sunday, start: '09:00', end: '09:30', location: 'Zoom', booked: true, status: 'Booked' };
+  win.slots = [booking]; win.render();
+  const published = JSON.stringify(win.getTestPublishedSchedule());
+  doc.querySelector('[data-method="dropdownPanel"]').click();
+  const days = () => [...doc.querySelectorAll('#dropdownOpenSlots [data-work-day]')];
+  const day = () => days()[6];
+  const card = () => [...day().querySelectorAll('.availability-range-card')].find((node) => node.textContent.includes('14:07'));
+  assert(days().length === 7 && days().every((node) => node.querySelector('[data-planner-action="add-work-range"]')), 'All seven days, including closed weekends, must offer an add action.');
+  assert(!doc.getElementById('coachAddOpenForm') && !doc.getElementById('availabilityForm') && !doc.querySelector('#dropdownOpenSlots table') && days().every(day => day.querySelector('[data-planner-action="add-work-range"]').textContent === '＋'), 'Daily plus controls must accompany the cards without a permanent form.');
+  day().querySelector('[data-planner-action="add-work-range"]').click();
+  field('coachWorkTimeStart', '14:07'); field('coachWorkTimeEnd', '15:13'); field('coachWorkTimeLocation', 'Zoom'); field('coachWorkTimeMemo', '精确分钟备注');
+  submit(doc.getElementById('coachWorkTimeForm'));
+  assert(card() && card().querySelector('small').textContent.includes('1 小时 6 分钟'), 'Adding from Sunday must update the compact card and secondary duration.');
+  card().click();
+  assert(doc.getElementById('coachWorkTimeMemo').value === '精确分钟备注', 'Reopening must preserve the note in a dated override.');
+  field('coachWorkTimeEnd', '15:21'); submit(doc.getElementById('coachWorkTimeForm'));
+  const scope = ['coachPlannerFrom', 'coachPlannerTo', 'coachPlannerScope'].map((id) => doc.getElementById(id).value);
+  doc.querySelector('[data-method="calendarPanel"]').click();
+  const block = [...doc.querySelectorAll('.calendar-open-block')].find((node) => node.getAttribute('aria-label').includes('14:07–15:21'));
+  assert(block, 'The calendar must immediately show unsaved form edits.');
+  block.dispatchEvent(new win.MouseEvent('dblclick', { bubbles: true }));
+  field('coachWorkTimeEnd', '15:27'); submit(doc.getElementById('coachWorkTimeForm'));
+  doc.querySelector('[data-method="dropdownPanel"]').click();
+  assert(card().textContent.includes('15:27'), 'Editing from the calendar must immediately update the form card.');
+  assert(JSON.stringify(scope) === JSON.stringify(['coachPlannerFrom', 'coachPlannerTo', 'coachPlannerScope'].map((id) => doc.getElementById(id).value)), 'View changes must retain editing mode and date bounds.');
+  card().click(); doc.getElementById('deleteCoachWorkTime').click();
+  assert(!card() && ![...doc.querySelectorAll('.calendar-open-block')].some((node) => node.getAttribute('aria-label').includes('14:07')), 'Deleting must synchronize both draft views.');
+  assert(JSON.stringify(win.slots.find((slot) => slot.id === booking.id)) === JSON.stringify(booking) && JSON.stringify(win.getTestPublishedSchedule()) === published, 'Draft editing must preserve bookings and published data.');
+  assertNoRuntimeErrors('Availability week overview', errors); dom.window.close();
+}
+
 async function main() {
+  await testOpenCalendarButtons();
+  await testEditingRangePopover();
+  await testOnDemandOpenEditor();
+  await testAvailabilityWeekOverview();
+  await testLunchSettingModes();
+  await testCalendarSettingTools();
+  await testCalendarClipboardShortcuts();
+  await testCompactCommutePlanner();
+  await testOpenCalendarOperations();
+  await testPreciseAvailabilitySave();
+  await testLunchAlternativesPreview();
+  await testUnifiedPlannerRangeAndPicker();
+  await testPlannerDateRange();
+  await testWeeklyWorkTimeOperations();
+  await testWorkTimeTimetable();
   await testLandingPage();
   await testLoginPages();
   await testAdminPage();
@@ -2115,11 +2951,15 @@ async function main() {
   await testCoachScheduleWeekNavigation();
   await testCoachScheduleCalendarGrid();
   await testAvailabilityDragRetraction();
+  await testAutomaticSchedulingBookingTransactions();
   await testStudentPage();
   await testPublicCoachProfile();
   await testFullStudentPage();
+  await testStudentPublishedAvailability();
   await testRecurringAvailabilityAcceptance();
   await testTicketAcceptanceCoverage();
+  for (const dom of testPages) dom.window.close();
+  testPages.clear();
   console.log("Smoke test passed.");
 }
 

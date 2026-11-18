@@ -1,6 +1,6 @@
 import { activeStudentPanelStorageKey } from "../core/config.js";
 import { studentElements as elements } from "../dom/student-elements.js";
-import { storageSetItem } from "../core/storage-adapter.js";
+import { writeStorageItem } from "../core/storage-adapter.js";
 
 export function activateStudentPanel(panelId, shouldPersist = true) {
   const targetPanelId = [...elements.studentTabs].some((button) => button.dataset.studentPanel === panelId) ? panelId : "studentBookPanel";
@@ -11,7 +11,7 @@ export function activateStudentPanel(panelId, shouldPersist = true) {
     item.setAttribute("aria-selected", String(isActive));
   });
   elements.studentPanels.forEach((panel) => panel.classList.toggle("active", panel.dataset.studentContent === targetPanelId));
-  if (shouldPersist) storageSetItem(activeStudentPanelStorageKey, targetPanelId);
+  if (shouldPersist) writeStorageItem(activeStudentPanelStorageKey, targetPanelId);
 }
 
 export function switchStudentPanel(event) {

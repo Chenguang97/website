@@ -1,18 +1,21 @@
-import { openBookingDetails } from "../../ui/booking-details.js?v=coach-booking-list-1";
-import { prepareCoachBookingCancellation } from "./details-actions.js?v=coach-booking-row-effect-1";
-import { refreshAvailabilityDirty, showFormMessage } from "../availability/status.js";
+import { coachCanManage } from "../service-controller.js";
+import { renderFieldMessage } from "../../ui/field-feedback.js";
+import { renderWorkTimetable } from "../availability/planner-render.js";
+import { scheduleShowsFullDay, toggleScheduleFullDay } from "./view-state.js";
+import { openBookingDetails } from "../../ui/booking-details.js";
+import { prepareCoachBookingCancellation } from "./details-actions.js";
+import { renderAvailabilityStatus, showFormMessage } from "../availability/status.js";
 import { calendarStep, currentCoachId, defaultStart } from "../../core/config.js";
 import { isActiveBooking, rangesOverlap } from "../../domain/scheduling.mjs";
 import { coachElements as elements } from "../../dom/coach-elements.js";
 import {
-  addBlockedException,
-  state,
+  addAvailabilityBlocks,
+  readScheduleState,
 } from "../../core/state.js";
 import {
-  renderDragCalendar, renderDropdownOpenSlots, renderDropdownWeekSlots, syncEndTimeOptions,
+  renderDragCalendar, syncEndTimeOptions,
 } from "../availability/render.js";
 import { renderExceptionDragCalendar } from "./calendar-render.js";
-import { captureAvailabilityUndoState, pushAvailabilityUndoState } from "../availability/undo.js";
 import {
   addDaysIso,
   cellKey,
@@ -24,8 +27,8 @@ import {
 } from "../../core/utils-data.js";
 
 export function toggleScheduleCalendarHours() {
-  state.exceptionCalendarShowsFullDay = !state.exceptionCalendarShowsFullDay;
-  elements.toggleExceptionCalendarHours.textContent = state.exceptionCalendarShowsFullDay ? "收起全天" : "显示全天";
+  toggleScheduleFullDay();
+  elements.toggleExceptionCalendarHours.textContent = scheduleShowsFullDay() ? "收起全天" : "显示全天";
   renderExceptionDragCalendar();
 }
 
@@ -41,6 +44,7 @@ export function goToCurrentScheduleWeek() {
 }
 
 export function openBlockTimeDialog() {
+  if (!coachCanManage()) return;
   try {
     const today = todayIso();
     const viewedWeekStart = startOfWeekIso(elements.exceptionCalendarWeekStart.value || today);
@@ -63,6 +67,7 @@ export function closeBlockTimeDialog() {
 
 export function addBlockException(event) {
   event.preventDefault();
+  if (!coachCanManage()) return;
   clearBlockTimeDialogErrors();
   const start = elements.blockDialogStart.value;
   const end = elements.blockDialogEnd.value;
@@ -81,7 +86,7 @@ export function addBlockException(event) {
   }
 
   const dates = Array.from({ length: elements.blockRepeatWeekly.checked ? 12 : 1 }, (_, index) => addDaysIso(date, index * 7));
-  const bookingConflict = state.slots.find((slot) => slot.coachId === currentCoachId
+  const bookingConflict = readScheduleState().slots.find((slot) => slot.coachId === currentCoachId
     && isActiveBooking(slot)
     && dates.includes(slot.date)
     && rangesOverlap(minutesFromTime(start), minutesFromTime(end), minutesFromTime(slot.start), minutesFromTime(slot.end)));
@@ -90,9 +95,13 @@ export function addBlockException(event) {
     return;
   }
 
-  const undoSnapshot = captureAvailabilityUndoState();
-  dates.forEach((blockDate) => addBlockExceptionRange(blockDate, minutesFromTime(start), minutesFromTime(end)));
-  pushAvailabilityUndoState(undoSnapshot);
+  const blocks = dates.map((blockDate) => ({
+    id: createId(), coachId: currentCoachId, date: blockDate,
+    start, end, reason: "不可预约时间",
+  }));
+  const result = addAvailabilityBlocks(blocks);
+  if (!result.ok) { showBlockDialogError(result.message || "无法添加，草稿已保留。", [elements.blockDialogStart]); return; }
+  renderAvailabilityStatus("有未保存的不可预约时间");
   elements.blockDialog.close();
   renderAffectedAvailabilityViews();
   const message = elements.blockRepeatWeekly.checked ? "已添加每周重复不可预约时间，请在「开放时间」中保存。" : "已添加不可预约时间，请在「开放时间」中保存。";
@@ -105,7 +114,7 @@ export function handleCoachBookingAction(event) {
   if (!button) return;
   const { action, id } = button.dataset;
   if (action !== "coach-booking-details" && action !== "coach-cancel-booking") return;
-  const slot = state.slots.find((item) => item.id === id && item.coachId === currentCoachId && item.booked);
+  const slot = readScheduleState().slots.find((item) => item.id === id && item.coachId === currentCoachId && item.booked);
   if (!slot) return;
   if (action === "coach-booking-details") openBookingDetails(id);
   else {
@@ -113,21 +122,10 @@ export function handleCoachBookingAction(event) {
   }
 }
 
-function addBlockExceptionRange(date, start, end, reason = "不可预约时间") {
-  const block = { id: createId(), coachId: currentCoachId, date, start: timeFromMinutes(start), end: timeFromMinutes(end), reason };
-  addBlockedException(block);
-  state.unsavedBlockExceptionIds.add(block.id);
-  for (let minutes = start; minutes < end; minutes += calendarStep) {
-    state.unsavedBlockedCellKeys.add(cellKey(date, minutes));
-  }
-  refreshAvailabilityDirty("有未保存的不可预约时间");
-}
-
 function renderAffectedAvailabilityViews() {
   renderDragCalendar();
   renderExceptionDragCalendar();
-  renderDropdownOpenSlots();
-  renderDropdownWeekSlots();
+  renderWorkTimetable();
 }
 
 export function clearBlockTimeDialogErrors() {
@@ -140,8 +138,7 @@ export function clearBlockTimeDialogErrors() {
 
 function showBlockDialogError(message, fields) {
   const target = fields.includes(elements.blockDialogDate) ? elements.blockDialogDateMessage : elements.blockDialogMessage;
-  target.textContent = message;
-  target.hidden = false;
+  renderFieldMessage(target, message);
   fields.forEach((field) => field.setAttribute("aria-invalid", "true"));
   fields[0].focus();
 }
@@ -152,4 +149,3 @@ function setCoachBookingActionMessage(message, isError = false) {
   elements.coachBookingActionStatus.hidden = !message;
   elements.coachBookingActionStatus.classList.toggle("is-error", isError);
 }
-

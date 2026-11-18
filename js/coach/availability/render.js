@@ -1,3 +1,13 @@
+import { coachAuthorizedRinks } from "../profile/rink-directory.js";
+import {
+  readAvailabilityChanges,
+  readProfileState,
+  getSchedulingConfig,
+  readScheduleState,
+} from "../../core/state.js";
+import { getCoachUnderlyingAvailability } from "../../core/scheduling-rules.js";
+import { renderOpenAvailabilityBlocks } from "./open-block-render.js";
+import { availabilityShowsFullDay } from "./view-state.js";
 import {
   calendarStep,
   coreDayEnd,
@@ -10,7 +20,6 @@ import {
   rinks,
   unavailableSelection,
 } from "../../core/config.js";
-import { getProfile, state } from "../../core/state.js";
 import { findSlotAt, slotOverlapsBlockedException } from "../../core/scheduling-rules.js";
 import {
   addDaysIso,
@@ -23,16 +32,18 @@ import {
   timeFromMinutes,
   todayIso,
 } from "../../core/utils-data.js";
-import { getAvailabilityLocation, isActiveBooking, slotSort } from "../../domain/scheduling.mjs";
+import { getAvailabilityLocation, isCancelledBooking, isActiveBooking } from "../../domain/scheduling.mjs";
 import { coachElements as elements } from "../../dom/coach-elements.js";
 import { renderCalendarLocationWatermarks, renderWeekCalendarGrid, setCalendarCellLocation } from "../../ui/calendar-grid.js";
 import { formatLocationLabel } from "../../ui/display.js";
 import { escapeHtml } from "../../ui/safe-html.mjs";
 import { renderCoachBookingBlocks } from "../calendar-bookings.js";
 import { getBookedRinkColor, getRinkColor } from "../calendar-colors.js";
+import { renderWorkTimetable, renderPlanningCalendarBlocks } from "./planner-render.js";
 
 function rinkOptionsForCoach(coachId) {
-  const profile = getProfile(coachId);
+  const profileState = readProfileState(coachId);
+  const profile = profileState.draft || profileState.saved;
   const servedRinks = profile.servedRinks && profile.servedRinks.length ? profile.servedRinks : [profile.homeRink || rinks[0]];
   return [
     `<option value="Any served rink">${formatLocationLabel("Any served rink")}</option>`,
@@ -42,9 +53,10 @@ function rinkOptionsForCoach(coachId) {
 }
 
 export function renderAvailabilityStats() {
+  const snapshot = readScheduleState();
   const weekStart = startOfWeekIso(todayIso());
   const weekEnd = addDaysIso(weekStart, 7);
-  const weeklySlots = state.slots.filter((slot) => slot.coachId === currentCoachId && slot.date >= weekStart && slot.date < weekEnd);
+  const weeklySlots = snapshot.slots.filter((slot) => slot.coachId === currentCoachId && slot.date >= weekStart && slot.date < weekEnd);
   const availableHours = weeklySlots
     .filter((slot) => !slot.booked && !slotOverlapsBlockedException(slot))
     .reduce((total, slot) => total + (minutesFromTime(slot.end) - minutesFromTime(slot.start)) / 60, 0);
@@ -61,19 +73,18 @@ export function populateTimeSelects() {
     startOptions.push(`<option value="${timeFromMinutes(minutes)}">${timeFromMinutes(minutes)}</option>`);
   }
 
-  elements.startTime.innerHTML = startOptions.join("");
+
   elements.blockDialogStart.innerHTML = startOptions.join("");
-  elements.startTime.value = defaultStart;
   elements.blockDialogStart.value = defaultStart;
-  syncEndTimeOptions(elements.startTime, elements.endTime, "12:00");
   syncEndTimeOptions(elements.blockDialogStart, elements.blockDialogEnd, "12:00");
 }
 
 export function syncEndTimeOptions(startSelect, endSelect, preferredEnd = endSelect.value) {
-  const minimumEnd = minutesFromTime(startSelect.value) + calendarStep;
+  const step = calendarStep;
+  const minimumEnd = minutesFromTime(startSelect.value) + step;
   const options = [];
 
-  for (let minutes = minimumEnd; minutes <= minutesFromTime(fullDayEnd); minutes += calendarStep) {
+  for (let minutes = minimumEnd; minutes <= minutesFromTime(fullDayEnd); minutes += step) {
     options.push(`<option value="${timeFromMinutes(minutes)}">${timeFromMinutes(minutes)}</option>`);
   }
 
@@ -82,24 +93,21 @@ export function syncEndTimeOptions(startSelect, endSelect, preferredEnd = endSel
 }
 
 export function syncLocationOptions() {
-  const dropdownLocation = elements.locationType.value || "Any served rink";
-  const calendarLocation = elements.calendarLocationType.value || "Any served rink";
-  elements.locationType.innerHTML = rinkOptionsForCoach(currentCoachId);
-  elements.calendarLocationType.innerHTML = `${rinkOptionsForCoach(currentCoachId)}<option value="${unavailableSelection}">不可预约</option>`;
-  elements.locationType.value = dropdownLocation;
+  const calendarLocation = elements.calendarLocationType.value;
+  elements.calendarLocationType.innerHTML = `<option value="">选择时间范围</option>${rinkOptionsForCoach(currentCoachId)}<option value="${unavailableSelection}">不可预约</option>`;
   elements.calendarLocationType.value = calendarLocation;
-  if (!elements.locationType.value) elements.locationType.value = "Any served rink";
-  if (!elements.calendarLocationType.value) elements.calendarLocationType.value = "Any served rink";
   renderCalendarRinkOptions();
   renderScheduleLegend();
 }
 
 export function renderCalendarRinkOptions() {
-  const profile = getProfile(currentCoachId);
+  const profileState = readProfileState(currentCoachId);
+  const profile = profileState.draft || profileState.saved;
   const servedRinks = profile.servedRinks && profile.servedRinks.length ? profile.servedRinks : [profile.homeRink || rinks[0]];
+  const authorizedRinks = coachAuthorizedRinks(servedRinks);
   const options = [
-    ["Any served rink", formatLocationLabel("Any served rink")],
-    ...servedRinks.map((rink) => [rink, formatLocationLabel(rink)]),
+    ...(authorizedRinks.length ? [["Any served rink", formatLocationLabel("Any served rink")]] : []),
+    ...authorizedRinks.map((rink) => [rink, formatLocationLabel(rink)]),
     ["Zoom", "Zoom"],
   ];
 
@@ -107,26 +115,23 @@ export function renderCalendarRinkOptions() {
     .map(([value, label]) => {
       const isActive = elements.calendarLocationType.value === value;
       return `
-        <button class="rink-option ${isActive ? "active" : ""}" type="button" data-rink="${escapeHtml(value)}" aria-pressed="${isActive}" style="--rink-option-color:${getRinkColor(value)}">
+        <button class="rink-option coach-availability-paint-option ${isActive ? "active" : ""}" type="button" data-rink="${escapeHtml(value)}" aria-pressed="${isActive}" style="--rink-option-color:${getRinkColor(value)}">
           <i class="legend-dot" aria-hidden="true"></i>
           <span>${escapeHtml(label)}</span>
         </button>
       `;
     })
     .join("");
-  const location = elements.calendarLocationType.value;
-  const unavailable = location === unavailableSelection;
+  const unavailable = elements.calendarLocationType.value === unavailableSelection;
   elements.calendarUnavailableTool.classList.toggle("active", unavailable);
   elements.calendarUnavailableTool.setAttribute("aria-pressed", String(unavailable));
-  elements.calendarPaintHint.textContent = unavailable
-    ? "在下方日历拖选，即可将对应开放时段设为不可预约；已有预约不受影响。"
-    : location === "Any served rink"
-      ? "在下方日历拖选，即可设置为不限冰场的开放时段。"
-      : `在下方日历拖选，即可设置为在 ${formatLocationLabel(location)} 授课的开放时段。`;
+  const location = elements.calendarLocationType.value;
+  elements.calendarPaintHint.textContent = unavailable ? "点击或拖选目标范围，设为不可预约；已有预约不变。" : location ? `点击或拖选目标范围，设为 ${formatLocationLabel(location)} 开放；已有预约不变。` : "";
 }
 
 function getScheduleLegendItems() {
-  const profile = getProfile(currentCoachId);
+  const profileState = readProfileState(currentCoachId);
+  const profile = profileState.draft || profileState.saved;
   const servedRinks = profile.servedRinks && profile.servedRinks.length ? profile.servedRinks : [profile.homeRink || rinks[0]];
   return [
     ["Any served rink", formatLocationLabel("Any served rink")],
@@ -140,7 +145,7 @@ function renderScheduleLegend() {
     ...getScheduleLegendItems().map(([value, label]) => {
       return `
         <div class="schedule-legend-row">
-          <strong>${label}</strong>
+          <strong>${escapeHtml(label)}</strong>
           <div class="schedule-legend-states">
             <span><i class="legend-dot" style="background:${getRinkColor(value)}"></i>可预约</span>
             <span><i class="legend-dot" style="background:${getBookedRinkColor(value)}"></i>已预约</span>
@@ -154,140 +159,54 @@ function renderScheduleLegend() {
   elements.scheduleLegend.innerHTML = markup;
 }
 
-function getSlotsForDate(date) {
-  return state.slots.filter((slot) => slot.coachId === currentCoachId && slot.date === date).sort(slotSort);
-}
-
-function groupSlotsForDisplay(daySlots, options = {}) {
-  const ignoreBooked = Boolean(options.ignoreBooked);
-  return daySlots.reduce((groups, slot) => {
-    if (slot.booked && !ignoreBooked) {
-      groups.push({
-        type: "booked",
-        ids: [slot.id],
-        start: slot.start,
-        end: slot.end,
-        lessonName: slot.lessonName,
-        lessonPrice: slot.lessonPrice,
-        location: slot.location,
-      });
-      return groups;
-    }
-
-    const previous = groups[groups.length - 1];
-    const canMerge =
-      previous &&
-      previous.type === "open" &&
-      previous.end === slot.start &&
-      previous.lessonName === slot.lessonName &&
-      previous.lessonPrice === slot.lessonPrice &&
-      previous.location === slot.location;
-
-    if (canMerge) {
-      previous.end = slot.end;
-      previous.ids.push(slot.id);
-      return groups;
-    }
-
-    groups.push({
-      type: "open",
-      ids: [slot.id],
-      start: slot.start,
-      end: slot.end,
-      lessonName: slot.lessonName,
-      lessonPrice: slot.lessonPrice,
-      location: slot.location,
-    });
-    return groups;
-  }, []);
-}
-
-export function renderDropdownOpenSlots() {
-  const selectedDate = elements.slotDate.value || todayIso();
-  const visible = groupSlotsForDisplay(getSlotsForDate(selectedDate), { ignoreBooked: true });
-
-  elements.selectedDateMeta.textContent = `${selectedDate} · ${formatWeekday(selectedDate)}`;
-
-  if (!visible.length) {
-    elements.dropdownOpenSlots.innerHTML = `<p class="empty-state">这一天暂无开放时间。可在上方添加，或切到日历拖选。</p>`;
-    return;
-  }
-
-  elements.dropdownOpenSlots.innerHTML = visible
-    .map((group) => {
-      return `
-        <article class="open-slot-row ${group.type === "booked" ? "booked" : ""}">
-          <div>
-            <strong>${group.start} - ${group.end}</strong>
-            <span>${group.type === "booked" ? "已预约" : "可预约"}</span>
-          </div>
-          <div>
-            <strong>${formatLocationLabel(group.location)}</strong>
-            <span>开放给学生预约</span>
-          </div>
-          ${
-            group.type === "booked"
-              ? `<span class="pill booked">已预约</span>`
-              : `<button class="danger-button" type="button" data-action="delete-many" data-ids="${group.ids.join(",")}" data-date="${selectedDate}" data-start="${group.start}" data-end="${group.end}">删除</button>`
-          }
-        </article>
-      `;
-    })
-    .join("");
-}
-
-export function renderDropdownWeekSlots() {
-  const weekStart = startOfWeekIso(elements.slotDate.value || todayIso());
-  const cards = dayLabels.map((_, index) => {
-    const date = addDaysIso(weekStart, index);
-    const daySlots = groupSlotsForDisplay(getSlotsForDate(date), { ignoreBooked: true }).filter((group) => group.type === "open");
-    const chips = daySlots.length
-      ? daySlots
-          .map((group) => `<span class="time-chip" style="background:${getRinkColor(group.location)}">${group.start}-${group.end}<small>${formatLocationLabel(group.location)}</small></span>`)
-          .join("")
-      : `<span>暂无开放时间</span>`;
-
-    return `
-      <article class="week-day-card">
-        <strong>${formatWeekday(date).replace("星期", "周")}</strong>
-        <span><time datetime="${date}">${date.slice(5).replace("-", "/")}</time></span>
-        <div>${chips}</div>
-      </article>
-    `;
-  });
-
-  elements.dropdownWeekSlots.innerHTML = cards.join("");
-}
 
 export function renderDragCalendar() {
   const weekStart = startOfWeekIso(elements.calendarWeekStart.value || todayIso());
-  elements.calendarWeekStart.value = weekStart;
   const weekEnd = addDaysIso(weekStart, 6);
   const [year, month, day] = weekStart.split("-").map(Number);
   const [endYear, endMonth, endDay] = weekEnd.split("-").map(Number);
   const rangeLabel = `${year}年${month}月${day}日—${endYear !== year ? `${endYear}年` : ""}${endMonth}月${endDay}日`;
   elements.availabilityWeekRange.textContent = rangeLabel;
-  elements.calendarWeekStart.setAttribute("aria-label", `选择开放时间周：${rangeLabel}`);
-  const displayStart = state.calendarShowsFullDay ? fullDayStart : coreDayStart;
-  const displayEnd = state.calendarShowsFullDay ? fullDayEnd : coreDayEnd;
+  elements.availabilityWeekTrigger.setAttribute("aria-label", `选择开放时间周：${rangeLabel}`);
+  const displayStart = availabilityShowsFullDay() ? fullDayStart : coreDayStart;
+  const displayEnd = availabilityShowsFullDay() ? fullDayEnd : coreDayEnd;
 
-  renderWeekCalendarGrid(elements.dragCalendar, weekStart, displayStart, displayEnd);
+  renderWeekCalendarGrid(elements.dragCalendar, weekStart, displayStart, displayEnd, getSchedulingConfig().enabled ? 15 : calendarStep);
   renderCalendarAvailability();
 }
 
+// Partial cells retain the original calendar appearance, with minute-exact color boundaries.
+function paintPreciseAvailabilityCell(cell, start, daySlots, changes) {
+  const end = start + Number(cell.dataset.duration || calendarStep);
+  const ranges = daySlots.filter((slot) => !isCancelledBooking(slot) && minutesFromTime(slot.start) < end && minutesFromTime(slot.end) > start);
+  const points = [...new Set([start, end, ...ranges.flatMap((slot) => [Math.max(start, minutesFromTime(slot.start)), Math.min(end, minutesFromTime(slot.end))])])].sort((a, b) => a - b);
+  const stops = points.slice(0, -1).map((point, index) => {
+    const slot = ranges.find((range) => minutesFromTime(range.start) <= point && minutesFromTime(range.end) > point);
+    const color = slot ? `color-mix(in srgb, ${getRinkColor(getAvailabilityLocation(slot))} ${changes.addedSlotIds.includes(slot.id) ? 62 : 50}%, white)` : '#efede9';
+    return `${color} ${(point - start) / (end - start) * 100}% ${(points[index + 1] - start) / (end - start) * 100}%`;
+  });
+  cell.dataset.preciseAvailability = '';
+  cell.style.setProperty('--precise-cell-background', `linear-gradient(to bottom, ${stops.join(', ')})`);
+}
+
 export function renderCalendarAvailability() {
+  const snapshot = readScheduleState();
+  const changes = readAvailabilityChanges();
   if (!elements.dragCalendar || !elements.dragCalendar.children.length) return;
 
   const weekStart = elements.calendarWeekStart.value;
   const selectedCoach = currentCoachId;
   const cells = elements.dragCalendar.querySelectorAll(".calendar-cell");
+  const byDate = new Map();
+  getCoachUnderlyingAvailability(selectedCoach, weekStart, addDaysIso(weekStart, 6)).map((range) => ({ ...range, id: range.slotIds[0] })).forEach((slot) => { if (!byDate.has(slot.date)) byDate.set(slot.date, []); byDate.get(slot.date).push(slot); });
   cells.forEach((cell) => {
     const date = addDaysIso(weekStart, Number(cell.dataset.dayIndex));
     const minutes = Number(cell.dataset.minutes);
-    const slot = findSlotAt(selectedCoach, date, minutes);
-    const isUnsavedOpen = Boolean(slot && state.unsavedAddedSlotIds.has(slot.id));
-    const isUnsavedBlock = !slot && state.unsavedBlockedCellKeys.has(cellKey(date, minutes));
-    const isRecurringEdit = state.unsavedRecurringCellKeys.has(cellKey(date, minutes));
+    const slot = (byDate.get(date) || []).find((range) => minutesFromTime(range.start) <= minutes && minutesFromTime(range.end) > minutes);
+    const booking = snapshot.slots.find((item) => item.coachId === selectedCoach && item.date === date && isActiveBooking(item) && minutesFromTime(item.start) < minutes + Number(cell.dataset.duration || calendarStep) && minutesFromTime(item.end) > minutes);
+    const isUnsavedOpen = Boolean(slot && changes.addedSlotIds.includes(slot.id));
+    const isUnsavedBlock = !slot && changes.blockedCellKeys.includes(cellKey(date, minutes));
+    const isRecurringEdit = changes.recurringCellKeys.includes(cellKey(date, minutes));
     const isPast = isPastCalendarCell(date, minutes);
 
     cell.style.removeProperty("--rink-color");
@@ -296,7 +215,7 @@ export function renderCalendarAvailability() {
     }
     setCalendarCellLocation(cell, slot ? getAvailabilityLocation(slot) : "");
     cell.classList.toggle("has-slot", Boolean(slot));
-    cell.classList.toggle("has-booking", Boolean(slot && slot.booked));
+    cell.classList.toggle("has-booking", Boolean(booking));
     cell.classList.toggle("has-blocked", !slot);
     cell.classList.toggle("is-editing", !slot?.booked && (isUnsavedOpen || isUnsavedBlock || isRecurringEdit));
     cell.classList.toggle("is-past", isPast);
@@ -304,19 +223,21 @@ export function renderCalendarAvailability() {
       ? `${slot.start}-${slot.end} ${formatLocationLabel(getAvailabilityLocation(slot))}${slot.booked ? ` · 已预约 · ${formatLocationLabel(slot.location)}` : " · 可预约"}${isPast ? " · 已过去" : ""}`
       : `不可预约${isPast ? " · 已过去" : ""}`;
     cell.setAttribute("aria-label", cell.title);
+    paintPreciseAvailabilityCell(cell, minutes, byDate.get(date) || [], changes);
   });
   renderCalendarLocationWatermarks(elements.dragCalendar);
   renderCoachBookingBlocks({
     calendar: elements.dragCalendar,
     weekStart,
-    showsFullDay: state.calendarShowsFullDay,
+    showsFullDay: availabilityShowsFullDay(),
   });
+  renderPlanningCalendarBlocks();
+  renderOpenAvailabilityBlocks();
 }
 
 export function renderAvailabilityData() {
+  renderWorkTimetable();
   renderAvailabilityStats();
-  renderDropdownOpenSlots();
-  renderDropdownWeekSlots();
   renderCalendarAvailability();
 }
 

@@ -31,3 +31,10 @@ export function setSelectedCoachRequestId(requestId) {
   selectedRequestIds[scope] = String(requestId || "");
   return selectedRequestIds[scope];
 }
+
+// Selection transitions belong to the workspace receive boundary, never paint.
+export function receiveCoachRequestSelection(model) {
+  let id = getSelectedCoachRequestId();
+  if (!model.visibleRequest(id)) id = setSelectedCoachRequestId(model.requests[0]?.id || "");
+  return model.visibleRequest(id);
+}

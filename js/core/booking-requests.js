@@ -1,7 +1,9 @@
-import { currentCoachId } from "./config.js";
-import { replaceBookingRequests, replaceSlots, saveBookingRequests, saveSlots, state } from "./state.js";
-import { createId, minutesFromTime } from "./utils-data.js";
-import { getAvailabilityLocation, isCancelledBooking, rangesOverlap } from "../domain/scheduling.mjs";
+import { currentCoachId, readServiceContext } from "./config.js";
+import { publishBookingRequests, readScheduleState } from "./state.js";
+import { minutesFromTime } from "./utils-data.js";
+import { isCancelledBooking, rangesOverlap } from "../domain/scheduling.mjs";
+import { applyAgreedBookingRequest } from "./bookings.js";
+import { refreshLocalScheduleFacts } from "./scheduling-transactions.js";
 import {
   acceptBookingRequest,
   addBookingRequestMessage,
@@ -18,27 +20,25 @@ function proposalMinutes(proposal) {
 }
 
 export function getCoachPendingBookingRequests(now = new Date()) {
-  return getPendingBookingRequests(state.bookingRequests, "coach", currentCoachId, now);
+  return Object.freeze(getPendingBookingRequests(readScheduleState().bookingRequests, "coach", currentCoachId, now));
 }
 
-export function synchronizeExpiredBookingRequests(now = new Date()) {
-  const next = state.bookingRequests.map((request) => expireBookingRequest(request, now));
-  if (next.some((request, index) => request !== state.bookingRequests[index])) {
-    replaceBookingRequests(next);
-    saveBookingRequests();
-  }
-  return state.bookingRequests;
+export function synchronizeExpiredBookingRequestsResult(now = new Date()) {
+  if (readServiceContext().service) return { ok: true, persistence: null, requests: readScheduleState().bookingRequests };
+  const next = readScheduleState().bookingRequests.map((request) => expireBookingRequest(request, now));
+  const result = next.some((request, index) => request !== readScheduleState().bookingRequests[index]) ? publishBookingRequests(next) : { ok: true, persistence: null };
+  return { ...result, requests: readScheduleState().bookingRequests };
 }
 
 export function getBookingRequest(requestId) {
-  return state.bookingRequests.find((request) => request.id === requestId) || null;
+  return readScheduleState().bookingRequests.find((request) => request.id === requestId) || null;
 }
 
 export function getBookingRequestConflict(request) {
   if (!request || getBookingRequestStatus(request) !== "negotiating") return null;
   const proposal = request.proposal;
   const range = proposalMinutes(proposal);
-  return state.slots.find((slot) => slot.coachId === request.coachId
+  return readScheduleState().publishedSlots.find((slot) => slot.coachId === request.coachId
     && slot.booked
     && !isCancelledBooking(slot)
     && slot.id !== request.bookingId
@@ -46,9 +46,9 @@ export function getBookingRequestConflict(request) {
     && rangesOverlap(minutesFromTime(slot.start), minutesFromTime(slot.end), range.start, range.end)) || null;
 }
 
-export function synchronizeBookingRequestConflicts(now = new Date()) {
+export function synchronizeBookingRequestConflictsResult(now = new Date()) {
   let changed = false;
-  const next = state.bookingRequests.map((request) => {
+  const next = readScheduleState().bookingRequests.map((request) => {
     const conflict = getBookingRequestConflict(request);
     if (conflict && request.conflictSlotId !== conflict.id) {
       changed = true;
@@ -70,130 +70,47 @@ export function synchronizeBookingRequestConflicts(now = new Date()) {
     }
     return request;
   });
-  if (changed) {
-    replaceBookingRequests(next);
-    saveBookingRequests();
-  }
-  return state.bookingRequests;
+  const result = changed ? publishBookingRequests(next) : { ok: true, persistence: null };
+  return { ...result, requests: readScheduleState().bookingRequests };
 }
 
-function replaceRequest(nextRequest) {
-  replaceBookingRequests(state.bookingRequests.map((request) => request.id === nextRequest.id ? nextRequest : request));
-  saveBookingRequests();
-  return nextRequest;
-}
-
-export function extendCoachBookingRequest(requestId, now = new Date()) {
+const serviceCommandRequired = () => ({ ok: false, reason: "service", message: "请通过服务命令提交商议变更。" });
+const missingRequest = () => ({ ok: false, reason: "missing" });
+export function extendCoachBookingRequestResult(requestId, now = new Date()) {
+  if (readServiceContext().service) return serviceCommandRequired();
   const request = getBookingRequest(requestId);
-  return request ? replaceRequest(extendBookingRequest(request, "coach", now)) : null;
+  return request ? publishCoachRequestChange(extendBookingRequest(request, "coach", now)) : missingRequest();
 }
-
-export function addCoachBookingRequestMessage(requestId, coachName, message, now = new Date()) {
+export function addCoachBookingRequestMessageResult(requestId, coachName, message, now = new Date()) {
   const request = getBookingRequest(requestId);
-  if (!request) return null;
-  const nextRequest = addBookingRequestMessage(request, "coach", coachName, message, now);
-  return nextRequest === request ? null : replaceRequest(nextRequest);
+  if (!request) return missingRequest();
+  const next = addBookingRequestMessage(request, "coach", coachName, message, now);
+  return next === request ? { ok: false, reason: "not-actionable" } : publishCoachRequestChange(next);
 }
-
-export function endCoachBookingRequest(requestId, coachName, now = new Date()) {
+export function endCoachBookingRequestResult(requestId, coachName, now = new Date()) {
   const request = getBookingRequest(requestId);
-  return request ? replaceRequest(endBookingRequest(request, "coach", coachName, now)) : null;
+  return request ? publishCoachRequestChange(endBookingRequest(request, "coach", coachName, now)) : missingRequest();
 }
-
-export function counterCoachBookingRequest(requestId, proposal, now = new Date()) {
+export function counterCoachBookingRequestResult(requestId, proposal, now = new Date()) {
+  if (readServiceContext().service) return serviceCommandRequired();
   const request = getBookingRequest(requestId);
-  return request ? replaceRequest(proposeBookingRequestVersion(request, { ...request.proposal, ...proposal }, "coach", now)) : null;
+  return request ? publishCoachRequestChange(proposeBookingRequestVersion(request, { ...request.proposal, ...proposal }, "coach", now)) : missingRequest();
 }
-
 export function acceptCoachBookingRequest(requestId, now = new Date()) {
+  if (refreshLocalScheduleFacts()) return { ok: false, accepted: false, reason: "schedule", message: "排期或规则已更新，已保留草稿并同步最新预约，请检查后再次确认。" };
   const request = getBookingRequest(requestId);
-  if (!request || getBookingRequestConflict(request)) return { accepted: false, reason: "conflict", request };
+  if (!request || getBookingRequestConflict(request)) return { ok: false, accepted: false, reason: "conflict", request };
   const accepted = acceptBookingRequest(request, "coach", now);
-  if (accepted === request) return { accepted: false, reason: "not-actionable", request };
-  applyAgreedRequest(accepted, now);
-  replaceRequest(accepted);
-  saveSlots();
-  return { accepted: true, request: accepted };
+  if (accepted === request) return { ok: false, accepted: false, reason: "not-actionable", request };
+  const result = applyAgreedBookingRequest(accepted, now);
+  if (!result.ok) return { ok: false, accepted: false, reason: result.reason === "storage" ? "storage" : "schedule", message: result.message, scheduling: result.scheduling, request, persistence: result.persistence };
+  return { ok: true, accepted: true, request: JSON.parse(JSON.stringify(accepted)), persistence: result.persistence };
 }
 
-function createBookingFromProposal(request, now) {
-  const proposal = request.proposal;
-  const openSlot = state.slots.find((slot) => slot.coachId === request.coachId && !slot.booked && slot.date === proposal.date && slot.start === proposal.start);
-  const booking = openSlot || { id: createId(), coachId: request.coachId, date: proposal.date, start: proposal.start };
-  Object.assign(booking, {
-    date: proposal.date,
-    start: proposal.start,
-    end: proposal.end,
-    location: proposal.location,
-    availabilityLocation: openSlot ? getAvailabilityLocation(openSlot) : proposal.location,
-    booked: true,
-    status: "Booked",
-    student: { ...request.student },
-    lessonName: proposal.lessonName,
-    lessonDuration: proposal.duration,
-    lessonPrice: proposal.price,
-    specialRequestId: request.id,
-    bookedAt: now.toISOString(),
-    notifications: [{ type: "request-agreed", channel: "demo-event", message: "Demo 提示：特殊请求已达成，未发送真实通知。", at: now.toISOString() }],
-  });
-  const range = proposalMinutes(proposal);
-  const consumed = state.slots.filter((slot) => slot !== booking
-    && slot.coachId === request.coachId
-    && !slot.booked
-    && slot.date === proposal.date
-    && rangesOverlap(minutesFromTime(slot.start), minutesFromTime(slot.end), range.start, range.end));
-  booking.consumedAvailabilitySlots = consumed.map((slot) => ({ ...slot }));
-  replaceSlots([...state.slots.filter((slot) => !consumed.includes(slot)), ...(openSlot ? [] : [booking])]);
-  return booking;
-}
-
-function applyAgreedRequest(request, now) {
-  if (request.type === "new-booking") {
-    createBookingFromProposal(request, now);
-    return;
-  }
-  const original = state.slots.find((slot) => slot.id === request.bookingId && slot.booked && !isCancelledBooking(slot));
-  if (!original) return;
-  const originalAvailabilityLocation = getAvailabilityLocation(original);
-  const keepsOriginalTime = original.date === request.proposal.date && original.start === request.proposal.start;
-  const targetAvailabilitySlot = keepsOriginalTime ? null : state.slots.find((slot) => slot !== original
-    && slot.coachId === request.coachId
-    && !slot.booked
-    && slot.date === request.proposal.date
-    && minutesFromTime(slot.start) <= minutesFromTime(request.proposal.start)
-    && minutesFromTime(slot.end) > minutesFromTime(request.proposal.start));
-  const nextAvailabilityLocation = keepsOriginalTime
-    ? originalAvailabilityLocation
-    : targetAvailabilitySlot
-      ? getAvailabilityLocation(targetAvailabilitySlot)
-      : request.proposal.location;
-  const oldAvailability = {
-    ...original,
-    id: createId(),
-    location: originalAvailabilityLocation,
-    availabilityLocation: originalAvailabilityLocation,
-    booked: false,
-    student: null,
-    status: undefined,
-    specialRequestId: undefined,
-    notifications: undefined,
-  };
-  Object.assign(original, {
-    ...request.proposal,
-    availabilityLocation: nextAvailabilityLocation,
-    id: request.bookingId,
-    booked: true,
-    status: "Booked",
-    student: original.student,
-    specialRequestId: request.id,
-    modifiedAt: now.toISOString(),
-  });
-  const range = proposalMinutes(request.proposal);
-  const consumed = state.slots.filter((slot) => slot !== original
-    && !slot.booked
-    && slot.coachId === request.coachId
-    && slot.date === request.proposal.date
-    && rangesOverlap(minutesFromTime(slot.start), minutesFromTime(slot.end), range.start, range.end));
-  original.consumedAvailabilitySlots = consumed.map((slot) => ({ ...slot }));
-  replaceSlots([...state.slots.filter((slot) => !consumed.includes(slot)), oldAvailability]);
+export function publishCoachRequestChange(nextRequest) {
+  if (!nextRequest) return { ok: false, reason: "missing" };
+  const requests = readScheduleState().bookingRequests;
+  if (!requests.some(request => request.id === nextRequest.id)) return { ok: false, reason: "missing" };
+  const result = publishBookingRequests(requests.map(request => request.id === nextRequest.id ? nextRequest : request));
+  return result.ok ? { ...result, request: JSON.parse(JSON.stringify(nextRequest)) } : result;
 }

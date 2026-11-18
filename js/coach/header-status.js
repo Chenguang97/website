@@ -1,8 +1,15 @@
+import {
+  readProfileState,
+  readAvailabilityChanges,
+} from "../core/state.js";
 import { coachElements as elements } from "../dom/coach-elements.js";
-import { state } from "../core/state.js";
 
 const saveFeedback = { profile: null, schedule: null };
 let scheduleSaving = false;
+let profileSaving = false;
+
+export function isCoachProfileSaving() { return profileSaving; }
+export function setCoachProfileSaving(saving) { profileSaving = saving; }
 
 export function isCoachScheduleSaving() { return scheduleSaving; }
 export function setCoachScheduleSaving(saving) {
@@ -14,8 +21,8 @@ export function setCoachScheduleSaving(saving) {
 export function renderCoachHeaderSave() {
   const panel = document.documentElement.dataset.activeCoachPanel;
   const profile = panel === "profilePanel";
-  const dirty = profile ? state.hasUnsavedProfileChanges : state.hasUnsavedAvailabilityChanges;
-  const busy = profile ? state.isSavingProfile : scheduleSaving;
+  const dirty = profile ? readProfileState().dirty : readAvailabilityChanges().dirty;
+  const busy = profile ? profileSaving : scheduleSaving;
   const feedback = saveFeedback[profile ? "profile" : "schedule"];
   const tone = busy ? "saving" : feedback?.tone === "error" && dirty ? "error" : dirty ? "dirty" : "saved";
   const message = busy ? "保存中…" : tone === "error" ? feedback.message : dirty ? "未保存更改" : "已保存";

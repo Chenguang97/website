@@ -1,39 +1,38 @@
+import { isStudentService } from "./service-data.js";
+import { removeStudentFilterChip, closeStudentFilterPanel } from "./filter-controls.js";
 import {
   cancelStudentBooking,
   openBookingDialog,
   openModifyBookingDialog,
   openStudentSlotOptions,
-  syncModifyBookingLocation,
 } from "./booking-actions.js";
-import { bookingDialogElements } from "../dom/booking-dialog-elements.js";
 import { studentElements } from "../dom/student-elements.js";
-import {
-  renderStudentDatePendingState,
-  renderStudentSlots,
-  updateStudentFilterSummaries,
-} from "./render.js";
-import { state } from "../core/state.js";
+import { refreshStudentCalendar } from "./calendar-controller.js";
+import { renderStudentDatePendingState } from "./calendar-render.js";
+import { getStudentDateDraft, setStudentDateDraft, cancelStudentDateDraft, getStudentSelectedDate, selectStudentDate, setStudentViewMode } from "./view-state.js";
 import { addDaysIso, nextWeekdayIso } from "../core/utils-data.js";
 
-const elements = { ...studentElements, ...bookingDialogElements };
+const elements = studentElements;
 
 export function handleStudentAction(event) {
   const button = event.target.closest("button[data-action]");
   if (!button) return;
   const { action, id, ids } = button.dataset;
+  if (isStudentService() && ["subscribe-opening", "send-multi-coach-request"].includes(action)) return;
 
   if (action === "student-week") {
     const offset = Number(button.dataset.offset || 0);
-    state.studentSelectedDate = addDaysIso(state.studentSelectedDate || elements.studentDateFilter.value || nextWeekdayIso(), offset);
-    elements.studentDateFilter.value = state.studentSelectedDate;
-    renderStudentSlots();
+    selectStudentDate(addDaysIso(getStudentSelectedDate() || nextWeekdayIso(), offset));
+    elements.studentDateFilter.value = getStudentSelectedDate();
+    refreshStudentCalendar();
   } else if (action === "set-student-view-mode") {
-    state.studentViewMode = button.dataset.viewMode === "week" ? "week" : "day";
-    renderStudentSlots();
+    setStudentViewMode(button.dataset.viewMode);
+    refreshStudentCalendar();
   } else if (action === "apply-student-date") {
     applyStudentDateSelection();
   } else if (action === "remove-student-filter") {
     removeStudentFilterChip(button.dataset.filterName, button.dataset.filterValue);
+    refreshStudentCalendar();
   } else if (action === "subscribe-opening") {
     button.textContent = "已订阅候补 / 临时空位提醒";
     button.dataset.waitlist = "subscribed";
@@ -52,17 +51,19 @@ export function handleStudentAction(event) {
 }
 
 export function handleStudentDateDraftChange() {
+  setStudentDateDraft(elements.studentDateFilter.value);
   renderStudentDatePendingState();
 }
 
 function applyStudentDateSelection() {
-  state.studentSelectedDate = elements.studentDateFilter.value || state.studentSelectedDate || nextWeekdayIso();
-  elements.studentDateFilter.value = state.studentSelectedDate;
-  renderStudentSlots();
+  selectStudentDate(getStudentDateDraft() || getStudentSelectedDate() || nextWeekdayIso());
+  elements.studentDateFilter.value = getStudentSelectedDate();
+  refreshStudentCalendar();
 }
 
 function cancelStudentDateSelection() {
-  elements.studentDateFilter.value = state.studentSelectedDate || nextWeekdayIso();
+  cancelStudentDateDraft();
+  elements.studentDateFilter.value = getStudentSelectedDate() || nextWeekdayIso();
   renderStudentDatePendingState();
 }
 
@@ -72,97 +73,7 @@ export function handleStudentDateOutsideClick(event) {
   cancelStudentDateSelection();
 }
 
-export function handleBookingNewSlotChange() {
-  if (elements.bookingDialogMode.value !== "modify") return;
-  const currentSlot = state.slots.find((slot) => slot.id === elements.bookingSlotId.value);
-  if (currentSlot) syncModifyBookingLocation(currentSlot);
-}
-
-function removeStudentFilterChip(name, value) {
-  const input = document.querySelector(`input[name="${name}"][value="${value}"]`);
-  const allInput = document.querySelector(`input[name="${name}"][value="all"]`);
-  if (!input) return;
-  input.checked = false;
-  if (![...document.querySelectorAll(`input[name="${name}"]:checked`)].some((item) => item.value !== "all")) {
-    if (allInput) allInput.checked = true;
-    syncStudentFilterCheckboxes(allInput);
-  } else if (allInput) {
-    allInput.checked = false;
-  }
-  updateStudentFilterSummaries();
-  renderStudentSlots();
-}
-
-export function handleStudentFilterChange(event) {
-  const input = event.target.closest("input[type='checkbox']");
-  if (!input) return;
-  syncStudentFilterCheckboxes(input);
-  updateStudentFilterSummaries();
-}
-
 export function applyStudentFilterPanel(event) {
-  const panelType = event.currentTarget.dataset.studentFilterPanel;
-  const panel = panelType === "coach" ? elements.studentCoachFilterPanel : elements.studentRinkFilterPanel;
-  if (!panel) return;
-  panel.classList.add("is-hidden");
-  if (panelType === "coach" && elements.studentCoachSearch) elements.studentCoachSearch.value = "";
-  if (panelType === "rink" && elements.studentRinkSearch) elements.studentRinkSearch.value = "";
-  renderStudentSlots();
+  closeStudentFilterPanel(event);
+  refreshStudentCalendar();
 }
-
-export function openStudentFilterPanel(event) {
-  const search = event.currentTarget;
-  const panel = search === elements.studentCoachSearch ? elements.studentCoachFilterPanel : elements.studentRinkFilterPanel;
-  const optionGroup = search === elements.studentCoachSearch ? elements.studentCoachFilterGroup : elements.studentRinkFilterGroup;
-  if (!panel) return;
-  if (panel.classList.contains("is-hidden")) {
-    search.value = "";
-    optionGroup?.querySelectorAll("label").forEach((label) => label.classList.remove("is-hidden"));
-  }
-  panel.classList.remove("is-hidden");
-}
-
-export function handleStudentFilterSearch(event) {
-  const search = event.currentTarget;
-  const panel = search === elements.studentCoachSearch ? elements.studentCoachFilterGroup : elements.studentRinkFilterGroup;
-  const query = search.value.trim().toLowerCase();
-  if (!panel) return;
-  openStudentFilterPanel(event);
-  panel.querySelectorAll("label").forEach((label) => {
-    const isAllOption = label.querySelector("input")?.value === "all";
-    const matches = !query || label.textContent.toLowerCase().includes(query);
-    label.classList.toggle("is-hidden", !isAllOption && !matches);
-  });
-}
-
-export function handleStudentFilterOutsideClick(event) {
-  if (!elements.studentControls || elements.studentControls.contains(event.target)) return;
-  elements.studentCoachFilterPanel?.classList.add("is-hidden");
-  elements.studentRinkFilterPanel?.classList.add("is-hidden");
-  if (elements.studentCoachSearch) elements.studentCoachSearch.value = "";
-  if (elements.studentRinkSearch) elements.studentRinkSearch.value = "";
-}
-
-function syncStudentFilterCheckboxes(changedInput) {
-  const { name, value, checked } = changedInput;
-  const inputs = [...document.querySelectorAll(`input[name="${name}"]`)];
-  const allInput = inputs.find((input) => input.value === "all");
-  const itemInputs = inputs.filter((input) => input.value !== "all");
-  if (!allInput) return;
-  if (value === "all") {
-    allInput.checked = checked || !itemInputs.some((input) => input.checked);
-    itemInputs.forEach((input) => { input.checked = allInput.checked; });
-    return;
-  }
-  if (allInput.checked && !checked) {
-    itemInputs.forEach((input) => { input.checked = input === changedInput; });
-    changedInput.checked = true;
-  }
-  if (!itemInputs.some((input) => input.checked)) {
-    allInput.checked = true;
-    itemInputs.forEach((input) => { input.checked = true; });
-  } else {
-    allInput.checked = itemInputs.every((input) => input.checked);
-  }
-}
-

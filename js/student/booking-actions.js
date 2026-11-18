@@ -1,200 +1,154 @@
-import { cancelBooking } from "../core/bookings.js";
-import { pushBookingUndoSnapshot } from "../core/booking-undo.js";
+import { offerSessionsHtml } from "./offer-sessions.js";
+import { isStudentService, studentAvailability, studentCoach, studentProjection } from "./service-data.js";
+import { studentCommands } from "./remote-actions.js";
+import { productClient } from "../service/runtime.js";
+import { openStudentDialog, closeStudentDialog } from "./dialogs.js";
+import { bookLesson, cancelBooking, getBookingLessonOptions, updateBookingStudent } from "../core/bookings.js";
 import { rinks } from "../core/config.js";
-import { bookingDialogElements } from "../dom/booking-dialog-elements.js";
+import { studentBookingElements } from "../dom/student-booking-elements.js";
 import { studentElements } from "../dom/student-elements.js";
+import { refreshStudentPage } from "./calendar-controller.js";
+import { getFittingLessonOptionsForStart, getConcreteLocationsForCoach, getStudentSlotOptions } from "./queries.js";
+import { getSelectedStudentLessonDuration } from "./filter-controls.js";
+import { readProfileState, readScheduleState } from "../core/state.js";
 import {
-  concreteLocationOptionsForCoach,
-  getFittingLessonOptionsForStart,
-  getSelectedStudentLessonDuration,
-  getStudentLessonOptionsForCoach,
-  renderStudentPage,
-} from "./render.js";
-import { getProfile, replaceSlots, saveSlots, state } from "../core/state.js";
-import {
-  canFitLessonFromSlot,
   canCancelBooking,
-  getAvailabilitySlotsCoveredByLesson,
   isPastStudentBooking,
-  slotOverlapsBlockedException,
 } from "../core/scheduling-rules.js";
 import { formatLocationLabel } from "../ui/display.js";
 import { showFormMessage } from "../ui/form-message.js";
 import { closeBookingDetails, getBookingDetailsSlotId } from "../ui/booking-details.js";
 import { escapeAttribute, escapeHtml } from "../ui/safe-html.mjs";
 import { formatDate, getCoach, minutesFromTime, timeFromMinutes } from "../core/utils-data.js";
-const elements = { ...studentElements, ...bookingDialogElements };
+const elements = studentElements;
+let selectedOffer = null;
 function openBookingDialog(slotId, lessonId = "") {
-  const slot = state.slots.find((item) => item.id === slotId);
+  const slot = isStudentService() ? studentAvailability.find(slotId) : readScheduleState().publishedSlots.find((item) => item.id === slotId);
   if (!slot) return;
-  const coach = getCoach(slot.coachId);
-  const profile = getProfile(slot.coachId);
-  const lesson = getStudentLessonOptionsForCoach(slot.coachId).find((option) => option.id === lessonId) || getFittingLessonOptionsForStart(slot, getSelectedStudentLessonDuration())[0] || getStudentLessonOptionsForCoach(slot.coachId)[0];
+  const coach = isStudentService() ? studentCoach(slot.coachId) : getCoach(slot.coachId);
+  const profile = readProfileState(slot.coachId).saved;
+  const lessons = isStudentService() ? getFittingLessonOptionsForStart(slot, getSelectedStudentLessonDuration()) : getBookingLessonOptions(slot.coachId);
+  const lesson = lessons.find((option) => option.id === lessonId) || (isStudentService() ? lessons[0] : getFittingLessonOptionsForStart(slot, getSelectedStudentLessonDuration())[0] || lessons[0]);
+  if (!lesson) return;
+  selectedOffer = isStudentService() ? lesson.offer : null;
+  renderBookingSessions(selectedOffer);
   const defaultConcreteLocation = profile.servedRinks && profile.servedRinks[0] || profile.homeRink || rinks[0];
-  elements.bookingSlotId.value = slot.id;
-  elements.bookingLessonId.value = lesson.id;
-  elements.bookingDialogMode.value = "create";
-  elements.dialogTitle.textContent = `${coach.name} · ${lesson.name || "Private lesson"} · $${lesson.price} · ${formatDate(slot.date)} ${slot.start}`;
-  elements.bookingSubmitButton.textContent = "确认预约";
-  elements.bookingNewSlotLabel.classList.add("is-hidden");
-  elements.bookingNewSlot.innerHTML = "";
-  elements.bookingLocation.innerHTML = bookingLocationOptionsForSlot(slot);
-  elements.bookingLocationLabel.classList.remove("is-hidden");
-  elements.bookingLocation.disabled = false;
-  elements.bookingLocation.value = slot.location === "Any served rink" ? defaultConcreteLocation : slot.location;
-  elements.bookingForSelf.checked = true;
-  elements.studentName.value = "";
+  studentBookingElements.bookingSlotId.value = slot.id;
+  studentBookingElements.bookingLessonId.value = lesson.id;
+  studentBookingElements.bookingDialogMode.value = "create";
+  studentBookingElements.dialogTitle.textContent = `${coach.name} · ${lesson.name || "Private lesson"} · $${lesson.price} · ${formatDate(slot.date)} ${slot.start}`;
+  studentBookingElements.bookingSubmitButton.textContent = "确认预约";
+  studentBookingElements.bookingLocation.innerHTML = bookingLocationOptionsForSlot(slot);
+  studentBookingElements.bookingLocationLabel.classList.remove("is-hidden");
+  studentBookingElements.bookingLocation.disabled = false;
+  studentBookingElements.bookingLocation.value = slot.location === "Any served rink" ? defaultConcreteLocation : slot.location;
+  studentBookingElements.bookingForSelf.checked = true;
+  studentBookingElements.studentName.value = "";
   syncBookingForSelf();
-  elements.studentEmailLabel.classList.remove("is-hidden");
-  elements.studentEmail.disabled = false;
-  elements.studentEmail.required = true;
-  elements.studentEmail.value = "";
-  elements.studentNote.value = "";
+  studentBookingElements.studentEmailLabel.classList.remove("is-hidden");
+  studentBookingElements.studentEmail.disabled = false;
+  studentBookingElements.studentEmail.required = true;
+  studentBookingElements.studentEmail.value = isStudentService() ? productClient.readSession()?.user?.email || "" : "";
+  if (isStudentService()) { studentBookingElements.studentEmail.readOnly = true; studentBookingElements.studentEmail.required = false; }
+  studentBookingElements.studentNote.value = "";
   if (elements.studentSlotOptionsDialog?.open) {
     elements.studentSlotOptionsDialog.close();
   }
-  elements.bookingDialog.showModal();
+  if (isStudentService()) openStudentDialog(studentBookingElements.bookingDialog); else studentBookingElements.bookingDialog.showModal();
 }
 function openModifyBookingDialog(slotId) {
-  const slot = state.slots.find((item) => item.id === slotId);
+  const slot = readScheduleState().publishedSlots.find((item) => item.id === slotId);
   if (!slot || !slot.booked || !slot.student || isPastStudentBooking(slot)) return;
-  const coach = getCoach(slot.coachId);
-  elements.bookingSlotId.value = slot.id;
-  elements.bookingDialogMode.value = "modify";
-  elements.dialogTitle.textContent = `修改预约 · ${coach.name} · ${formatDate(slot.date)} ${slot.start}`;
-  elements.bookingSubmitButton.textContent = "保存修改";
-  elements.bookingNewSlotLabel.classList.add("is-hidden");
-  elements.bookingNewSlot.innerHTML = "";
-  elements.bookingNewSlot.value = slot.id;
-  elements.bookingLocationLabel.classList.add("is-hidden");
-  elements.bookingLocation.disabled = true;
-  elements.studentEmailLabel.classList.add("is-hidden");
-  elements.studentEmail.disabled = true;
-  elements.studentEmail.required = false;
-  elements.bookingForSelf.checked = !slot.student.name || slot.student.name === "本人";
-  elements.studentName.value = elements.bookingForSelf.checked ? "" : slot.student.name;
+  renderBookingSessions(null);
+  const coach = isStudentService() ? studentCoach(slot.coachId) : getCoach(slot.coachId);
+  studentBookingElements.bookingSlotId.value = slot.id;
+  studentBookingElements.bookingDialogMode.value = "modify";
+  studentBookingElements.dialogTitle.textContent = `修改预约 · ${coach.name} · ${formatDate(slot.date)} ${slot.start}`;
+  studentBookingElements.bookingSubmitButton.textContent = "保存修改";
+  studentBookingElements.bookingLocationLabel.classList.add("is-hidden");
+  studentBookingElements.bookingLocation.disabled = true;
+  studentBookingElements.studentEmailLabel.classList.add("is-hidden");
+  studentBookingElements.studentEmail.disabled = true;
+  studentBookingElements.studentEmail.required = false;
+  studentBookingElements.bookingForSelf.checked = !slot.student.name || slot.student.name === "本人";
+  studentBookingElements.studentName.value = studentBookingElements.bookingForSelf.checked ? "" : slot.student.name;
   syncBookingForSelf();
-  elements.studentEmail.value = slot.student.email || "";
-  elements.studentNote.value = slot.student.note || "";
-  elements.bookingDialog.showModal();
+  studentBookingElements.studentEmail.value = slot.student.email || "";
+  studentBookingElements.studentNote.value = slot.student.note || "";
+  if (isStudentService()) openStudentDialog(studentBookingElements.bookingDialog); else studentBookingElements.bookingDialog.showModal();
 }
 function bookingLocationOptionsForSlot(slot) {
   if (slot.location === "Any served rink") {
-    return concreteLocationOptionsForCoach(slot.coachId);
+    return getConcreteLocationsForCoach(slot.coachId).map((location) => `<option value="${escapeAttribute(location)}">${escapeHtml(formatLocationLabel(location))}</option>`).join("");
   }
-  return `<option value="${slot.location}">${formatLocationLabel(slot.location)}</option>`;
-}
-function syncModifyBookingLocation(currentSlot) {
-  const selectedSlot = state.slots.find((slot) => slot.id === elements.bookingNewSlot.value) || currentSlot;
-  const profile = getProfile(selectedSlot.coachId);
-  const defaultConcreteLocation = profile.servedRinks && profile.servedRinks[0] || profile.homeRink || rinks[0];
-  elements.bookingLocation.innerHTML = bookingLocationOptionsForSlot(selectedSlot);
-  elements.bookingLocationLabel.classList.remove("is-hidden");
-  elements.bookingLocation.value = selectedSlot.id === currentSlot.id ? currentSlot.location : selectedSlot.location === "Any served rink" ? defaultConcreteLocation : selectedSlot.location;
+  return `<option value="${escapeAttribute(slot.location)}">${escapeHtml(formatLocationLabel(slot.location))}</option>`;
 }
 function openStudentSlotOptions(slotIds) {
   if (!elements.studentSlotOptionsDialog || !elements.studentSlotOptionsList) return;
   const selectedDuration = getSelectedStudentLessonDuration();
-  const startSlots = slotIds.map((id) => state.slots.find((slot) => slot.id === id)).filter(Boolean).filter((slot) => !slot.booked && !slotOverlapsBlockedException(slot)).sort((a, b) => `${getCoach(a.coachId).name}${a.location}${a.lessonPrice}`.localeCompare(`${getCoach(b.coachId).name}${b.location}${b.lessonPrice}`));
-  const options = startSlots.flatMap((slot) => {
-    return getFittingLessonOptionsForStart(slot, selectedDuration).map((lesson) => ({ slot, lesson }));
-  });
+  const options = getStudentSlotOptions(slotIds, selectedDuration).sort((a, b) => `${getCoach(a.slot.coachId).name}${a.slot.location}${a.slot.lessonPrice}`.localeCompare(`${getCoach(b.slot.coachId).name}${b.slot.location}${b.slot.lessonPrice}`));
   if (!options.length) return;
   const first = options[0].slot;
   elements.studentSlotOptionsTitle.textContent = `${formatDate(first.date)} ${first.start}`;
   elements.studentSlotOptionsList.innerHTML = options.map(({ slot, lesson }) => {
-    const coach = getCoach(slot.coachId);
+    const coach = isStudentService() ? studentCoach(slot.coachId) : getCoach(slot.coachId);
     const endTime = timeFromMinutes(minutesFromTime(slot.start) + Number(lesson.duration));
     return `
         <button class="student-coach-option" type="button" data-action="book" data-id="${escapeAttribute(slot.id)}" data-lesson-id="${escapeAttribute(lesson.id)}">
           <strong>${escapeHtml(coach.name)}</strong>
           <span>${escapeHtml(coach.subject)}</span>
           <small>${escapeHtml(slot.start)}-${escapeHtml(endTime)} · ${escapeHtml(formatLocationLabel(slot.location))} · ${escapeHtml(lesson.name || `${lesson.duration} min private lesson`)} · $${escapeHtml(lesson.price)}</small>
+          ${isStudentService() ? offerSessionsHtml(lesson.offer) : ""}
         </button>
       `;
   }).join("");
-  elements.studentSlotOptionsDialog.showModal();
+  if (isStudentService()) openStudentDialog(elements.studentSlotOptionsDialog); else elements.studentSlotOptionsDialog.showModal();
 }
-function cancelStudentBooking(slotId) {
-  const slot = state.slots.find((item) => item.id === slotId);
-  if (!slot || !canCancelBooking(slot)) return;
-  const confirmed = window.confirm(`确定要取消 ${formatDate(slot.date)} ${slot.start}-${slot.end} 的预约吗？`);
-  if (!confirmed) return;
-  pushBookingUndoSnapshot();
-  cancelBooking(slot, { role: "student", name: slot.student?.name || "学生" });
-  if (!saveSlots()) return;
-  renderStudentPage();
+function cancelStudentBooking(slotId, { fromDetails = false } = {}) {
+  const slot = readScheduleState().publishedSlots.find((item) => item.id === slotId);
+  if (!slot || (!isStudentService() && !canCancelBooking(slot))) return;
+  if (!window.confirm(`确定要取消 ${formatDate(slot.date)} ${slot.start}-${slot.end} 的预约吗？`)) return;
+  if (isStudentService()) return studentCommands.run("cancel-booking", { bookingId: slot.id }, () => { if (fromDetails) closeBookingDetails(); });
+  const result = cancelBooking(slot.id, { role: "student", name: slot.student?.name || "学生" });
+  if (!result.ok) { showFormMessage(studentBookingElements.formMessage, result.message, true); return; }
+  if (fromDetails) closeBookingDetails();
+  refreshStudentPage();
 }
 
 export function removeStudentBookingFromDetails() {
-  const slot = state.slots.find((item) => item.id === getBookingDetailsSlotId());
-  if (!slot || !canCancelBooking(slot)) return;
-  if (!window.confirm(`确定要取消 ${formatDate(slot.date)} ${slot.start}-${slot.end} 的预约吗？`)) return;
-  pushBookingUndoSnapshot();
-  cancelBooking(slot, { role: "student", name: slot.student?.name || "学生" });
-  if (!saveSlots()) return;
-  closeBookingDetails();
-  renderStudentPage();
+  cancelStudentBooking(getBookingDetailsSlotId(), { fromDetails: true });
 }
+
 function confirmBooking(event) {
   event.preventDefault();
-  const slot = state.slots.find((item) => item.id === elements.bookingSlotId.value);
-  const isModify = elements.bookingDialogMode.value === "modify";
-  if (!slot || slot.booked && !isModify || !slot.booked && isModify) return;
-  const lesson = isModify ? null : getStudentLessonOptionsForCoach(slot.coachId).find((option) => option.id === elements.bookingLessonId?.value) || getFittingLessonOptionsForStart(slot, getSelectedStudentLessonDuration())[0];
-  if (!isModify && (!lesson || !canFitLessonFromSlot(slot, Number(lesson.duration)))) {
-    showFormMessage("这个时间已经无法完整容纳所选课程时长，请重新选择。", true);
-    return;
-  }
-  if (!isModify && (slot.booked || slotOverlapsBlockedException(slot))) {
-    showFormMessage("提交预约时已重新校验可用性：该时段刚刚被占用，请重新选择。", true);
-    return;
-  }
-  const bookingForSelf = elements.bookingForSelf.checked;
+  const slotId = studentBookingElements.bookingSlotId.value;
+  const isModify = studentBookingElements.bookingDialogMode.value === "modify";
   const student = {
-    name: bookingForSelf ? "本人" : elements.studentName.value.trim(),
-    email: isModify ? slot.student?.email || "" : elements.studentEmail.value.trim(),
-    note: elements.studentNote.value.trim()
+    name: studentBookingElements.bookingForSelf.checked ? "本人" : studentBookingElements.studentName.value.trim(),
+    email: studentBookingElements.studentEmail.value.trim(),
+    note: studentBookingElements.studentNote.value.trim(),
   };
-  pushBookingUndoSnapshot();
-  if (isModify) {
-    slot.student = student;
-  } else {
-    applyLessonToBookingSlot(slot, lesson);
-    slot.booked = true;
-    slot.status = "Booked";
-    slot.version = (slot.version || 0) + 1;
-    slot.transactionState = "atomic-booked";
-    slot.student = student;
-    slot.notifications = [
-      { type: "coach-booking-created", channel: "demo-event", message: "Demo 提示：预约成功，未发送真实通知。" }
-    ];
-    if (slot.location === "Any served rink") {
-      slot.location = elements.bookingLocation.value;
-    }
+  if (isStudentService()) {
+    const snapshot = bookingFormSignature();
+    const payload = { ...(isModify ? { bookingId: slotId } : selectedOffer ? { slotId: selectedOffer.sourceSlotId || selectedOffer.id, start: selectedOffer.start, location: selectedOffer.location, lessonId: selectedOffer.lessonId } : {}), attendeeName: studentBookingElements.bookingForSelf.checked ? studentProjection()?.data.studentProfile?.contact?.name || productClient.readSession()?.user?.name || "本人" : student.name, note: student.note };
+    if (!isModify && !selectedOffer) return;
+    return studentCommands.run(isModify ? "modify-booking" : "book", payload, () => { if (bookingFormSignature() === snapshot) closeStudentDialog(studentBookingElements.bookingDialog); });
   }
-  elements.bookingDialog.close();
-  if (document.body.dataset.page === "student" && !saveSlots()) return;
-  renderStudentPage();
+  const result = isModify
+    ? updateBookingStudent(slotId, student)
+    : bookLesson({ slotId, lessonId: studentBookingElements.bookingLessonId.value, student, location: studentBookingElements.bookingLocation.value });
+  if (!result.ok) { showFormMessage(studentBookingElements.formMessage, result.message, true); return; }
+  studentBookingElements.bookingDialog.close();
+  refreshStudentPage();
 }
-function applyLessonToBookingSlot(slot, lesson) {
-  const duration = Number(lesson.duration);
-  const coveredSlots = getAvailabilitySlotsCoveredByLesson(slot, duration).filter((coveredSlot) => coveredSlot.id !== slot.id);
-  slot.consumedAvailabilitySlots = coveredSlots.map((coveredSlot) => ({ ...coveredSlot }));
-  replaceSlots(state.slots.filter((item) => !coveredSlots.some((coveredSlot) => coveredSlot.id === item.id)));
-  slot.end = timeFromMinutes(minutesFromTime(slot.start) + duration);
-  slot.lessonId = lesson.id;
-  slot.lessonName = lesson.name;
-  slot.lessonDuration = duration;
-  slot.lessonPrice = lesson.price;
-}
+
 function syncBookingForSelf() {
-  const bookingForSelf = elements.bookingForSelf.checked;
-  elements.studentNameLabel.classList.toggle("is-hidden", bookingForSelf);
-  elements.studentName.disabled = bookingForSelf;
-  elements.studentName.required = !bookingForSelf;
+  const bookingForSelf = studentBookingElements.bookingForSelf.checked;
+  studentBookingElements.studentNameLabel.classList.toggle("is-hidden", bookingForSelf);
+  studentBookingElements.studentName.disabled = bookingForSelf;
+  studentBookingElements.studentName.required = !bookingForSelf;
   if (bookingForSelf) {
-    elements.studentName.value = "本人";
+    studentBookingElements.studentName.value = "本人";
   }
 }
 export {
@@ -203,7 +157,16 @@ export {
   openBookingDialog,
   openModifyBookingDialog,
   openStudentSlotOptions,
-  syncBookingForSelf,
-  syncModifyBookingLocation
+  syncBookingForSelf
 };
 
+function bookingFormSignature() {
+  return JSON.stringify([studentBookingElements.bookingSlotId.value, studentBookingElements.bookingDialogMode.value, studentBookingElements.bookingForSelf.checked, studentBookingElements.studentName.value, studentBookingElements.studentNote.value, studentBookingElements.bookingLessonId.value]);
+}
+
+function renderBookingSessions(offer) {
+  if (!elements.studentBookingSessions) return;
+  const summary = offerSessionsHtml(offer);
+  elements.studentBookingSessions.innerHTML = summary;
+  elements.studentBookingSessions.hidden = !summary;
+}

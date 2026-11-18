@@ -4,9 +4,9 @@ function minutesFromTimeValue(time) {
   const [hours, minutes] = String(time).split(":").map(Number);
   return hours * 60 + minutes;
 }
-export function rangesOverlap(startA, endA, startB, endB) {
-  return startA < endB && endA > startB;
-}
+import { overlap as rangesOverlap } from "./calendar-primitives.mjs";
+import { isCancelledBooking, isActiveBooking } from "./booking-status.mjs";
+export { rangesOverlap, isCancelledBooking, isActiveBooking };
 export function getAvailabilityLocation(slot, unavailableValue = "Unavailable") {
   return slot?.availabilityLocation || slot?.location || unavailableValue;
 }
@@ -36,17 +36,12 @@ export function slotOverlapsBlockedException(slot, blockedExceptions) {
 export function slotSort(slotA, slotB) {
   return `${slotA.date}${slotA.start}`.localeCompare(`${slotB.date}${slotB.start}`);
 }
-export function isPastBooking(slot, now = new Date()) {
-  return /* @__PURE__ */ new Date(`${slot.date}T${slot.end}`) < now;
+export function isPastBooking(slot, now = new Date(), resolveInstant) {
+  const end = resolveInstant ? resolveInstant(slot.date, slot.end) : new Date(`${slot.date}T${slot.end}`);
+  return end < now;
 }
-export function isCancelledBooking(slot) {
-  return String(slot?.status || "").trim().toLocaleLowerCase() === "cancelled";
-}
-export function isActiveBooking(slot) {
-  return Boolean(slot?.booked) && !isCancelledBooking(slot);
-}
-export function canCancelBooking(slot, now = new Date(), leadMinutes = defaultCancellationLeadMinutes) {
-  return getCancellationEligibility(slot, now, leadMinutes).allowed;
+export function canCancelBooking(slot, now = new Date(), leadMinutes = defaultCancellationLeadMinutes, resolveInstant) {
+  return getCancellationEligibility(slot, now, leadMinutes, resolveInstant).allowed;
 }
 export function getAvailabilitySlotsCoveredByLesson(startSlot, duration, slots, blockedExceptions) {
   const startMinutes = minutesFromTimeValue(startSlot.start);
@@ -61,12 +56,14 @@ export function canFitLessonFromSlot(startSlot, duration, slots, blockedExceptio
   const endMinutes = startMinutes + Number(duration);
   const availabilityLocation = getAvailabilityLocation(startSlot);
   if (!Number.isFinite(endMinutes) || endMinutes > minutesFromTimeValue(fullDayEnd2)) return false;
-  for (let minutes = startMinutes; minutes < endMinutes; minutes += calendarStep2) {
-    const coveringSlot = slots.find((slot) => {
-      return slot.coachId === startSlot.coachId && slot.date === startSlot.date && !slot.booked && !slotOverlapsBlockedException(slot, blockedExceptions) && getAvailabilityLocation(slot) === availabilityLocation && minutesFromTimeValue(slot.start) <= minutes && minutesFromTimeValue(slot.end) >= Math.min(minutes + calendarStep2, endMinutes);
-    });
-    if (!coveringSlot) return false;
+  if (slots.some((slot) => isActiveBooking(slot) && slot.coachId === startSlot.coachId && slot.date === startSlot.date && rangesOverlap(startMinutes, endMinutes, minutesFromTimeValue(slot.start), minutesFromTimeValue(slot.end)))) return false;
+  let coveredUntil = startMinutes;
+  const available = slots.filter((slot) => slot.coachId === startSlot.coachId && slot.date === startSlot.date && !slot.booked && !slotOverlapsBlockedException(slot, blockedExceptions) && getAvailabilityLocation(slot) === availabilityLocation).slice().sort(slotSort);
+  for (const slot of available) {
+    if (minutesFromTimeValue(slot.start) > coveredUntil) break;
+    if (minutesFromTimeValue(slot.end) > coveredUntil) coveredUntil = minutesFromTimeValue(slot.end);
+    if (coveredUntil >= endMinutes) return true;
   }
-  return true;
+  return false;
 }
 

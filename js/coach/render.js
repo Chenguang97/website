@@ -1,23 +1,23 @@
+import { renderWorkTimetable } from "./availability/planner-render.js";
 import {
   renderAvailabilityStats,
-  renderCalendarAvailability,
-  renderDropdownOpenSlots,
-  renderDropdownWeekSlots,
+  renderCalendarAvailability, renderDragCalendar,
   syncLocationOptions,
 } from "./availability/render.js";
-import { renderExceptionCalendarAvailability } from "./bookings/calendar-render.js";
-import { renderCoachSlots } from "./bookings/render.js?v=coach-booking-row-effect-1";
-import { renderCoachBookingRequests } from "./bookings/request-render.js?v=coach-booking-row-effect-1";
+import { renderExceptionCalendarAvailability, renderExceptionDragCalendar } from "./bookings/calendar-render.js";
+import { renderCoachSlots } from "./bookings/render.js";
+import { renderCoachBookingRequests } from "./bookings/request-render.js";
 import { renderCoachProfile } from "./profile/render.js";
 
-export function renderCoachPage() {
+export function renderCoachPage({ buildCalendars = false } = {}) {
   renderCoachProfile();
   syncLocationOptions();
   renderCoachSlots();
   renderCoachBookingRequests();
   renderAvailabilityStats();
-  renderDropdownOpenSlots();
-  renderDropdownWeekSlots();
-  renderCalendarAvailability();
-  renderExceptionCalendarAvailability();
+  renderWorkTimetable();
+  if (buildCalendars) renderDragCalendar();
+  else renderCalendarAvailability();
+  if (buildCalendars) renderExceptionDragCalendar();
+  else renderExceptionCalendarAvailability();
 }

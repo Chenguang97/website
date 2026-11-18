@@ -28,11 +28,26 @@ for (const file of modules) {
   const dependencies = [];
   for (const match of source.matchAll(importPattern)) {
     if (!match[1].startsWith(".")) continue;
+    assert(!/[?#]/.test(match[1]), `${path.relative(root, file)} gives a production module a noncanonical URL: ${match[1]}`);
     const dependency = path.resolve(path.dirname(file), match[1].split(/[?#]/, 1)[0]);
     assert(moduleSet.has(dependency), `${path.relative(root, file)} imports missing module ${match[1]}.`);
     dependencies.push(dependency);
   }
   graph.set(file, dependencies);
+}
+
+// Enforce dependency direction rather than relying only on directory names.
+for (const [file, dependencies] of graph) {
+  const relative = path.relative(jsRoot, file);
+  for (const dependency of dependencies) {
+    const target = path.relative(jsRoot, dependency);
+    if (relative.startsWith(`domain${path.sep}`)) {
+      assert(target.startsWith(`domain${path.sep}`), `${relative} must not bind pure rules to ${target}.`);
+    }
+    if (relative.startsWith(`core${path.sep}`)) {
+      assert(["core", "domain"].includes(target.split(path.sep)[0]), `${relative} must not depend on page or DOM module ${target}.`);
+    }
+  }
 }
 
 const visiting = new Set();
@@ -58,7 +73,7 @@ for (const legacyModule of ["app-init.js", "actions.js", "navigation.js", "booki
 }
 
 const roleBoundaries = {
-  "coach/app.js": ["../dom/coach-elements.js", "./availability/actions.js", "./bookings/controls.js", "./profile/actions.js"],
+  "coach/app.js": ["../dom/coach-elements.js", "./availability/actions.js", "./bookings/controls.js", "./profile/fields-controller.js", "./profile/lesson-controller.js", "./profile/photo-controller.js", "./profile/save-controller.js"],
   "student/app.js": ["../dom/student-elements.js", "./actions.js"],
   "admin/app.js": ["../dom/admin-elements.js", "./actions.js"],
 };
@@ -84,21 +99,33 @@ for (const file of renderModules) {
 }
 
 const stateSource = fs.readFileSync(path.join(jsRoot, "core", "state.js"), "utf8");
-assert(/state\.slots\s*=\s*nextSlots\.slice\(\)\.sort\(slotSort\)/.test(stateSource), "Slot ordering must be established at the state update boundary without mutating the caller's array.");
+for (const removed of ['state-boundary.js', 'schedule-planning.js', 'undo-history.js']) assert(!fs.existsSync(path.join(jsRoot, 'core', removed)), `Removed bridge ${removed} reappeared.`);
+assert(!/export\s+(?:const|let|var)\s+state\b/.test(stateSource), 'Raw state must remain private.');
+assert(!/new Proxy\b/.test(stateSource + fs.readFileSync(path.join(jsRoot, 'core', 'owned-values.js'), 'utf8')), 'Owner must use explicit commits rather than observing external writes.');
 
 const renderSource = fs.readFileSync(path.join(jsRoot, "coach", "bookings", "render.js"), "utf8");
 assert(!/state\.coachBookingStudentKeys\s*=/.test(renderSource), "Coach booking rendering must not mutate the applied student filter.");
 const pickerSource = fs.readFileSync(path.join(jsRoot, "coach", "bookings", "student-picker.js"), "utf8");
 assert(!/core\/state\.js/.test(pickerSource) && /let searchQuery =/.test(pickerSource), "Coach booking picker drafts and search must remain local to the feature.");
-const profileActionsSource = fs.readFileSync(path.join(jsRoot, "coach", "profile", "actions.js"), "utf8");
-assert(!profileActionsSource.includes("renderCoachPage"), "Coach profile actions must not refresh unrelated coach features.");
+assert(!fs.existsSync(path.join(jsRoot, "coach", "profile", "actions.js")), "Superseded profile facade must not reappear.");
+for (const controller of ["fields-controller.js", "lesson-controller.js", "photo-controller.js", "save-controller.js"]) {
+  const source = fs.readFileSync(path.join(jsRoot, "coach", "profile", controller), "utf8");
+  assert(!source.includes("renderCoachPage"), `Coach profile ${controller} must not refresh unrelated coach features.`);
+}
 const availabilityActionsSource = fs.readFileSync(path.join(jsRoot, "coach", "availability", "actions.js"), "utf8");
 assert(!availabilityActionsSource.includes("renderCoachPage"), "Coach availability actions must not refresh the whole coach page.");
 assert(!availabilityActionsSource.includes('action === "cancel"'), "Booking cancellation must remain owned by coach/bookings.");
 const availabilityUndoSource = fs.readFileSync(path.join(jsRoot, "coach", "availability", "undo.js"), "utf8");
 assert(!availabilityUndoSource.includes("booking-undo.js"), "Availability undo must not restore booking-owned snapshots.");
 const coachBookingUndoSource = fs.readFileSync(path.join(jsRoot, "coach", "bookings", "undo.js"), "utf8");
-assert(coachBookingUndoSource.includes('popLatestUndoSnapshot("booking")'), "Coach bookings must own restoration of booking snapshots.");
+assert(graph.get(path.join(jsRoot, 'coach/bookings/undo.js')).includes(path.join(jsRoot, 'core/booking-undo.js')), 'Coach undo must use the booking owner.');
+for (const role of ['coach/bookings', 'student']) {
+  const undo = fs.readFileSync(path.join(jsRoot, role, 'undo.js'), 'utf8');
+  assert(!/popLatestUndoSnapshot|pushUndoSnapshot|restoreBookingUndoSnapshot/.test(undo), 'UI cannot consume history before persistence succeeds.');
+}
+for (const file of modules.filter(file => file.startsWith(path.join(jsRoot, 'core') + path.sep))) {
+  assert(!/\bHTMLElement\b|\bdocument\b/.test(fs.readFileSync(file, 'utf8')), 'Core cannot contain DOM keyboard policy.');
+}
 const bookingActionsSource = fs.readFileSync(path.join(jsRoot, "coach", "bookings", "actions.js"), "utf8");
 for (const bookingAction of ["shiftScheduleWeek", "goToCurrentScheduleWeek", "openBlockTimeDialog", "addBlockException"]) {
   assert(bookingActionsSource.includes(`function ${bookingAction}`), `Coach booking actions must own ${bookingAction}.`);

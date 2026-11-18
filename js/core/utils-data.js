@@ -1,12 +1,20 @@
+import { captureProductClock } from "./product-clock.js";
+import { addCalendarDays, calendarWeekdayIndex, isCalendarDate, startOfCalendarWeek } from "../domain/calendar-date.mjs";
+import { looseMinuteOf as minutesFromTime, timeOf as timeFromMinutes } from "../domain/calendar-primitives.mjs";
+import { createAvailabilitySlot } from "../domain/availability-slot.mjs";
 import { calendarStep, coaches, currentCoachId } from "./config.js";
 
-export function todayIso(offset = 0) {
-  const date = new Date();
+export function todayIso(offset = 0, now = new Date()) {
+  const clock = captureProductClock(now);
+  if (clock.service) return addCalendarDays(clock.today, offset);
+  const date = clock.at;
   date.setDate(date.getDate() + offset);
   return date.toISOString().slice(0, 10);
 }
 
 export function startOfWeekIso(dateString = todayIso()) {
+  if (isCalendarDate(dateString)) return startOfCalendarWeek(dateString);
+  // Preserve the old invalid/non-date argument behavior; no new normalization.
   const date = new Date(`${dateString}T00:00:00`);
   const day = date.getDay() || 7;
   date.setDate(date.getDate() - day + 1);
@@ -14,43 +22,41 @@ export function startOfWeekIso(dateString = todayIso()) {
 }
 
 export function addDaysIso(dateString, offset) {
+  if (isCalendarDate(dateString) && Number.isInteger(offset)) return addCalendarDays(dateString, offset);
+  // Invalid dates and non-integer/non-numeric offsets keep their legacy path.
   const date = new Date(`${dateString}T00:00:00`);
   date.setDate(date.getDate() + offset);
   return date.toISOString().slice(0, 10);
 }
 
 export function isWeekday(dateString) {
-  const day = new Date(`${dateString}T00:00:00`).getDay();
+  const day = weekdayIndex(dateString);
   return day >= 1 && day <= 5;
 }
 
 export function weekdayIndex(dateString) {
+  if (isCalendarDate(dateString)) return calendarWeekdayIndex(dateString);
   return new Date(`${dateString}T00:00:00`).getDay();
 }
 
-export function isPastCalendarCell(date, minutes) {
-  const cellEnd = new Date(`${date}T${timeFromMinutes(minutes + calendarStep)}`);
-  return cellEnd < new Date();
+export function isPastCalendarCell(date, minutes, now = new Date()) {
+  const clock = captureProductClock(now);
+  const time = timeFromMinutes(minutes + calendarStep);
+  const cellEnd = clock.instant ? clock.instant(date, time) : new Date(`${date}T${time}`);
+  return cellEnd < clock.at;
 }
 
-export function nextWeekdayIso(offset = 0) {
-  let date = todayIso(offset);
+export function nextWeekdayIso(offset = 0, now = new Date()) {
+  let date = todayIso(offset, now);
   while (!isWeekday(date)) {
     date = addDaysIso(date, 1);
   }
   return date;
 }
 
-export function minutesFromTime(time) {
-  const [hours, minutes] = time.split(":").map(Number);
-  return hours * 60 + minutes;
-}
-
-export function timeFromMinutes(totalMinutes) {
-  const hours = String(Math.floor(totalMinutes / 60)).padStart(2, "0");
-  const minutes = String(totalMinutes % 60).padStart(2, "0");
-  return `${hours}:${minutes}`;
-}
+// These unchecked colon/time formatting semantics are shared with planning;
+// strict and fixed-width persisted-record parsers remain separate leaf functions.
+export { minutesFromTime, timeFromMinutes };
 
 export function cellKey(date, minutes) {
   return `${currentCoachId}|${date}|${minutes}`;
@@ -95,22 +101,7 @@ export function createId() {
 }
 
 export function createSlot(coachId, date, start, end, location, note, lesson) {
-  return {
-    id: createId(),
-    coachId,
-    date,
-    start,
-    end,
-    location,
-    availabilityLocation: location,
-    note,
-    lessonId: lesson.id,
-    lessonName: lesson.name,
-    lessonDuration: lesson.duration,
-    lessonPrice: lesson.price,
-    booked: false,
-    student: null,
-  };
+  return createAvailabilitySlot({ id: createId(), coachId, date, start, end, location, note, lesson });
 }
 
 export function createSlotsFromRange(coachId, date, startMinutes, endMinutes, lesson, location, note, checkExisting = true, existingSlots = []) {

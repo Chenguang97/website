@@ -1,26 +1,32 @@
+import { coachUsesService, coachCanManage } from "../service-controller.js";
+import { runCoachBookingCommand } from "./service-commands.js";
+import { captureProductClock } from "../../core/product-clock.js";
+import { synchronizeCoachBookingRequests } from "./request-sync.js";
 import { currentCoachId } from "../../core/config.js";
 import {
   acceptCoachBookingRequest,
-  addCoachBookingRequestMessage,
-  counterCoachBookingRequest,
-  endCoachBookingRequest,
-  extendCoachBookingRequest,
+  addCoachBookingRequestMessageResult,
+  counterCoachBookingRequestResult,
+  endCoachBookingRequestResult,
+  extendCoachBookingRequestResult,
   getBookingRequest,
 } from "../../core/booking-requests.js";
-import { getProfile, state } from "../../core/state.js";
+import { readProfileState, readScheduleState } from "../../core/state.js";
 import { getBookingRequestStatus } from "../../domain/booking-requests.mjs";
 import { openBookingDetails } from "../../ui/booking-details.js";
 import { coachElements as elements } from "../../dom/coach-elements.js";
-import { activateBookingSection, activateCoachPanel } from "../navigation.js?v=confirmed-liquid-switch-1";
-import { confirmDiscardProfileChanges } from "../profile/actions.js";
-import { renderCoachBookingChanges } from "./refresh.js?v=coach-booking-row-effect-1";
+import { activateBookingSection, activateCoachPanel } from "../navigation.js";
+import { confirmDiscardProfileChanges } from "../profile/save-controller.js";
+import { receiveCoachBookingChanges } from "./refresh.js";
 import {
-  renderCoachBookingRequests,
-  selectCoachBookingRequest,
-} from "./request-render.js?v=coach-booking-row-effect-1";
+  receiveCoachBookingRequests,
+  chooseCoachBookingRequest,
+  resetCoachRequestEditor,
+} from "./request-editor.js";
 import { getCoachCurrentRequestFilter, getCoachRequestFilter, getCoachRequestStudentScope, setCoachRequestFilter, setSelectedCoachRequestId } from "./request-state.js";
 import { selectCoachBookingFilterScope } from "./filter-state.js";
-import { clearCoachBookingStudentFilter, closeCoachBookingFilter, renderAppliedCoachBookingStudentFilter } from "./controls.js?v=coach-booking-row-effect-1";
+import { previewCoachScheduledBooking } from "../../core/scheduling-rules.js";
+import { clearCoachBookingStudentFilter, closeCoachBookingFilter, renderAppliedCoachBookingStudentFilter } from "./controls.js";
 
 function selectRequestFilter(filter) {
   closeCoachBookingFilter();
@@ -30,12 +36,13 @@ function selectRequestFilter(filter) {
 }
 
 function refreshRequests(message = "") {
-  renderCoachBookingChanges();
+  synchronizeCoachBookingRequests();
+  receiveCoachBookingChanges({ resetRequest: true });
   elements.coachRequestMessage.textContent = message;
 }
 
 export function openCoachRequestWorkspace(requestId = "", { filter = requestId ? "all" : "coach", clearStudentFilter = true } = {}) {
-  if (!confirmDiscardProfileChanges()) return;
+  if (!coachCanManage() || !confirmDiscardProfileChanges()) return;
   const request = requestId ? getBookingRequest(requestId) : null;
   selectRequestFilter(request && getBookingRequestStatus(request) !== "negotiating" ? "history" : filter || getCoachRequestFilter());
   activateCoachPanel("bookingsPanel");
@@ -44,7 +51,7 @@ export function openCoachRequestWorkspace(requestId = "", { filter = requestId ?
   if (bookingDialog?.open) bookingDialog.close();
   if (clearStudentFilter) clearCoachBookingStudentFilter();
   if (requestId) setSelectedCoachRequestId(requestId);
-  renderCoachBookingRequests();
+  resetCoachRequestEditor();
 }
 
 export function openCoachRequestSection() {
@@ -55,7 +62,7 @@ export function handleCoachRequestRecordClick(event) {
   const target = event.target.closest("[data-request-id]");
   if (!target) return;
   if (elements.coachRequestWorkspace.hidden) openCoachRequestWorkspace(target.dataset.requestId);
-  else selectCoachBookingRequest(target.dataset.requestId);
+  else chooseCoachBookingRequest(target.dataset.requestId);
 }
 
 export function filterCoachRequests(event) {
@@ -71,8 +78,9 @@ export function returnToCurrentCoachRequests() {
 }
 
 export function openCoachRequestOriginalBooking(event) {
+  const snapshot = readScheduleState();
   const trigger = event.target.closest("[data-request-booking-id]");
-  if (!trigger || !state.slots.some((slot) => slot.id === trigger.dataset.requestBookingId && slot.coachId === currentCoachId)) return;
+  if (!trigger || !snapshot.slots.some((slot) => slot.id === trigger.dataset.requestBookingId && slot.coachId === currentCoachId)) return;
   openBookingDetails(trigger.dataset.requestBookingId);
 }
 
@@ -83,7 +91,7 @@ export function openCoachRequestProposal() {
 }
 
 export function cancelCoachRequestProposal() {
-  renderCoachBookingRequests();
+  resetCoachRequestEditor();
 }
 
 export function sendCoachRequestReply() {
@@ -93,24 +101,37 @@ export function sendCoachRequestReply() {
     elements.coachRequestReply.focus();
     return;
   }
-  const coachName = getProfile(currentCoachId)?.name || "Maya Chen";
-  const result = addCoachBookingRequestMessage(elements.coachRequestId.value, coachName, message);
-  if (!result) {
-    elements.coachRequestMessage.textContent = "当前商议已结束，无法发送回复。";
+  if (coachUsesService()) return requestCommand('message-request', { message }, '回复已保存，未发送外部通知。', () => {
+    if (elements.coachRequestReply.value.trim() === message) elements.coachRequestReply.value = '';
+  });
+  const profileState = readProfileState(currentCoachId);
+  const coachName = (profileState.draft || profileState.saved)?.name || "Maya Chen";
+  const result = addCoachBookingRequestMessageResult(elements.coachRequestId.value, coachName, message);
+  if (!result.ok) {
+    elements.coachRequestMessage.textContent = "回复未保存，请检查商议状态或稍后重试。输入已保留。";
     return;
   }
   refreshRequests("回复已保存，现在等待学生回应。Demo 内未发送真实通知。");
 }
 
 export function extendCurrentCoachRequest() {
-  extendCoachBookingRequest(elements.coachRequestId.value);
+  if (coachUsesService()) return requestCommand('extend-request', {}, '已延长商议；没有接受或变更行动方。');
+  if (!extendCoachBookingRequestResult(elements.coachRequestId.value).ok) {
+    elements.coachRequestMessage.textContent = "延长商议未能保存，请重试。";
+    return;
+  }
   refreshRequests("已从现在起延长商议；延长不代表接受，也没有改变当前行动方。Demo 内已记录事件。");
 }
 
 export function endCurrentCoachRequest() {
   if (!window.confirm("确定主动结束这次商议吗？记录会保留，如需再次协商应新建请求。")) return;
-  const coachName = getProfile(currentCoachId)?.name || "Maya Chen";
-  endCoachBookingRequest(elements.coachRequestId.value, coachName);
+  if (coachUsesService()) return requestCommand('end-request', {}, '商议已结束，记录已保留。');
+  const profileState = readProfileState(currentCoachId);
+  const coachName = (profileState.draft || profileState.saved)?.name || "Maya Chen";
+  if (!endCoachBookingRequestResult(elements.coachRequestId.value, coachName).ok) {
+    elements.coachRequestMessage.textContent = "结束商议未能保存，原状态已保留，请重试。";
+    return;
+  }
   refreshRequests("商议已结束，操作方已记录。Demo 内未发送真实通知。");
 }
 
@@ -122,21 +143,55 @@ export function counterCurrentCoachRequest() {
     location: elements.coachRequestLocation.value.trim(),
     price: Number(elements.coachRequestPrice.value),
   };
-  const start = new Date(`${proposal.date}T${proposal.start}`);
-  const end = new Date(`${proposal.date}T${proposal.end}`);
-  if (!proposal.date || !proposal.location || !Number.isFinite(proposal.price) || end <= start || start <= new Date()) {
+  let start, end, clock;
+  try {
+    clock = captureProductClock();
+    start = clock.instant ? clock.instant(proposal.date, proposal.start) : new Date(`${proposal.date}T${proposal.start}`);
+    end = clock.instant ? clock.instant(proposal.date, proposal.end) : new Date(`${proposal.date}T${proposal.end}`);
+  } catch (error) { elements.coachRequestMessage.textContent = error.message; return; }
+  if (!proposal.date || !proposal.location || !Number.isFinite(proposal.price) || end <= start || start <= clock.at) {
     elements.coachRequestMessage.textContent = "请填写未来的有效上课时间、地点和价格。";
     return;
   }
-  counterCoachBookingRequest(elements.coachRequestId.value, proposal);
+  if (coachUsesService()) return requestCommand('propose-request', { proposal }, '新方案已保存；旧版本的接受已失效，未发送外部通知。');
+  if (!counterCoachBookingRequestResult(elements.coachRequestId.value, proposal).ok) {
+    elements.coachRequestMessage.textContent = "新方案未能保存，输入已保留，请重试。";
+    return;
+  }
   refreshRequests("已生成新版本；旧版本的接受结果已失效，现在等待学生回应。Demo 内未发送真实通知。");
 }
 
 export function acceptCurrentCoachRequest() {
+  const request = getBookingRequest(elements.coachRequestId.value);
+  if (request) {
+    const preview = previewCoachScheduledBooking({ ...request.proposal, id: request.bookingId || `request-${request.id}`, replacesBookingId: request.bookingId, coachId: request.coachId });
+    if (!preview.allowed) { refreshRequests(preview.message); return; }
+    if (preview.requiresConfirmation && !window.confirm(`确认接受 ${request.proposal.date} ${request.proposal.start}–${request.proposal.end} 在 ${request.proposal.location} 的课程？\n将同步收紧 ${preview.closedMinutes} 分钟不再可行的开放时间，并更新必要通勤。${preview.lunch?.length ? `\n午餐保留：${preview.lunch.map((block) => `${block.start}–${block.end}`).join("、")}` : ""}\n剩余开放地点的优化将先提供建议，不自动发布。`)) return;
+  }
+  if (coachUsesService()) {
+    if (!request) return;
+    return requestCommand('accept-request', { proposalVersion: request.proposal.version }, '服务器已确认本次接受结果，预约以最新服务记录为准。');
+  }
   const result = acceptCoachBookingRequest(elements.coachRequestId.value);
   if (!result.accepted) {
-    refreshRequests(result.reason === "conflict" ? "当前时段已被预约，不能接受；请提交其他时间的新方案。" : "当前请求不需要教练回应。");
+    refreshRequests(result.message || (result.reason === "conflict" ? "当前时段已被预约，不能接受；请提交其他时间的新方案。" : "当前请求不需要教练回应。"));
     return;
   }
   refreshRequests("双方已接受同一版本，方案已达成并应用。Demo 内未发送真实通知。");
+}
+
+function requestCommand(type, fields, message, success) {
+  const requestId = elements.coachRequestId.value;
+  const buttons = [elements.sendCoachRequestReply, elements.extendCoachRequest, elements.endCoachRequest, elements.counterCoachRequest, elements.acceptCoachRequest];
+  return runCoachBookingCommand(type, { requestId, ...fields }, {
+    key: `request:${requestId}`,
+    busy(value) {
+      if (elements.coachRequestId.value !== requestId) return;
+      if (value) buttons.forEach(button => { button.disabled = true; });
+      else receiveCoachBookingRequests();
+    },
+    success() { if (elements.coachRequestId.value === requestId) { success?.(); elements.coachRequestMessage.textContent = message; } },
+    failure(receipt) { if (elements.coachRequestId.value === requestId) elements.coachRequestMessage.textContent = receipt.message || '结果未确认，输入已保留。'; },
+    message,
+  });
 }

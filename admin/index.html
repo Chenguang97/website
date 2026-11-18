@@ -4,18 +4,6 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Ice Skating Coach Booking</title>
-    <script>
-      (() => {
-        try {
-          const savedPanel = localStorage.getItem("ice-skating-coach-active-panel-v1");
-          if (savedPanel) {
-            document.documentElement.dataset.activeCoachPanel = savedPanel;
-          }
-        } catch (error) {
-          document.documentElement.dataset.activeCoachPanel = "profilePanel";
-        }
-      })();
-    </script>
     <link rel="stylesheet" href="../css/base.css?v=warm-ui-1" />
     <link rel="stylesheet" href="../css/coach-profile.css?v=warm-ui-1" />
     <link rel="stylesheet" href="../css/calendar.css?v=warm-ui-1" />
@@ -23,6 +11,7 @@
     <link rel="stylesheet" href="../css/student-bookings.css?v=warm-ui-1" />
     <link rel="stylesheet" href="../css/responsive.css?v=warm-ui-1" />
     <link rel="stylesheet" href="../css/design-system.css?v=warm-ui-11" />
+    <link rel="stylesheet" href="../css/admin-product.css" />
   </head>
   <body data-page="admin">
     <main class="app-shell">
@@ -63,14 +52,14 @@
               <p class="eyebrow">Admin dashboard</p>
               <h2 id="adminHeading">平台管理</h2>
             </div>
-            <button id="resetDemo" class="ghost-button" type="button">重置示例数据</button>
+            <button id="resetDemo" class="ghost-button" type="button">重置本地示例</button>
           </div>
 
           <div class="admin-grid">
             <article class="admin-card">
               <p class="eyebrow">Coaches</p>
-              <strong>3</strong>
-              <span>管理教练资料、照片、授课地点和课程价格；可批准 approve、暂停 suspend 或移除 remove 教练冰场权限。</span>
+              <strong id="adminCoachCount">0</strong>
+              <span>管理教练资料、照片、授课地点和课程价格；可批准、暂停或移除教练在各冰场的授课权限。</span>
             </article>
             <article class="admin-card">
               <p class="eyebrow">Bookings</p>
@@ -79,33 +68,74 @@
             </article>
             <article class="admin-card">
               <p class="eyebrow">Rinks</p>
-              <strong>3</strong>
+              <strong id="adminRinkCount">0</strong>
               <span>维护可授课冰场列表和后续扩展规则。</span>
             </article>
           </div>
-          <section class="admin-rule-card">
-            <p class="eyebrow">MVP Scheduling Rules</p>
-            <strong>Freestyle Session / Travel Buffer</strong>
-            <span>维护 Freestyle Session 场次；根据教练开放时间与 Freestyle Session 交集生成可约时段，禁止课程跨越两个 Freestyle Session，同一冰场 back-to-back lessons 不强制休息。</span>
-            <span>固定跨冰场 transition / 切换时间使用 travel buffer，支持不同冰场组合与方向，并预留 Google Maps 推荐场馆切换时间。</span>
-            <span>预约写入使用 atomic transaction version；提交预约时重新校验可用性、课程时长、已占用时段、Freestyle 边界和切换规则。</span>
-            <div class="student-account-grid">
-              <label>
-                Freestyle Session 导入
-                <textarea id="freestyleSessionImport" rows="3">Polar Ice Rink, Mon-Fri, 06:00-16:00
-Arcadia Ice Arena, Mon-Fri, 09:00-17:00</textarea>
-              </label>
-              <label>
-                Session 边界规则
-                <select id="sessionBoundaryRule">
-                  <option value="strict">禁止课程跨场次</option>
-                  <option value="same-rink-back-to-back">同冰场连续课程允许无休息衔接</option>
-                </select>
-              </label>
-            </div>
-          </section>
-        </section>
-
+<section id="adminProduct" hidden aria-label="账号服务管理"><div class="admin-actions"><button type="button" id="adminRefresh">刷新资料</button><span id="adminRevision"></span></div><p id="adminNotice" role="status" aria-live="polite" tabindex="-1"></p><div id="adminIdentityRecovery" hidden><a href="login/index.html">重新登录管理员账号</a> <button type="button" id="adminReload">重新载入</button></div><nav class="admin-section-nav" aria-label="管理区域"><a href="#usersHeading">用户</a><a href="#permissionHeading">冰场授权</a><a href="#profileHeading">教练资料</a><a href="#rinkHeading">冰场</a><a href="#sessionsHeading">场次</a><a href="#recordsHeading">预约记录</a><a href="#legacyHeading">导入旧资料</a></nav>
+<section class="admin-product-panel"><h3 id="usersHeading">用户与教练审批</h3><label>搜索姓名、邮箱或状态<input id="adminUserFilter" type="search" /></label><div id="adminUserList" class="admin-table-region"></div>
+<form data-admin-form="user" aria-labelledby="userHeading"><h3 id="userHeading">用户资料</h3><p class="admin-help">账户审批与冰场授权分别管理。暂停账户不会取消既有预约。</p><div class="admin-form-grid">
+<label>选择用户<select name="userId" required></select></label>
+<label>姓名<input name="name" type="text" required maxlength="100" /></label>
+<label>角色<select name="role"><option value="student">学生</option><option value="coach">教练</option><option value="admin">管理员</option></select></label>
+<label>账户状态<select name="status"><option value="active">启用／批准</option><option value="pending">待审核</option><option value="suspended">暂停</option></select></label>
+</div><div class="admin-actions"><button type="submit" class="primary-button">保存用户</button><button type="button" data-retry hidden>确认上次操作</button><button type="button" data-rebase hidden>核对并合并最新资料</button><button type="button" data-discard>放弃本表单修改</button></div><p data-feedback role="status" aria-live="polite" tabindex="-1"></p><details class="admin-diagnostics"><summary>查看详细回执</summary><pre data-result hidden></pre></details></form>
+</section><section class="admin-product-panel">
+<form data-admin-form="permission" aria-labelledby="permissionHeading"><h3 id="permissionHeading">教练冰场授权</h3><p class="admin-help">仅影响该教练在此冰场的新安排，既有预约保持不变。</p><div class="admin-form-grid">
+<label>教练<select name="coachId" required></select></label>
+<label>冰场<select name="rinkId" required></select></label>
+<label>此冰场权限<select name="status"><option value="approved">批准</option><option value="suspended">暂停</option><option value="removed">移除</option></select></label>
+</div><div class="admin-actions"><button type="submit" class="primary-button">保存此场授权</button><button type="button" data-retry hidden>确认上次操作</button><button type="button" data-rebase hidden>核对并合并最新资料</button><button type="button" data-discard>放弃本表单修改</button></div><p data-feedback role="status" aria-live="polite" tabindex="-1"></p><details class="admin-diagnostics"><summary>查看详细回执</summary><pre data-result hidden></pre></details></form>
+<div id="adminPermissionList" class="admin-table-region"></div></section><section class="admin-product-panel">
+<form data-admin-form="profile" aria-labelledby="profileHeading"><h3 id="profileHeading">教练资料与课程</h3><p class="admin-help">保存期间可以继续输入，新的修改会保留。</p><div class="admin-form-grid">
+<label>选择教练<select name="coachId" required></select></label>
+<label>公开姓名<input name="name" type="text" required maxlength="100" /></label>
+<label>简介标题<input name="subject" type="text"  /></label>
+<label>城市<input name="city" type="text"  /></label>
+<label>个人简介<textarea name="bio" rows="3" ></textarea></label>
+<label>照片网址<input name="photoUrl" type="text" placeholder="https://… 或 /assets/…" /></label><p class="admin-help">当前使用照片网址，不提供文件上传。</p><input type="hidden" name="servedRinks" /><fieldset class="admin-wide"><legend>授课冰场</legend><div data-editor="servedRinks"></div></fieldset><label>常用冰场<select name="homeRink" ></select></label>
+<label><span data-rate-label>每 30 分钟基础价格</span><input name="rate" type="number" required min="1" step="1" /></label><input type="hidden" name="basePriceUnitMinutes" /><div class="admin-wide"><h4>课程</h4><p class="admin-help">调整课程价格不会改变已经预约的价格。</p><input type="hidden" name="lessonOptions" /><div data-editor="lessonOptions"></div><button type="button" data-add-lesson>添加课程</button></div><label>授课项目（每行一项）<textarea name="teachingDisciplines" rows="3" ></textarea></label>
+<label>专长（每行一项）<textarea name="specialties" rows="3" ></textarea></label>
+<label>自定义专长（每行一项）<textarea name="customSpecialties" rows="3" ></textarea></label>
+<label>要展示的自定义专长（每行一项）<textarea name="selectedCustomSpecialties" rows="3" ></textarea></label>
+<label>开始滑冰年份<input name="skatingStartYear" type="number" step="1" /></label>
+<label>开始执教年份<input name="coachingStartYear" type="number" step="1" /></label>
+<label>可赴其它冰场<input name="travelsToOtherRinks" type="checkbox"  /></label>
+<label>出行安排说明<textarea name="travelConditions" rows="3" ></textarea></label>
+<label>取消需提前多少分钟（可留空）<input name="cancellationLeadMinutes" type="number" min="0" step="any" /></label>
+</div><div class="admin-actions"><button type="submit" class="primary-button">保存教练资料</button><button type="button" data-retry hidden>确认上次操作</button><button type="button" data-rebase hidden>核对并合并最新资料</button><button type="button" data-discard>放弃本表单修改</button></div><p data-feedback role="status" aria-live="polite" tabindex="-1"></p><details class="admin-diagnostics"><summary>查看详细回执</summary><pre data-result hidden></pre></details></form>
+</section><section class="admin-product-panel">
+<form data-admin-form="rink" aria-labelledby="rinkHeading"><h3 id="rinkHeading">冰场资料</h3><p class="admin-help">停场或暂停冰场不会取消既有预约。</p><div class="admin-form-grid">
+<label>选择冰场<select name="id" ></select></label>
+<label>冰场名称<input name="name" type="text" required maxlength="200" /></label>
+<label>地址<textarea name="address" rows="3" ></textarea></label>
+<label>启用冰场<input name="active" type="checkbox"  /></label><input type="hidden" name="closures" /><div class="admin-wide"><h4>停场日期与时间</h4><div data-editor="closures"></div><button type="button" data-add-closure>添加停场安排</button></div></div><div class="admin-actions"><button type="submit" class="primary-button">保存冰场</button><button type="button" data-retry hidden>确认上次操作</button><button type="button" data-rebase hidden>核对并合并最新资料</button><button type="button" data-discard>放弃本表单修改</button></div><p data-feedback role="status" aria-live="polite" tabindex="-1"></p><details class="admin-diagnostics"><summary>查看详细回执</summary><pre data-result hidden></pre></details></form>
+<div id="adminRinkList" class="admin-table-region"></div></section><section class="admin-product-panel">
+<form data-admin-form="sessions" aria-labelledby="sessionsHeading"><h3 id="sessionsHeading">Freestyle 场次</h3><p class="admin-help">选择已有场次可修改；新建场次需明确日期，不设置自动重复。</p><div class="admin-form-grid">
+<label>选择场次<select name="sessionId" ></select></label>
+<label>冰场<select name="sessionRinkId" required></select></label>
+<label>日期<input name="sessionDate" type="date" required /></label>
+<label>开始<input name="sessionStart" type="time" required step="60" /></label>
+<label>结束<input name="sessionEnd" type="time" required step="60" /></label>
+<label>至当日结束（24:00）<input name="sessionDayEnd" type="checkbox"  /></label>
+<label>场次名称<input name="sessionName" type="text" required /></label>
+<label>价格（可留空）<input name="sessionPrice" type="number" min="0" step="0.01" /></label>
+<label>容量（可留空）<input name="sessionCapacity" type="number" min="0" step="1" /></label>
+<label>启用场次<input name="sessionActive" type="checkbox"  /></label><input type="hidden" name="sessions" /></div><div class="admin-actions"><button type="submit" class="primary-button">保存场次</button><button type="button" data-retry hidden>确认上次操作</button><button type="button" data-rebase hidden>核对并合并最新资料</button><button type="button" data-discard>放弃本表单修改</button></div><p data-feedback role="status" aria-live="polite" tabindex="-1"></p><details class="admin-diagnostics"><summary>查看详细回执</summary><pre data-result hidden></pre></details></form>
+<div id="adminSessionList" class="admin-table-region"></div><details><summary>高级：批量导入明确日期场次</summary>
+<form data-admin-form="sessionBatch" aria-labelledby="sessionBatchHeading"><h3 id="sessionBatchHeading">批量场次</h3><p class="admin-help">只更新所列场次，其它场次保留。格式示例见下方。</p><div class="admin-form-grid">
+<label>场次 JSON 数组<textarea name="sessionsBatch" rows="3" ></textarea></label>
+</div><div class="admin-actions"><button type="submit" class="primary-button">提交批量场次</button><button type="button" data-retry hidden>确认上次操作</button><button type="button" data-rebase hidden>核对并合并最新资料</button><button type="button" data-discard>放弃本表单修改</button></div><p data-feedback role="status" aria-live="polite" tabindex="-1"></p><details class="admin-diagnostics"><summary>查看详细回执</summary><pre data-result hidden></pre></details></form>
+<button type="button" id="adminSessionPreview">预览批量内容</button><pre id="adminSessionPreviewResult" aria-live="polite"></pre><p class="admin-help">[{"rinkId":"冰场标识","date":"2035-01-08","start":"09:00","end":"12:00","name":"Freestyle","price":0,"capacity":20,"active":true}]</p></details></section>
+<section class="admin-product-panel"><h3 id="recordsHeading">预约记录与不可预约安排</h3><p>可查看取消记录。此页面不取消或改动课程；冰场、授权和课程资料的变更不会取消既有预约。</p><label>搜索教练、日期、学生或状态<input id="adminRecordFilter" type="search" /></label><div id="adminRecordList" class="admin-table-region"></div></section><section class="admin-product-panel">
+<form data-admin-form="legacy" aria-labelledby="legacyHeading"><h3 id="legacyHeading">导入旧资料</h3><p class="admin-help">先回到原来使用的网址，在管理员页导出本地资料，再选择文件。检查会发送所选资料进行核对，确认前不追加课程或预约。</p><div class="admin-form-grid"><div class="admin-wide"><label>选择旧资料文件<input type="file" id="adminLegacyFile" accept="application/json,.json" /></label><p id="adminLegacyFileStatus" role="status" aria-live="polite"></p><details><summary>或粘贴已有导出内容</summary><label>已有导出内容<textarea name="source" rows="3" ></textarea></label></details><div id="adminLegacySummary" role="status"></div><fieldset><legend>旧教练对应哪位教练</legend><div data-editor="coachMapping"></div></fieldset><fieldset><legend>历史预约与请求对应哪位学生（可不关联）</legend><p class="admin-help">不关联时保留原联系人，不会按邮箱自动认领。</p><div data-editor="studentMapping"></div></fieldset></div><input type="hidden" name="coachMapping" /><input type="hidden" name="studentMapping" /></div><div class="admin-actions"><button type="submit" class="primary-button">检查导入</button><button type="button" data-retry hidden>确认上次操作</button><button type="button" data-rebase hidden>核对并合并最新资料</button><button type="button" data-discard>放弃本表单修改</button></div><p data-feedback role="status" aria-live="polite" tabindex="-1"></p><details class="admin-diagnostics"><summary>查看详细回执</summary><pre data-result hidden></pre></details></form>
+<label class="admin-confirm"><input type="checkbox" id="adminImportConfirm" /> 我已核对检查结果，确认追加这些资料</label><button type="button" id="adminApplyImport" disabled>确认追加</button></section></section>
+<section id="adminLocalNotice" class="admin-rule-card"><strong>本地示例</strong><p>当前资料仅保存在这个网址的浏览器中。可导出备份，再主动导入账号服务。</p><button type="button" id="adminExportLocal">导出已保存本地资料</button><p id="adminExportStatus" role="status" aria-live="polite"></p><p class="admin-help">备份含联系方式和照片，请妥善保管，不要公开分享。</p></section><p id="adminResetReceipt" role="status" aria-live="polite"></p><section class="admin-rule-card"><strong>场次与行程安排</strong><span>课程不能跨越 Freestyle Session；同一冰场的连续课程不强制额外休息。跨冰场切换时间与准备时间按教练已保存的行程安排校验。</span></section></section></section></main>
+    <dialog id="adminResetDialog" aria-labelledby="adminResetHeading" aria-describedby="adminResetWarning">
+      <h2 id="adminResetHeading">恢复本地示例？</h2>
+      <p id="adminResetWarning">将覆盖此浏览器已保存的资料，包括预约和排期。请先下载并确认备份。是否继续恢复示例？</p>
+      <div class="admin-actions"><button type="button" id="adminResetCancel">取消，保留资料</button><button type="button" id="adminResetConfirm">已确认备份，恢复示例</button></div>
+    </dialog>
     <script type="module" src="../js/admin-entry.js?v=architecture-3"></script>
   </body>
 </html>

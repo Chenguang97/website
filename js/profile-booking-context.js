@@ -27,10 +27,8 @@ function applyPublicProfileBookingContext(studentPage = null) {
   }
   if (!studentPage) return;
   studentPage.activateStudentPanel("studentBookPanel", false);
-  for (const input of document.querySelectorAll('input[name="studentCoachFilter"]')) input.checked = input.value === coachId;
-  studentPage.updateStudentFilterSummaries();
-  studentPage.renderStudentFilterChips();
-  studentPage.renderStudentSlots();
+  studentPage.selectCoach(coachId);
+  studentPage.refreshCalendar();
   updateLinks();
 }
 export {

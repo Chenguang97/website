@@ -6,21 +6,24 @@ export function storageGetItem(key) {
     return Object.prototype.hasOwnProperty.call(memoryStorage, key) ? memoryStorage[key] : null;
   }
 }
-export function storageSetItem(key, value) {
+// Persistence result distinguishes durable writes from session-only fallback.
+export function writeStorageItem(key, value) {
   try {
     localStorage.setItem(key, value);
-    return true;
+    return { key, persisted: true, memoryFallback: false, reason: null };
   } catch (error) {
     memoryStorage[key] = value;
     console.warn("localStorage unavailable; using in-memory storage for this session.", error);
-    return false;
+    return { key, persisted: false, memoryFallback: true, reason: isQuotaError(error) ? "quota" : "unavailable", error };
   }
 }
-export function storageRemoveItem(key) {
+export function removeStorageItem(key) {
   try {
     localStorage.removeItem(key);
-  } catch {
+    return { key, persisted: true, memoryFallback: false, reason: null };
+  } catch (error) {
     delete memoryStorage[key];
+    return { key, persisted: false, memoryFallback: true, reason: isQuotaError(error) ? "quota" : "unavailable", error };
   }
 }
 export function storageKeys() {
@@ -34,4 +37,11 @@ export function isQuotaError(error) {
   return error && (error.name === "QuotaExceededError" || error.name === "NS_ERROR_DOM_QUOTA_REACHED" || error.code === 22 || error.code === 1014);
 }
 
-
+// Durable read only: a backup must distinguish a missing key from inaccessible storage.
+export function readStorageItemResult(key) {
+  try {
+    return { ok: true, value: localStorage.getItem(key) };
+  } catch {
+    return { ok: false, reason: "unavailable" };
+  }
+}

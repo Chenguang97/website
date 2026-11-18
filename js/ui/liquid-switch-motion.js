@@ -1,4 +1,7 @@
+import { createControlScope } from "./control-lifecycle.js";
 import { LIQUID_DURATION, clamp, smooth, mix, liquidOutline, createLiquidSpring, liquidBody, createLiquidSurface } from "./liquid-motion.js";
+
+const owners = new WeakMap();
 
 // Creates one self-contained liquid decoration. Business selection remains owned
 // by the feature navigation that calls animate().
@@ -17,21 +20,31 @@ export function createLiquidSwitchMotion(buttonList, {
     ? restingCenters
     : buttons.map((_, index) => 90 + index * 180);
   const root = buttons[0].parentElement;
-  if (root.querySelector(`.${className}`)) return null;
+  const existing = owners.get(root);
+  if (existing) return existing;
+  const scope = createControlScope();
+  const view = root.ownerDocument.defaultView;
+  // In-page controls use the current realm; foreign-document roots use theirs.
+  const runtime = root.ownerDocument === globalThis.document ? globalThis : view;
+  const requestFrame = runtime.requestAnimationFrame.bind(runtime);
+  const cancelFrame = runtime.cancelAnimationFrame.bind(runtime);
+  const addedClass = !root.classList.contains("has-liquid-switch");
+  let destroyed = false;
+  let generation = 0;
   const { svg, path, beads } = createLiquidSurface({ id, className });
   root.prepend(svg);
   root.classList.add("has-liquid-switch");
   const selected = Math.max(0, buttons.findIndex((button) => button.getAttribute(selectedAttribute) === "true"));
   const motion = {
-    buttons, root, svg, path, beads, frame: 0, target: selected, velocity: 0,
-    media: window.matchMedia?.("(prefers-reduced-motion: reduce)"),
+    buttons, root, svg, path, beads, frame: null, target: selected, velocity: 0,
+    media: view?.matchMedia?.("(prefers-reduced-motion: reduce)"),
     layout: buttons.map((_, index) => ({ center: fallbackCenters[index], width: restingWidth, height: restingHeight })),
     shape: { center: fallbackCenters[selected], width: restingWidth, height: restingHeight, tail: 0 },
     droplets: beads.map(() => ({ x: 0, y: 44, rx: 0, ry: 0 })),
   };
 
   function measure() {
-    if (!dynamicLayout) return false;
+    if (destroyed || !dynamicLayout) return false;
     const bounds = root.getBoundingClientRect();
     if (!bounds.width || !bounds.height) return false;
     const scale = 88 / bounds.height;
@@ -50,6 +63,7 @@ export function createLiquidSwitchMotion(buttonList, {
   }
 
   function draw() {
+    if (destroyed) return;
     path.setAttribute("d", liquidOutline(motion.shape));
     beads.forEach((bead, index) => {
       const drop = motion.droplets[index];
@@ -57,9 +71,18 @@ export function createLiquidSwitchMotion(buttonList, {
     });
   }
 
+  function stopFrame() {
+    generation += 1;
+    // Zero is a valid scheduler ID; only null means there is no owned frame.
+    if (motion.frame !== null) {
+      cancelFrame(motion.frame);
+    }
+    motion.frame = null;
+  }
+
   function settle() {
-    cancelAnimationFrame(motion.frame);
-    motion.frame = 0;
+    if (destroyed) return;
+    stopFrame();
     motion.velocity = 0;
     motion.shape = { ...motion.layout[motion.target], tail: 0 };
     motion.droplets.forEach((drop) => { drop.rx = drop.ry = 0; });
@@ -67,14 +90,16 @@ export function createLiquidSwitchMotion(buttonList, {
   }
 
   function refresh() {
-    if (measure() || !motion.frame) settle();
+    if (destroyed) return;
+    if (measure() || motion.frame === null) settle();
   }
 
   function animate(button) {
+    if (destroyed) return;
     const next = buttons.indexOf(button);
     if (next < 0 || next === motion.target || button.disabled || button.getAttribute("aria-disabled") === "true") return;
     if (measure()) settle();
-    cancelAnimationFrame(motion.frame);
+    stopFrame();
     motion.target = next;
     if (motion.media?.matches) { settle(); return; }
     const initial = { ...motion.shape };
@@ -83,7 +108,8 @@ export function createLiquidSwitchMotion(buttonList, {
     const distance = target.center - initial.center;
     const direction = Math.sign(distance) || (next ? 1 : -1);
     const amplitude = Math.min(1, Math.abs(distance) / Math.max(1, Math.abs(motion.layout[1].center - motion.layout[0].center)));
-    const start = performance.now();
+    const start = runtime.performance.now();
+    const flight = generation;
     const spring = createLiquidSpring(initial.center, target.center, motion.velocity);
     function poseAt(time) {
       const { center, velocity } = spring(time);
@@ -96,6 +122,7 @@ export function createLiquidSwitchMotion(buttonList, {
       };
     }
     function tick(now) {
+      if (destroyed || flight !== generation) return;
       const elapsed = (now - start) / 1000;
       if (elapsed >= LIQUID_DURATION) { settle(); return; }
       const pose = poseAt(elapsed);
@@ -129,17 +156,42 @@ export function createLiquidSwitchMotion(buttonList, {
         };
       });
       draw();
-      motion.frame = requestAnimationFrame(tick);
+      if (!destroyed && flight === generation) {
+        motion.frame = requestFrame(tick);
+      }
     }
-    motion.frame = requestAnimationFrame(tick);
+    motion.frame = requestFrame(tick);
   }
 
+  const controller = {
+    animate,
+    refresh,
+    destroy() {
+      if (destroyed) return;
+      destroyed = true;
+      scope.destroy();
+      svg.remove();
+      if (owners.get(root) === controller) {
+        if (addedClass) {
+          root.classList.remove("has-liquid-switch");
+        }
+        owners.delete(root);
+      }
+    },
+  };
+  scope.add(stopFrame);
+  owners.set(root, controller);
   measure();
   settle();
-  motion.media?.addEventListener("change", () => { if (motion.media.matches) settle(); });
-  if (dynamicLayout && typeof ResizeObserver === "function") {
-    const observer = new ResizeObserver(refresh);
-    observer.observe(root);
+  if (motion.media) {
+    scope.listen(motion.media, "change", () => {
+      if (!destroyed && motion.media.matches) settle();
+    });
   }
-  return { animate, refresh };
+  if (dynamicLayout && typeof runtime.ResizeObserver === "function") {
+    const observer = new runtime.ResizeObserver(refresh);
+    observer.observe(root);
+    scope.add(() => observer.disconnect());
+  }
+  return controller;
 }

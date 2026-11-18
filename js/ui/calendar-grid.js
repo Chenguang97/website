@@ -2,7 +2,7 @@ import { calendarStep, dayLabels } from "../core/config.js";
 import { addDaysIso, minutesFromTime, timeFromMinutes, todayIso } from "../core/utils-data.js";
 import { formatLocationShortLabel } from "./display.js";
 
-export function renderWeekCalendarGrid(calendar, weekStart, displayStart, displayEnd) {
+export function renderWeekCalendarGrid(calendar, weekStart, displayStart, displayEnd, cellStep = calendarStep) {
   const currentDate = todayIso();
   const displayStartMinutes = minutesFromTime(displayStart);
   const header = [
@@ -15,11 +15,11 @@ export function renderWeekCalendarGrid(calendar, weekStart, displayStart, displa
   ].join("");
 
   const rows = [];
-  for (let minutes = minutesFromTime(displayStart); minutes < minutesFromTime(displayEnd); minutes += calendarStep) {
+  for (let minutes = minutesFromTime(displayStart); minutes < minutesFromTime(displayEnd); minutes += cellStep) {
     const gridRow = 2 + minutes - displayStartMinutes;
-    rows.push(`<div class="calendar-time" style="grid-column:1;grid-row:${gridRow} / span ${calendarStep}">${timeFromMinutes(minutes)}</div>`);
+    if ((minutes - displayStartMinutes) % calendarStep === 0) rows.push(`<div class="calendar-time" style="grid-column:1;grid-row:${gridRow} / span ${calendarStep}">${timeFromMinutes(minutes)}</div>`);
     for (let dayIndex = 0; dayIndex < 7; dayIndex += 1) {
-      rows.push(`<button class="calendar-cell" type="button" style="grid-column:${dayIndex + 2};grid-row:${gridRow} / span ${calendarStep}" data-day-index="${dayIndex}" data-minutes="${minutes}" aria-label="${dayLabels[dayIndex]} ${timeFromMinutes(minutes)}"></button>`);
+      rows.push(`<button class="calendar-cell" type="button" style="grid-column:${dayIndex + 2};grid-row:${gridRow} / span ${cellStep}" data-day-index="${dayIndex}" data-minutes="${minutes}" data-duration="${cellStep}" aria-label="${dayLabels[dayIndex]} ${timeFromMinutes(minutes)}"></button>`);
     }
   }
   calendar.innerHTML = header + rows.join("");
@@ -33,7 +33,7 @@ export function setCalendarCellLocation(cell, location) {
 function createLocationWatermark(calendar, dayIndex, cells, location) {
   const firstCell = cells[0];
   const startMinutes = Number(firstCell.dataset.minutes);
-  const endMinutes = Number(cells.at(-1).dataset.minutes) + calendarStep;
+  const endMinutes = Number(cells.at(-1).dataset.minutes) + Number(cells.at(-1).dataset.duration || calendarStep);
   const duration = endMinutes - startMinutes;
   const gridRowStart = firstCell.style.gridRowStart || firstCell.style.gridRow.split("/")[0].trim();
   const watermark = document.createElement("div");
@@ -86,7 +86,7 @@ export function renderCalendarLocationWatermarks(calendar) {
       const previous = segment.at(-1);
       const isContinuous = previous
         && location === segmentLocation
-        && minutes === Number(previous.dataset.minutes) + calendarStep;
+        && minutes === Number(previous.dataset.minutes) + Number(previous.dataset.duration || calendarStep);
       if (!isFree) {
         flushSegment();
         return;

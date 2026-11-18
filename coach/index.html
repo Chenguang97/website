@@ -17,22 +17,25 @@
       })();
     </script>
     <link rel="stylesheet" href="../css/base.css?v=warm-ui-1" />
-    <link rel="stylesheet" href="../css/coach-profile.css?v=coach-availability-paint-20" />
-    <link rel="stylesheet" href="../css/calendar.css?v=warm-ui-1" />
+    <link rel="stylesheet" href="../css/coach-profile.css?v=lunch-modes-42" />
+    <link rel="stylesheet" href="../css/calendar.css?v=lunch-modes-42" />
     <link rel="stylesheet" href="../css/forms-dialogs.css?v=warm-ui-1" />
     <link rel="stylesheet" href="../css/student-bookings.css?v=warm-ui-1" />
     <link rel="stylesheet" href="../css/responsive.css?v=warm-ui-1" />
-    <link rel="stylesheet" href="../css/design-system.css?v=coach-availability-paint-20" />
+    <link rel="stylesheet" href="../css/design-system.css?v=coach-auto-schedule-revert-23" />
+    <link rel="stylesheet" href="../css/coach-workspace.css?v=structure-1" />
+  <link rel="stylesheet" href="../css/coach-service.css" />
   </head>
   <body data-page="coach">
     <main class="app-shell coach-app-shell">
       <section class="workspace">
         <div class="coach-workspace-container">
-          <a class="role-home-link coach-global-home" href="../index.html"><svg class="coach-operation-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1" stroke="currentColor" stroke-width="1.8"/><rect x="14" y="3" width="7" height="7" rx="1" stroke="currentColor" stroke-width="1.8"/><rect x="3" y="14" width="7" height="7" rx="1" stroke="currentColor" stroke-width="1.8"/><rect x="14" y="14" width="7" height="7" rx="1" stroke="currentColor" stroke-width="1.8"/></svg><span>切换入口</span><svg class="coach-portal-arrow" viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false"><path d="M6 18 18 6M6 6h12v12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></a>
+          <a class="role-home-link coach-global-home" href="../index.html"><svg class="coach-operation-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1" stroke="currentColor" stroke-width="1.8"/><rect x="14" y="3" width="7" height="7" rx="1" stroke="currentColor" stroke-width="1.8"/><rect x="3" y="14" width="7" height="7" rx="1" stroke="currentColor" stroke-width="1.8"/><rect x="14" y="14" width="7" height="7" rx="1" stroke="currentColor" stroke-width="1.8"/></svg><span>切换入口</span></a>
           <section id="coachView" class="view active" aria-labelledby="coachHeading">
             <div class="section-header coach-action-bar">
-              <div class="coach-header-identity">
-                <h2 id="coachHeading">教练工作台</h2>
+              <div class="coach-header-identity coach-welcome-row">
+                <h2 id="coachHeading" lang="en">Welcome!</h2>
+                <img class="coach-welcome-mascot" src="../assets/snowball-welcome.png" alt="" width="48" height="48" />
               </div>
               <div class="header-actions">
                 <div class="coach-pending-menu">
@@ -51,6 +54,7 @@
                 <p id="coachSaveError" class="coach-save-error" role="alert" hidden></p>
             </section>
 
+          <section id="coachServiceControls" class="coach-service-controls" hidden aria-label="服务同步"><button id="coachServiceRefresh" type="button" class="ghost-button">刷新</button><button id="coachServiceRetry" type="button" class="ghost-button" hidden>重试上次操作</button><button id="coachRemoteUndo" type="button" class="ghost-button" hidden>撤销上次预约更改</button><a id="coachServiceReload" hidden>重新载入</a><p id="coachServiceMessage" role="status" aria-live="polite"></p></section>
           <div class="coach-tabs" role="tablist" aria-label="Coach settings">
             <button class="coach-tab active" type="button" data-coach-panel="profilePanel" aria-selected="true">基本资料</button>
             <button class="coach-tab" type="button" data-coach-panel="bookingsPanel" aria-selected="false">预约管理</button>
@@ -80,7 +84,7 @@
                         </button>
                       </div>
                       <div class="profile-identity-copy">
-                        <strong>Maya Chen</strong>
+                        <strong id="coachProfileName"></strong>
                         <div class="profile-identity-meta" aria-label="教练身份信息">
                           <span class="coach-role-badge">
                             <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 2a5 5 0 0 1 3.9 8.13A8 8 0 0 1 20 17v3H4v-3a8 8 0 0 1 4.1-6.87A5 5 0 0 1 12 2Zm0 2a3 3 0 1 0 0 6 3 3 0 0 0 0-6Zm0 8c-3.31 0-6 2.24-6 5v1h12v-1c0-2.76-2.69-5-6-5Z" /></svg>
@@ -221,168 +225,116 @@
                 <h3>开放时间</h3>
                 <div class="method-switch liquid-switch availability-method-switch booking-view-switch" role="tablist" aria-label="选择可预约时间设置方式">
                   <button class="method-button active" type="button" data-method="calendarPanel" aria-selected="true"><svg class="booking-view-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="3.5" y="5.5" width="17" height="15" rx="2.5" stroke="currentColor" stroke-width="1.8"/><path d="M8 3.5v4M16 3.5v4M3.5 9.5h17" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg><span>日历</span></button>
-                  <button class="method-button" type="button" data-method="dropdownPanel" aria-selected="false"><svg class="booking-view-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="5" cy="6.5" r="1.2" fill="currentColor"/><circle cx="5" cy="12" r="1.2" fill="currentColor"/><circle cx="5" cy="17.5" r="1.2" fill="currentColor"/><path d="M9 6.5h11M9 12h11M9 17.5h11" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg><span>表单</span></button>
+                  <button class="method-button" type="button" data-method="dropdownPanel" aria-selected="false"><svg class="booking-view-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="5" cy="6.5" r="1.2" fill="currentColor"/><circle cx="5" cy="12" r="1.2" fill="currentColor"/><circle cx="5" cy="17.5" r="1.2" fill="currentColor"/><path d="M9 6.5h11M9 12h11M9 17.5h11" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg><span>时段总览</span></button>
                 </div>
                 <p class="heading-note">设置每周重复的可预约时间</p>
               </div>
 
               <section id="regularAvailabilitySection" class="availability-section active" data-availability-content="regularAvailabilitySection">
               <p id="formMessage" class="form-message coach-availability-feedback" role="status" aria-live="polite"></p>
-              <div id="dropdownPanel" class="method-panel is-hidden" data-method-panel="dropdownPanel">
-                <form id="availabilityForm" class="form-panel">
-                  <div>
-                    <h4>添加开放时间</h4>
-                    <p class="coach-filter-note">按所选日期的星期设置每周重复的开放时段。</p>
-                  </div>
-
-                  <div class="two-column">
-                    <label>
-                      日期
-                      <input id="slotDate" type="date" required />
-                    </label>
-                    <label>
-                      地点 / 上课方式
-                      <select id="locationType">
-                        <option value="Polar Ice Rink">Polar Ice Rink</option>
-                        <option value="Arcadia Ice Arena">Arcadia Ice Arena</option>
-                        <option value="Oceanside Ice Arena">Oceanside Ice Arena</option>
-                        <option value="Zoom">Zoom</option>
-                      </select>
-                    </label>
-                  </div>
-
-                  <div class="two-column">
-                    <label>
-                      开始时间
-                      <select id="startTime" required></select>
-                    </label>
-                    <label>
-                      结束时间
-                      <select id="endTime" required></select>
-                    </label>
-                  </div>
-
-                  <label>
-                    备注
-                    <textarea id="coachNote" rows="3" placeholder="例如：成人基础训练、比赛前专项训练"></textarea>
-                  </label>
-
-                  <div class="dialog-actions">
-                  <button class="primary-button" type="submit">
-                    <span class="button-icon" aria-hidden="true">+</span>
-                    添加可预约时间
-                  </button>
-                  </div>
-                </form>
-
-                <section class="dropdown-open-panel" aria-label="所选日期开放时间">
-                  <div class="panel-heading compact-heading">
-                    <div>
-                      <h4>所选日期的开放时间</h4>
-                      <p id="selectedDateMeta" class="date-meta"></p>
-                    </div>
-                  </div>
-                  <div id="dropdownOpenSlots" class="dropdown-open-list" aria-live="polite"></div>
-                </section>
-
-                <section class="dropdown-open-panel" aria-label="每周可预约时间总览">
-                  <div class="panel-heading compact-heading">
-                    <div>
-                      <h4>本周开放总览</h4>
-                    </div>
-                  </div>
-                  <div id="dropdownWeekSlots" class="week-open-grid" aria-live="polite"></div>
-                </section>
-              </div>
-
-              <div id="calendarPanel" class="calendar-panel method-panel" data-method-panel="calendarPanel">
-                <div class="coach-availability-calendar-toolbar">
+              <div class="availability-shared-week">
                   <div class="coach-booking-date-filter">
                     <div class="coach-booking-date-controls">
                       <div class="coach-schedule-week-navigation" role="group" aria-label="切换开放时间周">
                         <button id="previousCalendarWeek" class="calendar-side-arrow" type="button" aria-label="上一周">‹</button>
-                        <div class="coach-schedule-date-picker coach-availability-week-picker">
-                          <span id="availabilityWeekRange" class="coach-schedule-week-range" aria-hidden="true"></span>
+                        <button id="availabilityWeekTrigger" class="coach-schedule-date-picker coach-availability-week-picker" type="button" aria-label="选择开放时间周" aria-haspopup="dialog" aria-expanded="false" aria-controls="availabilityWeekPopover">
+                          <span id="availabilityWeekRange" class="coach-schedule-week-range" aria-live="polite" aria-atomic="true"></span>
                           <svg class="control-chevron" viewBox="0 0 16 16" aria-hidden="true"><path d="m3 6 5 5 5-5"/></svg>
-                          <input id="calendarWeekStart" type="date" aria-label="选择开放时间周" />
-                        </div>
+                        </button>
+                        <input id="calendarWeekStart" type="hidden" />
+                        <div id="availabilityWeekPopover" class="coach-schedule-date-popover" role="dialog" aria-label="选择开放时间周" hidden></div>
                         <button id="nextCalendarWeek" class="calendar-side-arrow" type="button" aria-label="下一周">›</button>
                       </div>
                       <button id="todayCalendarWeek" class="calendar-today-button" type="button">本周</button>
                     </div>
                   </div>
-                  <button id="toggleCalendarHours" class="ghost-button" type="button">显示全天</button>
+                <div class="coach-editing-range">
+                  <button id="coachEditingRangeTrigger" class="ghost-button" aria-describedby="coachEditingRangeError" type="button" aria-haspopup="dialog" aria-expanded="false" aria-controls="coachBaseAvailabilitySettings"><span>编辑范围</span><span id="coachEditingRangeSummary" aria-live="polite"></span></button>
+                  <p id="coachEditingRangeError" class="dialog-field-message" role="status" hidden></p>
+                  <section id="coachBaseAvailabilitySettings" class="coach-editing-range-popover" role="dialog" aria-modal="false" aria-label="编辑范围" hidden>
+                    <button id="closeCoachEditingRange" class="ghost-button" type="button">关闭</button>
+                  <div class="planner-scope-controls">
+                    <label>日历编辑方式<select id="coachPlannerScope"><option value="weekly" selected>每周安排</option><option value="dates">仅指定日期（拖选只改当天）</option></select></label>
+                    <div class="planner-date-field">
+                      <label for="coachPlannerFrom">开始日期</label>
+                      <div class="planner-date-control coach-schedule-date-picker">
+                        <input id="coachPlannerFrom" type="text" inputmode="numeric" placeholder="YYYY-MM-DD" aria-describedby="coachPlannerFromError" autocomplete="off"/>
+                        <button id="coachPlannerFromTrigger" class="planner-date-toggle" type="button" aria-label="选择开始日期" aria-haspopup="dialog" aria-expanded="false" aria-controls="coachPlannerFromPopover"><svg class="control-chevron" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="m3 6 5 5 5-5" /></svg></button>
+                      </div>
+                      <div id="coachPlannerFromPopover" class="coach-schedule-date-popover" role="dialog" aria-label="选择开始日期" hidden></div>
+                      <span id="coachPlannerFromError" class="dialog-field-message" hidden></span>
+                    </div>
+                    <div class="planner-date-field">
+                      <label for="coachPlannerTo">结束日期</label>
+                      <div class="planner-date-control coach-schedule-date-picker">
+                        <input id="coachPlannerTo" type="text" inputmode="numeric" placeholder="YYYY-MM-DD" aria-describedby="coachPlannerToError" autocomplete="off"/>
+                        <button id="coachPlannerToTrigger" class="planner-date-toggle" type="button" aria-label="选择结束日期" aria-haspopup="dialog" aria-expanded="false" aria-controls="coachPlannerToPopover"><svg class="control-chevron" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="m3 6 5 5 5-5" /></svg></button>
+                      </div>
+                      <div id="coachPlannerToPopover" class="coach-schedule-date-popover" role="dialog" aria-label="选择结束日期" hidden></div>
+                      <span id="coachPlannerToError" class="dialog-field-message" hidden></span>
+                    </div>
+                  </div>
+                  <p id="coachPlannerRangeHint" class="coach-filter-note" role="status" aria-live="polite" hidden></p>
+                  <p id="coachPlannerScopeNote" class="coach-filter-note">在所选日期范围内，按每周安排重复。</p>
+                  </section>
+                </div>
+              </div>
+              <div id="dropdownPanel" class="method-panel is-hidden" data-method-panel="dropdownPanel">
+                <section class="dropdown-open-panel" aria-label="现有开放安排">
+                  <div class="panel-heading compact-heading"><div><h4>本周开放总览</h4><p id="selectedDateMeta" class="date-meta"></p></div></div>
+                  <div id="dropdownOpenSlots" class="availability-timetable" aria-live="polite"></div>
+                </section>
+              </div>
+
+              <div id="calendarPanel" class="calendar-panel method-panel" data-method-panel="calendarPanel">
+                <div class="coach-availability-calendar-toolbar">
+                  <div class="coach-availability-toolbar-actions"><button id="openCoachScheduler" class="ghost-button" type="button">自动排程</button><button id="toggleCalendarHours" class="ghost-button" type="button">显示全天</button></div>
                 </div>
 
-                <div class="rink-picker" aria-label="新增开放时段的授课地点">
+                <div class="rink-picker" role="group" aria-label="设置开放状态">
                   <div class="coach-availability-location-heading">
-                    <span class="rink-picker-label">新增开放时段的授课地点</span>
-                    <span class="coach-filter-note">先选择授课地点，再在日历上拖选开放时段。</span>
+                    <span class="rink-picker-label">设置开放状态</span>
                   </div>
                   <div class="coach-availability-paint-tools">
                     <div id="calendarRinkOptions" class="rink-option-grid" role="group" aria-label="新增开放时段的授课地点"></div>
-                    <button id="calendarUnavailableTool" class="ghost-button coach-availability-unavailable" type="button" data-rink="Unavailable" aria-pressed="false"><svg class="coach-operation-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="8.5" stroke="currentColor" stroke-width="1.8"/><path d="M8 12h8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg><span>设为不可预约</span></button>
+                    <button id="calendarUnavailableTool" class="ghost-button coach-availability-paint-option coach-availability-unavailable" type="button" data-rink="Unavailable" aria-pressed="false"><svg class="coach-operation-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="8.5" stroke="currentColor" stroke-width="1.8"/><path d="M8 12h8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg><span>不可预约</span></button>
                   </div>
-                  <p id="calendarPaintHint" class="coach-filter-note" role="status" aria-live="polite"></p>
+                  <div class="coach-calendar-feedback-row">
+                    <p id="calendarPaintHint" class="coach-filter-note" role="status" aria-live="polite"></p>
+                    <p id="coachOpenOperationMessage" class="coach-filter-note" role="status" aria-live="polite" hidden></p>
+                  </div>
                   <select id="calendarLocationType" class="hidden-control" aria-hidden="true" tabindex="-1">
-                    <option value="Any served rink">不限冰场</option>
+                    <option value="">选择时间范围</option>
                   </select>
                 </div>
 
-                <div class="coach-availability-calendar-notes">
-                  <p class="coach-filter-note">已有预约同步显示，方便参考；调整开放时间不会更改已有预约。</p>
-                  <details class="coach-availability-help">
-                    <summary>操作说明</summary>
-                    <ul>
-                      <li>选择授课地点后拖选，可设置或覆盖每周重复的开放时段；仅选择地点不会修改或筛选日历。</li>
-                      <li>「设为不可预约」是独立的时间设置，拖选后移除对应开放时段，已有预约保持不变。</li>
-                      <li>拖选回缩时恢复本次拖动前的安排；按 Esc 可取消本次拖选。</li>
-                      <li>深色描边表示未保存的修改；保存前可用 Ctrl / ⌘ + Z 撤销上一步。</li>
-                      <li>商议中的特殊请求不会占用或锁定时段。</li>
-                    </ul>
-                  </details>
+                <div id="coachOpenActions" class="coach-open-actions" role="group" aria-label="日历开放时段操作">
+                  <button type="button" class="ghost-button" data-open-action="add">添加开放时段</button>
+                  <button type="button" class="ghost-button" data-open-action="select" aria-pressed="true">选择时段</button>
+                  <button type="button" class="ghost-button" data-open-action="edit" disabled>编辑</button>
+                  <button type="button" class="ghost-button" data-open-action="copy" disabled>复制</button>
+                  <button type="button" class="ghost-button" data-open-action="paste" disabled>粘贴</button>
+                  <button type="button" class="ghost-button" data-open-action="delete" disabled>删除</button>
+                  <p id="coachOpenSelectionStatus" class="coach-filter-note" role="status" aria-live="polite">单击时段或日期表头选择操作目标。</p>
                 </div>
-                <div id="dragCalendar" class="drag-calendar coach-week-calendar" aria-label="拖选可预约时间日历"></div>
+                <p class="coach-filter-note">细轮廓表示选区或未保存修改；调整开放时间不会更改已有预约。</p>
+                <div id="coachOpenContextMenu" class="coach-open-context-menu" role="menu" aria-label="开放时段操作" hidden></div>
+                <div id="coachSchedulerSuggestionRow" class="planner-suggestion-row" hidden><p id="coachSchedulerSuggestions" class="coach-filter-note" role="status"></p><button id="reviewCoachScheduleSuggestions" class="ghost-button" type="button">查看优化建议</button></div>
+                <div id="dragCalendar" class="drag-calendar coach-week-calendar" aria-label="可预约时间日历"></div>
 
-                <section class="coach-availability-rules" aria-labelledby="coachAvailabilityRulesTitle">
-                  <div>
-                    <h4 id="coachAvailabilityRulesTitle">预约规则设置</h4>
-                    <p class="coach-filter-note">确认方式、预约提前时间及跨冰场切换时间。</p>
-                  </div>
-                  <div class="two-column">
-                    <label>
-                      预约确认模式
-                      <select id="coachConfirmationMode">
-                        <option value="instant">自动确认</option>
-                        <option value="manual">需要教练手动确认</option>
-                      </select>
-                    </label>
-                    <label>
-                      最短预约提前时间
-                      <select id="minimumLeadTime">
-                        <option value="120">提前 2 小时</option>
-                        <option value="240">提前 4 小时</option>
-                        <option value="1440">提前 24 小时</option>
-                      </select>
-                    </label>
-                  </div>
-                  <div class="two-column">
-                    <label>
-                      固定跨冰场切换时间（分钟）
-                      <input id="defaultTravelBuffer" type="number" min="0" step="5" value="30" />
-                    </label>
-                    <label>
-                      Google Maps 推荐切换时间
-                      <input id="googleMapsTravelRecommendation" type="text" value="Polar → Arcadia：28 分钟" />
-                    </label>
-                  </div>
-                  <label>
-                    按冰场组合与方向设置时间（分钟）
-                    <textarea id="directionalTravelBuffers" rows="3">Polar Ice Rink → Arcadia Ice Arena: 30
-Arcadia Ice Arena → Oceanside Ice Arena: 45
-Oceanside Ice Arena → Polar Ice Rink: 40</textarea>
-                  </label>
-                </section>
+                <details id="coachSchedulerPanel" class="coach-availability-rules coach-availability-settings coach-scheduler-panel">
+                  <summary id="coachAvailabilityRulesTitle">自动排程设置</summary>
+                  <p class="coach-filter-note">每周开放时间是基础安排。优化仅修改选中的具体日期，保留已有预约；先预览和调整，再应用并保存。</p>
+                  <fieldset class="planner-lunch-modes planner-optimization-scope"><legend>本次优化范围</legend><div class="planner-lunch-options">
+                    <label><input type="radio" name="optimizationScope" data-optimize-scope="today" checked/><span>今天</span></label>
+                    <label><input type="radio" name="optimizationScope" data-optimize-scope="tomorrow"/><span>明天</span></label>
+                    <label><input type="radio" name="optimizationScope" data-optimize-scope="week"/><span>本周</span></label>
+                  </div><p id="coachOptimizationDates" class="coach-filter-note" aria-live="polite"></p><p class="coach-filter-note">仅优化尚未开始的安排，不改变每周基础规则。</p></fieldset>
+                  <div id="coachSchedulerConfig"></div>
+                  <div id="coachSchedulePreview" class="planner-section" hidden></div>
+                  <p id="coachSchedulerMessage" class="form-message" role="status" aria-live="polite"></p>
+                  <div class="planner-generate-actions"><button id="generateCoachSchedule" class="primary-button" type="button">生成开放草稿</button></div>
+                </details>
               </div>
               <div class="availability-actions" hidden>
                 <button id="saveAvailability" class="primary-button" type="button">保存</button>
@@ -461,16 +413,7 @@ Oceanside Ice Arena → Polar Ice Rink: 40</textarea>
                       </button>
                       <input id="exceptionCalendarWeekStart" type="hidden" />
                       <div id="coachScheduleDatePopover" class="coach-schedule-date-popover" role="dialog" aria-label="选择日期" hidden>
-                        <div class="coach-date-picker-heading">
-                          <button type="button" data-date-action="previous-month" aria-label="上个月">‹</button>
-                          <div class="coach-date-picker-selects">
-                            <select id="coachScheduleMonth" aria-label="月份"></select>
-                            <select id="coachScheduleYear" aria-label="年份"></select>
-                          </div>
-                          <button type="button" data-date-action="next-month" aria-label="下个月">›</button>
-                        </div>
-                        <div class="coach-date-picker-weekdays" aria-hidden="true"><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span><span>日</span></div>
-                        <div id="coachScheduleDateGrid" class="coach-date-picker-grid" role="grid" aria-label="日期"></div>
+
                       </div>
                       <button id="nextScheduleWeek" class="calendar-side-arrow" type="button" aria-label="下一周">›</button>
                     </div>
@@ -596,6 +539,30 @@ Oceanside Ice Arena → Polar Ice Rink: 40</textarea>
       </section>
     </main>
 
+    <template id="coachDatePickerTemplate">
+                        <div class="coach-date-picker-heading">
+                          <button type="button" data-date-action="previous-month" aria-label="上个月">‹</button>
+                          <div class="coach-date-picker-selects">
+                            <select data-date-month aria-label="月份"></select>
+                            <select data-date-year aria-label="年份"></select>
+                          </div>
+                          <button type="button" data-date-action="next-month" aria-label="下个月">›</button>
+                        </div>
+                        <div class="coach-date-picker-weekdays" aria-hidden="true"><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span><span>日</span></div>
+                        <div data-date-grid class="coach-date-picker-grid" role="grid" aria-label="日期"></div>
+    </template>
+
+    <dialog id="coachWorkTimeDialog" class="booking-dialog" aria-labelledby="coachWorkTimeTitle">
+      <form id="coachWorkTimeForm">
+        <h3 id="coachWorkTimeTitle">编辑开放时段</h3><p id="coachWorkTimeDate" class="coach-filter-note"></p>
+        <div class="two-column"><label>开始时间<input id="coachWorkTimeStart" type="time" step="60" required/></label><label>结束时间<input id="coachWorkTimeEnd" type="time" step="60" required/></label></div>
+        <label>授课地点<select id="coachWorkTimeLocation" required></select></label>
+        <details class="availability-note"><summary>备注（可选）</summary><label>备注<textarea id="coachWorkTimeMemo" rows="2"></textarea></label></details>
+        <p id="coachWorkTimeNote" class="coach-filter-note"></p>
+        <p id="coachWorkTimeMessage" class="form-message" role="status"></p>
+        <div class="planner-generate-actions"><button class="primary-button" type="submit">确认修改</button><button id="deleteCoachWorkTime" class="ghost-button" type="button" hidden>确认删除</button><button id="cancelCoachWorkTime" class="ghost-button" type="button">取消</button></div>
+      </form>
+    </dialog>
     <dialog id="coachPhotoDialog" class="booking-dialog coach-photo-dialog" aria-labelledby="coachPhotoDialogTitle">
       <form id="coachPhotoDialogForm" method="dialog">
         <div class="dialog-heading">
@@ -615,7 +582,7 @@ Oceanside Ice Arena → Polar Ice Rink: 40</textarea>
       </form>
     </dialog>
 
-    <dialog id="bookingDetailsDialog" class="booking-dialog">
+    <dialog id="bookingDetailsDialog" class="booking-dialog" aria-labelledby="bookingDetailsTitle">
       <form method="dialog">
         <div class="dialog-heading">
           <div>
@@ -668,22 +635,8 @@ Oceanside Ice Arena → Polar Ice Rink: 40</textarea>
       </form>
     </dialog>
 
-    <dialog id="conflictDialog" class="booking-dialog" data-conflict-dialog aria-labelledby="conflictDialogTitle">
-      <form method="dialog">
-        <div class="dialog-heading">
-          <div>
-            <p class="eyebrow">开放时间冲突</p>
-            <h3 id="conflictDialogTitle">确认覆盖重叠时段</h3>
-          </div>
-        </div>
-        <p id="conflictDetails" class="dialog-note">新时段与其他冰场已有开放时间重叠。</p>
-        <div class="dialog-actions">
-          <button class="ghost-button" type="button" id="cancelConflictOverride" autofocus>取消</button>
-          <button class="primary-button" type="button" id="confirmConflictOverride">覆盖并添加</button>
-        </div>
-      </form>
-    </dialog>
 
-    <script type="module" src="../js/coach-entry.js?v=coach-availability-paint-20"></script>
+
+    <script type="module" src="../js/coach-entry.js?v=lunch-modes-42"></script>
   </body>
 </html>

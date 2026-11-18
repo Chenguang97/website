@@ -1,11 +1,10 @@
-import { coreDayEnd, coreDayStart, currentCoachId, fullDayEnd, fullDayStart } from "../core/config.js";
-import { state } from "../core/state.js";
+import { coreDayEnd, coreDayStart, fullDayEnd, fullDayStart } from "../core/config.js";
+import { captureCoachBookingReadModel } from "./bookings/read-model.js";
 import { addDaysIso, minutesFromTime } from "../core/utils-data.js";
 import { hasBookingLocationChanged } from "../core/scheduling-rules.js";
-import { coachBookingMatchesStudent } from "./bookings/render.js";
 import { formatLocationLabel, formatLocationShortLabel } from "../ui/display.js";
 import { getBookedRinkColor } from "./calendar-colors.js";
-import { getAvailabilityLocation, isCancelledBooking } from "../domain/scheduling.mjs";
+import { getAvailabilityLocation } from "../domain/scheduling.mjs";
 
 export function getCoachCalendarBookingLabel(slot, studentName = slot?.student?.name || "学生") {
   const actualLocation = formatLocationLabel(slot.location);
@@ -14,26 +13,23 @@ export function getCoachCalendarBookingLabel(slot, studentName = slot?.student?.
   return `${studentName}，${slot.start}–${slot.end}，${availabilityLabel}：${availabilityLocation}，实际授课地点：${actualLocation}`;
 }
 
-export function renderCoachBookingBlocks({ calendar, weekStart, showsFullDay, filtersStudents = false, enablesDetails = false }) {
+export function renderCoachBookingBlocks({ calendar, weekStart, showsFullDay, filtersStudents = false, enablesDetails = false, readModel = captureCoachBookingReadModel({ weekStart }) }) {
   calendar.querySelectorAll(".coach-calendar-booking").forEach((block) => block.remove());
 
   const displayStart = minutesFromTime(showsFullDay ? fullDayStart : coreDayStart);
   const displayEnd = minutesFromTime(showsFullDay ? fullDayEnd : coreDayEnd);
   const weekDates = Array.from({ length: 7 }, (_, index) => addDaysIso(weekStart, index));
-  state.slots
-    .filter((slot) => slot.coachId === currentCoachId && slot.booked && !isCancelledBooking(slot) && weekDates.includes(slot.date))
+  readModel.weekBookings
     .forEach((slot) => {
       const slotStart = minutesFromTime(slot.start);
       const slotEnd = minutesFromTime(slot.end);
       const clippedStart = Math.max(displayStart, slotStart);
       const clippedEnd = Math.min(displayEnd, slotEnd);
-      const overlapsBlock = state.blockedExceptions.some((block) => block.coachId === currentCoachId
-        && block.date === slot.date
-        && slotStart < minutesFromTime(block.end)
+      const overlapsBlock = readModel.blocksOn(slot.date).some((block) => slotStart < minutesFromTime(block.end)
         && slotEnd > minutesFromTime(block.start));
       if (clippedEnd <= clippedStart || overlapsBlock) return;
 
-      const isFiltered = filtersStudents && !coachBookingMatchesStudent(slot);
+      const isFiltered = filtersStudents && !readModel.matchesStudent(slot);
       const hasDetailsAction = enablesDetails && !isFiltered;
       const booking = document.createElement(hasDetailsAction ? "button" : "div");
       const duration = slotEnd - slotStart;

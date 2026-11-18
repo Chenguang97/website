@@ -1,14 +1,23 @@
+import { captureCoachBookingReadModel } from "./read-model.js";
 import { renderAvailabilityData } from "../availability/render.js";
 import { renderExceptionCalendarAvailability } from "./calendar-render.js";
-import { renderCoachSlots } from "./render.js?v=coach-booking-row-effect-1";
-import { synchronizeBookingRequestConflicts, synchronizeExpiredBookingRequests } from "../../core/booking-requests.js";
-import { renderCoachBookingRequests } from "./request-render.js?v=coach-booking-row-effect-1";
+import { renderCoachSlots } from "./render.js";
+import { renderCoachBookingRequests } from "./request-render.js";
+import { receiveCoachBookingRequests } from "./request-editor.js";
 
-export function renderCoachBookingChanges() {
-  synchronizeExpiredBookingRequests();
-  synchronizeBookingRequestConflicts();
-  renderCoachSlots();
-  renderCoachBookingRequests();
+function renderBookingSurfaces(model) {
+  renderCoachSlots(model);
   renderAvailabilityData();
-  renderExceptionCalendarAvailability();
+  renderExceptionCalendarAvailability(model);
+}
+export function receiveCoachBookingChanges({ resetRequest = false } = {}) {
+  const model = captureCoachBookingReadModel();
+  receiveCoachBookingRequests(model, { reset: resetRequest });
+  renderBookingSurfaces(model);
+}
+// Repaint only. Fact/selection transitions are explicit at the receive boundary.
+export function renderCoachBookingChanges() {
+  const model = captureCoachBookingReadModel();
+  renderCoachBookingRequests(model);
+  renderBookingSurfaces(model);
 }

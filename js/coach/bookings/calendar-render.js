@@ -1,37 +1,33 @@
-import { coreDayEnd, coreDayStart, currentCoachId, fullDayEnd, fullDayStart } from "../../core/config.js";
-import { state } from "../../core/state.js";
-import { findSlotAt } from "../../core/scheduling-rules.js";
-import { addDaysIso, minutesFromTime, startOfWeekIso, todayIso } from "../../core/utils-data.js";
+import { captureCoachBookingReadModel } from "./read-model.js";
+import { readAvailabilityChanges } from "../../core/state.js";
+import { scheduleShowsFullDay } from "./view-state.js";
+import { coreDayEnd, coreDayStart, fullDayEnd, fullDayStart } from "../../core/config.js";
+import { addDaysIso, startOfWeekIso, todayIso } from "../../core/utils-data.js";
 import { coachElements as elements } from "../../dom/coach-elements.js";
 import { renderCalendarLocationWatermarks, renderWeekCalendarGrid, setCalendarCellLocation } from "../../ui/calendar-grid.js";
 import { formatLocationLabel } from "../../ui/display.js";
 import { getAvailabilityLocation } from "../../domain/scheduling.mjs";
 import { getCoachCalendarBookingLabel, renderCoachBookingBlocks } from "../calendar-bookings.js";
 import { getBookedRinkColor, getRinkColor } from "../calendar-colors.js";
-import { coachBookingMatchesStudent, renderCoachCalendarFilterSummary } from "./render.js";
+import { renderCoachCalendarFilterSummary } from "./render.js";
 
 export function renderExceptionDragCalendar() {
   const weekStart = startOfWeekIso(elements.exceptionCalendarWeekStart.value || elements.calendarWeekStart.value || todayIso());
-  elements.exceptionCalendarWeekStart.value = weekStart;
   const weekEnd = addDaysIso(weekStart, 6);
   const [startYear, startMonth, startDay] = weekStart.split("-").map(Number);
   const [endYear, endMonth, endDay] = weekEnd.split("-").map(Number);
   if (elements.coachScheduleWeekRange) {
     elements.coachScheduleWeekRange.innerHTML = `<span>${startYear}年${startMonth}月${startDay}日</span><wbr>—<wbr><span>${endYear !== startYear ? `${endYear}年` : ""}${endMonth}月${endDay}日</span>`;
   }
-  const displayStart = state.exceptionCalendarShowsFullDay ? fullDayStart : coreDayStart;
-  const displayEnd = state.exceptionCalendarShowsFullDay ? fullDayEnd : coreDayEnd;
+  const displayStart = scheduleShowsFullDay() ? fullDayStart : coreDayStart;
+  const displayEnd = scheduleShowsFullDay() ? fullDayEnd : coreDayEnd;
 
   renderWeekCalendarGrid(elements.exceptionDragCalendar, weekStart, displayStart, displayEnd);
   renderExceptionCalendarAvailability();
 }
 
-function findBlockAt(date, minutes) {
-  return state.blockedExceptions.find((block) => {
-    return block.coachId === currentCoachId && block.date === date && minutes >= minutesFromTime(block.start) && minutes < minutesFromTime(block.end);
-  });
-}
-export function renderExceptionCalendarAvailability() {
+export function renderExceptionCalendarAvailability(model = captureCoachBookingReadModel()) {
+  const changes = readAvailabilityChanges();
   if (!elements.exceptionDragCalendar || !elements.exceptionDragCalendar.children.length) return;
 
   const weekStart = elements.exceptionCalendarWeekStart.value;
@@ -39,10 +35,10 @@ export function renderExceptionCalendarAvailability() {
   cells.forEach((cell) => {
     const date = addDaysIso(weekStart, Number(cell.dataset.dayIndex));
     const minutes = Number(cell.dataset.minutes);
-    const slot = findSlotAt(currentCoachId, date, minutes);
-    const block = findBlockAt(date, minutes);
-    const isUnsavedBlock = Boolean(block && state.unsavedBlockExceptionIds.has(block.id));
-    const isFilteredBooking = Boolean(slot && slot.booked && !coachBookingMatchesStudent(slot));
+    const slot = model.slotAt(date, minutes);
+    const block = model.blockAt(date, minutes);
+    const isUnsavedBlock = Boolean(block && changes.blockExceptionIds.includes(block.id));
+    const isFilteredBooking = Boolean(slot && slot.booked && !model.matchesStudent(slot));
     const availabilityLocation = slot ? getAvailabilityLocation(slot) : "";
 
     cell.textContent = "";
@@ -78,11 +74,12 @@ export function renderExceptionCalendarAvailability() {
   renderCoachBookingBlocks({
     calendar: elements.exceptionDragCalendar,
     weekStart,
-    showsFullDay: state.exceptionCalendarShowsFullDay,
+    showsFullDay: scheduleShowsFullDay(),
     filtersStudents: true,
     enablesDetails: true,
+    readModel: model,
   });
-  renderCoachCalendarFilterSummary();
+  renderCoachCalendarFilterSummary(model);
 }
 
 

@@ -21,6 +21,15 @@ import {
   weekdayIndex
 } from "./utils-data.js";
 import { basePriceUnitMinutes, calculateLessonPrice } from "../domain/pricing.mjs";
+
+// Fictional planning totals, including parking and venue access. Not route data.
+export const demoDefaultRinkTravelMinutes = 30;
+export const demoRinkTravelTimes = Object.freeze([
+  { from: "Polar Ice Rink", to: "Arcadia Ice Arena", minutes: demoDefaultRinkTravelMinutes },
+  { from: "Polar Ice Rink", to: "Oceanside Ice Arena", minutes: demoDefaultRinkTravelMinutes },
+  { from: "Arcadia Ice Arena", to: "Oceanside Ice Arena", minutes: demoDefaultRinkTravelMinutes },
+].map(Object.freeze));
+
 function createDefaultProfile(coachId) {
   const index = Math.max(0, coaches.findIndex((coach) => coach.id === coachId));
   const rate = [60, 47, 55][index];

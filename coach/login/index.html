@@ -8,8 +8,9 @@
     <link rel="stylesheet" href="../../css/coach-profile.css?v=warm-ui-1" />
     <link rel="stylesheet" href="../../css/responsive.css?v=warm-ui-1" />
     <link rel="stylesheet" href="../../css/design-system.css?v=warm-ui-11" />
+    <link rel="stylesheet" href="../../css/service-auth.css" />
   </head>
-  <body class="landing-body">
+  <body class="landing-body service-auth-page">
     <main class="student-auth-shell coach-auth-shell" aria-labelledby="authHeading">
       <header class="student-auth-header">
         <div class="student-auth-brand">
@@ -29,7 +30,7 @@
           <p>设置每周开放时间，维护资料和价格，并查看实际预约课表。</p>
         </div>
 
-        <a class="primary-button public-preview-button" href="../index.html">先进入 demo 后台</a>
+        <a data-demo-only hidden class="primary-button public-preview-button" href="../index.html">先进入 demo 后台</a>
 
         <div class="access-summary-list">
           <div class="access-summary-item">
@@ -75,34 +76,26 @@
           <p>登录后管理资料、开放时间和预约课表。</p>
         </div>
 
-        <form id="coachLoginForm" class="auth-form" action="../index.html" method="get">
-          <label>
-            邮箱
-            <span class="auth-input-wrap auth-input-email">
-              <input type="email" placeholder="coach@example.com" autocomplete="email" />
-            </span>
-          </label>
-          <label>
-            密码
-            <span class="auth-input-wrap auth-input-password">
-              <input type="password" placeholder="输入密码" autocomplete="current-password" />
-              <span class="auth-eye" aria-hidden="true">◎</span>
-            </span>
-          </label>
-          <div class="password-help-row">
-            <a class="forgot-password-link" href="../index.html">忘记密码？</a>
-          </div>
-          <div class="auth-form-row">
-            <label class="checkbox-row">
-              <input type="checkbox" />
-              记住我
-            </label>
-          </div>
-          <a class="primary-button auth-button" href="../index.html">登录</a>
+        <form id="coachLoginForm" class="auth-form" data-auth-form method="post" action="/api/auth/login">
+          <label hidden>姓名<span class="auth-input-wrap"><input name="name" type="text" autocomplete="name" maxlength="100" /></span></label>
+          <label>邮箱<span class="auth-input-wrap auth-input-email"><input name="email" type="email" placeholder="coach@example.com" autocomplete="email" required /></span></label>
+          <label>密码<span class="auth-input-wrap auth-input-password">
+            <input name="password" maxlength="128" type="password" placeholder="输入密码" autocomplete="current-password" required />
+            <button type="button" class="auth-eye" data-auth-visibility aria-label="显示密码" aria-pressed="false">◎</button>
+          </span></label>
+          <div class="password-help-row"><button type="button" class="forgot-password-link" data-auth-recovery>忘记密码？</button></div>
+          <div class="auth-form-row"><label class="checkbox-row"><input name="remember" type="checkbox" />记住我</label></div>
+          <p data-auth-message role="status" aria-live="polite"></p>
+          <button type="button" class="ghost-button" data-auth-retry hidden>重新连接</button>
+          <button type="submit" class="primary-button auth-button" data-auth-submit disabled>登录</button>
           <div class="auth-divider"><span>或</span></div>
-          <a class="ghost-button auth-button" href="../index.html">申请教练账号</a>
+          <button type="button" class="ghost-button auth-button" data-auth-register aria-pressed="false">申请教练账号</button>
+          <button type="button" class="ghost-button" data-auth-continue hidden>继续使用当前账号</button>
+          <button type="button" class="ghost-button" data-auth-logout hidden>退出登录</button>
+          <a class="ghost-button" data-demo-only hidden href="../index.html">本地 demo：预览后台</a>
         </form>
       </section>
     </main>
+    <script type="module" src="../../js/coach-login-entry.js"></script>
   </body>
 </html>

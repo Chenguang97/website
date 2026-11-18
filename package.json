@@ -1,9 +1,20 @@
 {
   "scripts": {
-    "test": "node tests/module-architecture.mjs && node tests/domain-rules.mjs && node tests/view-motion.mjs && node tests/booking-period-motion.mjs && node tests/availability-method-motion.mjs && node tests/coach-tab-motion.mjs && node tests/smoke.js"
+    "dev": "node server/dev-server.mjs",
+    "test": "node scripts/run-tests.mjs",
+    "check": "node scripts/check-modules.mjs && node tests/module-architecture.mjs && git diff --check",
+    "test:browser": "node scripts/run-tests.mjs --browser",
+    "start": "node server/app-server.mjs",
+    "db:init": "node scripts/product-db.mjs init",
+    "db:seed": "node scripts/product-db.mjs seed",
+    "db:validate": "node scripts/product-db.mjs validate",
+    "admin:bootstrap": "node scripts/product-admin.mjs bootstrap"
   },
   "devDependencies": {
     "esbuild": "^0.28.2",
     "jsdom": "^29.1.1"
+  },
+  "engines": {
+    "node": ">=24.22.1"
   }
 }

@@ -1,4 +1,4 @@
-import { currentCoachId } from "../../core/config.js";
+import { currentCoachId, readServiceSession, readServiceContext } from "../../core/config.js";
 import {
   coachSpecialtyOptions,
   coachTeachingDisciplineOptions,
@@ -7,30 +7,49 @@ import {
   normalizeCustomCoachSpecialties,
 } from "../../domain/coach-profile.mjs";
 import { coachElements as elements } from "../../dom/coach-elements.js";
-import { ensureCoachProfileDraft, getProfile } from "../../core/state.js";
+import { readProfileEdit } from "./draft.js";
 import { escapeAttribute } from "../../ui/safe-html.mjs";
 import { getCoach } from "../../core/utils-data.js";
 
+// View-local receipt of the last full form projection. It is not a profile
+// draft: native autofill/IME may update inputs before emitting owner commands.
+let projectedInputs = '';
+export function captureCoachProfileInputs() {
+  return JSON.stringify([...elements.coachProfileForm.querySelectorAll('input,textarea,select')].map(node => [node.id, node.value, node.checked]));
+}
+export function hasUnprojectedCoachProfileInputs() { return projectedInputs !== captureCoachProfileInputs(); }
+// An acknowledged save can accept the unchanged form without repainting it.
+export function acceptCoachProfileInputCheckpoint() { projectedInputs = captureCoachProfileInputs(); }
 export function renderCoachProfile() {
-  syncProfileForm();
-  syncPhotoForm();
+  renderProfileFields();
+  renderProfilePhoto();
+  acceptCoachProfileInputCheckpoint();
 }
 
-export function syncProfileForm() {
-  ensureCoachProfileDraft();
-  const profile = getProfile(currentCoachId);
+function renderProfileFields() {
+  const profile = readProfileEdit();
+  renderCoachProfileIdentity(profile);
   elements.coachRate.value = profile.rate;
   elements.coachBio.value = typeof profile.bio === "string" ? profile.bio : "";
   renderCoachTeachingDisciplines(profile.teachingDisciplines);
   renderCoachSpecialtyOptions(profile.specialties);
   renderCoachCustomSpecialties(profile.customSpecialties, profile.selectedCustomSpecialties);
-  elements.servedRinkInputs.forEach((input) => {
+  document.querySelectorAll("#servedRinks input[name=servedRinks]").forEach((input) => {
     input.checked = profile.servedRinks.includes(input.value);
   });
   elements.travelsToOtherRinks.value = profile.travelsToOtherRinks ? "negotiable" : "no";
   elements.travelConditions.value = typeof profile.travelConditions === "string" ? profile.travelConditions : "";
   elements.travelConditionsLabel.classList.toggle("is-hidden", !profile.travelsToOtherRinks);
   renderLessonOptions();
+}
+
+export function renderCoachProfileIdentity(profile = readProfileEdit()) {
+  const profileName = typeof profile.name === "string" ? profile.name.trim() : "";
+  const accountName = readServiceSession()?.user?.name;
+  elements.coachProfileName.textContent = profileName
+    || (typeof accountName === "string" ? accountName.trim() : "")
+    || (!readServiceContext().service ? getCoach(currentCoachId)?.name : "")
+    || "教练";
 }
 
 function renderCoachTeachingDisciplines(selectedValues) {
@@ -49,8 +68,8 @@ function renderCoachTeachingDisciplines(selectedValues) {
 }
 
 export function renderCoachCustomSpecialties(
-  values = getProfile(currentCoachId).customSpecialties,
-  selectedValues = getProfile(currentCoachId).selectedCustomSpecialties,
+  values = readProfileEdit().customSpecialties,
+  selectedValues = readProfileEdit().selectedCustomSpecialties,
 ) {
   const specialties = normalizeCustomCoachSpecialties(values);
   const selected = new Set(normalizeCustomCoachSpecialties(selectedValues));
@@ -96,17 +115,17 @@ function renderCoachSpecialtyOptions(selectedValues) {
 }
 
 function renderLessonOptions() {
-  const profile = getProfile(currentCoachId);
+  const profile = readProfileEdit();
   elements.lessonOptionsList.innerHTML = profile.lessonOptions.map((lesson) => {
     const displayName = lesson.name
       .replace("30 min private lesson", "30 分钟私教")
       .replace("60 min private lesson", "60 分钟私教")
       .replace("45 min private lesson", "45 分钟私教");
     return `
-      <article class="lesson-option-row" data-lesson-id="${lesson.id}">
+      <article class="lesson-option-row" data-lesson-id="${escapeAttribute(lesson.id)}">
         <input class="lesson-name-input" type="text" value="${escapeAttribute(displayName)}" aria-label="课程名称" />
-        <input class="lesson-duration-input" type="number" min="15" step="15" value="${lesson.duration}" aria-label="Lesson duration" />
-        <input class="lesson-price-input" type="number" min="0" step="0.01" value="${lesson.price}" aria-label="Lesson price" />
+        <input class="lesson-duration-input" type="number" min="15" step="15" value="${escapeAttribute(lesson.duration)}" aria-label="Lesson duration" />
+        <input class="lesson-price-input" type="number" min="0" step="0.01" value="${escapeAttribute(lesson.price)}" aria-label="Lesson price" />
         <button class="lesson-delete-button" type="button" data-action="remove-lesson" data-tooltip="删除课程" aria-label="删除 ${escapeAttribute(displayName)}">
           <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M9 3h6l1 2h4v2h-1l-1 14H6L5 7H4V5h4l1-2Zm-1.86 4 .75 12h8.22l.75-12H7.14ZM10 9h2v7h-2V9Zm4 0h2v7h-2V9Z" /></svg>
         </button>
@@ -133,7 +152,6 @@ export function setCoachPhotoDialogPreview(photoUrl) {
   setPhotoPreview(elements.coachPhotoDialogPreview, photoUrl);
 }
 
-export function syncPhotoForm() {
-  setCoachPhotoPreview(getProfile(currentCoachId).photoUrl || "");
+function renderProfilePhoto() {
+  setCoachPhotoPreview(readProfileEdit().photoUrl || "");
 }
-

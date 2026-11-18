@@ -1,5 +1,4 @@
-/* All coach tabs share one frame. The auxiliary booking navigation never
-   changes the frame; narrower desktop windows reserve the same space on every tab. */
+/* All coach tabs share one frame, with separate navigation and action gutters. */
 html:has(body[data-page="coach"]) { overflow-y: scroll; scrollbar-gutter: stable; }
 body[data-page="coach"] .coach-workspace-container {
   position: relative;
@@ -10,14 +9,11 @@ body[data-page="coach"] .coach-layout > .coach-panel { width: 100%; margin: 0; }
 body[data-page="coach"] .coach-layout > .profile-panel { padding: 0; }
 body[data-page="coach"] .coach-header-identity { display: flex; align-items: center; gap: 18px; flex-shrink: 0; }
 body[data-page="coach"] .coach-header-identity h2 { margin: 0; }
-body[data-page="coach"] .coach-global-home { position: absolute; top: -16px; right: calc(100% + 24px); width: 144px; display: flex; justify-content: center; align-items: center; gap: 8px; padding: 0 11px; min-height: 28px; border: 1px solid #b4c0a8; border-radius: var(--radius-pill); background: #e1e8d7; color: var(--brand-hover); box-shadow: none; text-decoration: none; white-space: nowrap; font-size: 13px; transition: background-color 160ms ease; }
+body[data-page="coach"] .coach-global-home { position: fixed; top: 28px; left: 24px; right: auto; z-index: 20; width: 128px; display: flex; justify-content: center; align-items: center; gap: 8px; padding: 0 11px; min-height: 28px; border: 1px solid #b4c0a8; border-radius: var(--radius-pill); background: #e1e8d7; color: var(--brand-hover); box-shadow: none; text-decoration: none; white-space: nowrap; font-size: 13px; transition: background-color 160ms ease; }
 body[data-page="coach"] .coach-global-home:hover { background: #d4dfc8; color: var(--brand-hover); text-decoration: none; }
 body[data-page="coach"] .coach-global-home:focus-visible { outline: 2px solid var(--brand-hover); outline-offset: 3px; }
-.coach-portal-arrow { width: 14px; height: 14px; flex: 0 0 14px; transition: transform 160ms ease; }
-.coach-global-home:hover .coach-portal-arrow { transform: translate(2px, -2px); }
 @media (prefers-reduced-motion: reduce) {
-  body[data-page="coach"] .coach-global-home, .coach-portal-arrow { transition: none; }
-  .coach-global-home:hover .coach-portal-arrow { transform: none; }
+  body[data-page="coach"] .coach-global-home { transition: none; }
 }
 .coach-operation-icon { width: 18px; height: 18px; flex: 0 0 18px; }
 body[data-page="coach"] .coach-pending-trigger { min-width: 0; gap: 8px; }
@@ -32,15 +28,34 @@ body[data-page="coach"] .coach-save-toolbar[data-layout="side"] {
   left: var(--coach-save-side-left);
   right: auto;
 }
+/* Desktop controls stay stacked even when the side gutter is too narrow.
+   Keep the compact horizontal fallback limited to the existing mobile layout. */
+@media (max-width: 760px) {
+  body[data-page="coach"] .coach-save-toolbar[data-layout="bottom"] {
+    width: max-content;
+    grid-template-columns: minmax(72px, auto) 104px 104px;
+    gap: 12px;
+    padding: 8px 12px;
+    border: 1px solid var(--line);
+    border-radius: 18px;
+    background: var(--surface);
+    box-shadow: 0 3px 12px #393c2f0a;
+  }
+}
 body[data-page="coach"] .coach-app-shell .workspace { padding-bottom: var(--coach-save-clearance, 188px); }
 @media (max-width: 1100px) {
   body[data-page="coach"] .coach-global-home { position: static; width: max-content; margin-bottom: 20px; }
 }
-@media (min-width: 1101px) {
+/* Reserve 104px for the controls, 24px to the cards and at least 24px
+   to the viewport. The form keeps its existing 1160px maximum width. */
+@media (min-width: 761px) {
   body[data-page="coach"] .coach-app-shell .workspace {
-    width: min(100%, 1320px);
-    padding: 20px 28px var(--coach-save-clearance, 188px) clamp(28px, calc(852px - 50vw), 192px);
+    width: min(100%, 1512px);
+    padding: 20px 160px var(--coach-save-clearance, 188px) 28px;
   }
+}
+@media (min-width: 1101px) {
+  body[data-page="coach"] .coach-app-shell .workspace { padding-left: 168px; }
 }
 
 @layer legacy {
@@ -519,15 +534,14 @@ body[data-page="coach"] .coach-app-shell .workspace { padding-bottom: var(--coac
   }
 
   .coach-app-shell #coachView > .coach-action-bar {
-    position: sticky;
-    top: 0;
-    z-index: 20;
+    position: static;
     align-items: center;
-    min-height: 58px;
-    margin-bottom: 14px;
-    padding: 10px 0;
-    border-bottom: 1px solid var(--line);
-    background: var(--bg);
+    min-height: 48px;
+    margin-bottom: 12px;
+    padding: 4px 0;
+    border: 0;
+    background: transparent;
+    box-shadow: none;
   }
 
   body:has(#coachView.view.active) .section-header h2 {
@@ -1341,50 +1355,184 @@ body[data-page="coach"] .coach-app-shell .workspace { padding-bottom: var(--coac
 .availability-panel #availabilityForm { padding: 0; border: 0; border-radius: 0; background: transparent; box-shadow: none; }
 .availability-panel #calendarPanel { gap: 14px; }
 .availability-panel .coach-availability-calendar-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.coach-availability-toolbar-actions { display: flex; align-items: center; gap: 8px; }
+.coach-availability-settings > summary { width: max-content; cursor: pointer; color: var(--brand-hover); font-size: 16px; font-weight: 600; }
+.coach-availability-settings { scroll-margin-top: 90px; }
+.planner-suggestion-row { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; }
+.planner-suggestion-row[hidden] { display: none; }
+.coach-availability-settings:not([open]) > :not(summary) { display: none; }
+.planner-section { display: grid; gap: 12px; padding-top: 18px; margin-top: 18px; border-top: 1px solid var(--line); }
+.planner-section h4 { margin: 0; }
+.planner-scope-controls { display: flex; align-items: end; flex-wrap: wrap; gap: 12px; }
+.planner-scope-controls > label { flex: 1 1 150px; min-width: 0; }
+.planner-window { display: flex; align-items: end; gap: 12px; flex-wrap: wrap; padding-block: 8px; }
+.planner-window > label { flex: 0 1 130px; }
+.planner-days { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.planner-days label, .planner-check { display: inline-flex; align-items: center; gap: 4px; font-weight: 400; white-space: nowrap; }
+.planner-days input, .planner-check input { width: 16px; height: 16px; accent-color: var(--brand); }
+.planner-generate-actions { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding-block: 16px; }
+#dragCalendar .planning-calendar-block { z-index: 3; min-width: 0; overflow: hidden; padding: 2px 4px; border: 1px solid #bbb29e; border-radius: 5px; background: #e8e1d2; color: #594d38; font-size: 10px; line-height: 1.25; text-align: left; cursor: pointer; }
+#dragCalendar .planning-calendar-block--rest { background: #e9e5dc; border-style: dashed; color: #605b50; }
+#dragCalendar .planning-calendar-block--open { background: #e9f0df; border: 2px solid #637854; color: #405334; opacity: .9; }
+#dragCalendar .planning-calendar-block.is-locked { box-shadow: inset 0 0 0 1px #75694f; }
+#dragCalendar .planning-calendar-block strong, #dragCalendar .planning-calendar-block span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 400; }
+.coach-availability-settings .text-button { min-height: 36px; padding: 6px 8px; border: 0; border-radius: 8px; background: transparent; color: var(--brand-hover); cursor: pointer; }
+.coach-availability-settings .text-button:hover { background: var(--brand-soft); }
+.planner-scope-controls [hidden] { display: none; }
 .availability-panel .coach-booking-date-filter { justify-self: start; }
 .availability-panel .coach-schedule-week-navigation { grid-template-columns: 44px minmax(230px, 340px) 44px; }
 .availability-panel .coach-availability-week-picker { position: relative; }
-.availability-panel #calendarWeekStart { position: absolute; inset: 0; width: 100%; height: 100%; padding: 0; opacity: 0; cursor: pointer; }
-.availability-panel #calendarWeekStart::-webkit-calendar-picker-indicator { position: absolute; inset: 0; width: 100%; height: 100%; padding: 0; cursor: pointer; }
-.availability-panel .coach-availability-week-picker:has(input:focus-visible) { outline: 2px solid var(--brand); outline-offset: 2px; }
 .availability-panel #toggleCalendarHours { height: 44px; min-height: 44px; }
 .availability-panel .coach-availability-location-heading { display: flex; align-items: baseline; flex-wrap: wrap; gap: 6px 16px; }
 .availability-panel .coach-availability-paint-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 24px; }
-.availability-panel .rink-option { min-height: 40px; font-weight: 500; }
-.availability-panel .coach-availability-unavailable { min-height: 40px; gap: 8px; color: var(--brand-hover); }
-.availability-panel .coach-availability-unavailable.active { background: #e5e2da; border-color: #a7a294; }
-.availability-panel .coach-availability-calendar-notes { display: flex; align-items: baseline; flex-wrap: wrap; justify-content: space-between; gap: 6px 20px; }
-.availability-panel .coach-availability-help { flex: 0 0 auto; color: var(--muted); font-size: 12px; }
-.availability-panel .coach-availability-help summary { cursor: pointer; color: var(--brand-hover); font-weight: 500; }
-.availability-panel .coach-availability-help[open] { flex-basis: 100%; }
-.availability-panel .coach-availability-help ul { margin: 8px 0 0; padding-left: 20px; line-height: 1.7; }
-.availability-panel .rink-option.active { border-color: transparent; box-shadow: none; background: var(--brand-soft); color: var(--brand-hover); }
-.availability-panel .rink-option.active[data-rink="Any served rink"] { border-color: transparent; box-shadow: none; }
+.availability-panel .coach-availability-paint-option { display: inline-flex; align-items: center; justify-content: center; flex: 0 1 auto; width: fit-content; max-width: 100%; min-width: 0; gap: 6px; min-height: 40px; padding: 8px 14px; border: 1px solid var(--line); border-radius: var(--radius-pill); background: var(--surface-white); color: var(--text); font-size: 13px; font-weight: 500; line-height: 22px; cursor: pointer; transition: background-color 150ms ease, border-color 150ms ease, box-shadow 150ms ease; }
+.availability-panel .coach-availability-paint-option .legend-dot { width: 10px; height: 10px; flex: 0 0 10px; margin: 0; }
+.availability-panel .coach-availability-paint-option > span { min-width: 0; overflow-wrap: anywhere; }
+.availability-panel .coach-availability-paint-option:hover { background: var(--brand-soft); border-color: var(--brand-border); color: var(--brand-hover); }
+.availability-panel .coach-availability-paint-option[aria-pressed="true"] { background: var(--brand-soft); border-color: var(--brand); box-shadow: inset 0 0 0 1px var(--brand); color: var(--brand-hover); }
+.availability-panel .coach-availability-unavailable { color: var(--red); border-color: #dbb6a8; }
+.availability-panel .coach-availability-unavailable:hover { background: var(--danger-soft); border-color: var(--red); color: var(--red); }
+.availability-panel .coach-availability-unavailable[aria-pressed="true"] { background: var(--danger-soft); border-color: var(--red); box-shadow: inset 0 0 0 1px var(--red); color: var(--red); }
+.availability-panel .coach-availability-paint-tools .coach-availability-paint-option:active { box-shadow: inset 0 0 0 2px currentColor; }
+.availability-panel .coach-availability-paint-option:focus-visible { outline: 2px solid var(--brand); outline-offset: 3px; }
 .availability-panel :is(.coach-availability-rules, .dropdown-open-panel) { display: grid; gap: 14px; margin-top: 6px; padding: 20px 0 0; border: 0; border-top: 1px solid var(--line); border-radius: 0; background: transparent; box-shadow: none; }
 .availability-panel :is(.coach-availability-rules, #availabilityForm, .dropdown-open-panel) h4 { margin: 0 0 4px; font-size: 16px; line-height: 1.5; }
 .availability-panel #availabilityForm { gap: 16px; }
 .availability-panel #availabilityForm > .dialog-actions > button { width: auto; }
 .availability-panel .dropdown-open-panel > .panel-heading { margin: 0; }
 .availability-panel .dropdown-open-panel .date-meta { margin: 0; font-size: 12px; }
-.availability-panel .open-slot-row { grid-template-columns: minmax(120px, .7fr) minmax(180px, 1fr) auto; gap: 16px; padding: 14px 16px; }
-.availability-panel .open-slot-row strong { font-size: 14px; }
-.availability-panel .open-slot-row span { font-size: 12px; }
-.availability-panel .week-open-grid { grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 8px; }
-.availability-panel .week-day-card { gap: 6px; padding: 12px; }
-.availability-panel .week-day-card > strong { font-size: 14px; }
-.availability-panel .week-day-card > span { font-size: 12px; }
-.availability-panel .week-day-card .time-chip { max-width: 100%; font-weight: 500; overflow-wrap: anywhere; color: var(--brand-hover); }
-.availability-panel .week-day-card .time-chip small { font-size: 11px; font-weight: 400; color: var(--muted); }
 .availability-panel .coach-availability-feedback { margin: 0; font-size: 13px; font-weight: 400; }
 .availability-panel .coach-availability-feedback:empty,
 .availability-panel .availability-actions[hidden] { display: none; }
 .availability-panel .coach-availability-feedback[data-tone="error"] { padding: 10px 12px; border: 1px solid #dbb6a8; border-radius: var(--radius-control); background: var(--danger-soft); }
 #conflictDialog .dialog-note { margin: 0; color: var(--muted); font-size: 13px; font-weight: 400; line-height: 1.7; }
-@media (max-width: 1100px) {
-  .availability-panel .week-open-grid { grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); }
-}
 @media (max-width: 760px) {
   .availability-panel .coach-availability-calendar-toolbar { align-items: start; flex-wrap: wrap; }
   .availability-panel .coach-schedule-week-navigation { grid-template-columns: 44px minmax(140px, 1fr) 44px; }
-  .availability-panel .open-slot-row { grid-template-columns: minmax(0, 1fr); }
+}
+
+#coachSchedulePreview[hidden] { display: none; }
+#coachWorkTimeForm { display: grid; gap: 16px; }
+
+.planner-timetable-day { display: grid; grid-template-columns: 155px 1fr; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--line); font-size: 14px; }
+#deleteCoachWorkTime[hidden] { display: none; }
+
+
+
+.planner-scope-controls > .planner-date-field { position: relative; display: grid; flex: 1 1 150px; min-width: 0; gap: 6px; }
+.planner-date-control input { flex: 1; min-width: 0; width: 100%; min-height: 0; padding: 0; border: 0; border-radius: 0; background: transparent; box-shadow: none; color: inherit; font: inherit; font-weight: 600; font-variant-numeric: tabular-nums; }
+.planner-date-control input:focus { outline: none; }
+.planner-date-control:focus-within { outline: 2px solid var(--brand); outline-offset: 2px; }
+.planner-date-control:has([aria-invalid="true"]) { border-color: var(--red); }
+.planner-date-toggle { display: grid; place-items: center; flex: 0 0 24px; min-height: 24px; width: 24px; padding: 0; border: 0; border-radius: 4px; background: transparent; color: inherit; }
+
+.planner-gap-setting { display: flex; align-items: center; gap: 16px; width: fit-content; }
+.planner-gap-setting > span { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-weight: 400; }
+.planner-gap-setting input, .planner-travel-table input { width: 76px; min-height: 32px; padding: 5px 8px; }
+.planner-travel-details > summary { width: fit-content; color: var(--brand-hover); font-size: 13px; cursor: pointer; }
+.planner-travel-table { width: min(100%, 680px); margin-top: 12px; border-collapse: collapse; font-size: 13px; }
+.planner-travel-table th, .planner-travel-table td { padding: 6px 10px; border-bottom: 1px solid var(--line); text-align: left; }
+.planner-travel-table thead th { color: var(--muted); font-weight: 500; }
+.planner-travel-table tbody th { font-weight: 400; }
+.planner-travel-table .planner-travel-source { color: var(--muted); font-size: 12px; }
+.planner-travel-table input:placeholder-shown { width: 118px; }
+.planner-travel-table .text-button { padding: 2px 0; font-size: 12px; }
+.planner-travel-estimate-note { font-size: 12px; }
+#dragCalendar .planning-calendar-block.is-planning-preview { border-style: dashed; }
+
+.planner-lunch-fields { display: flex; align-items: end; width: 100%; max-width: 100%; flex-wrap: wrap; gap: 12px; min-width: 0; }
+.planner-lunch-fields[hidden] { display: none; }
+.planner-lunch-fields > label, .planner-lunch-range { flex: 1 1 150px; min-width: 0; }
+.planner-lunch-range { margin: 0; padding: 0; border: 0; }
+.planner-lunch-range legend { padding: 0; margin-bottom: 8px; color: var(--text); font-size: 13px; font-weight: 600; line-height: 1.5; }
+.planner-lunch-range > div, .planner-lunch-duration { display: flex; align-items: center; gap: 8px; }
+.planner-lunch-range input { flex: 1; min-width: 0; }
+.planner-lunch-duration input { flex: 1; min-width: 0; }
+.planner-lunch-duration > span { flex: 0 0 auto; font-weight: 400; }
+
+
+.planner-lunch-modes { margin: 0; padding: 0; border: 0; min-width: 0; }
+.planner-lunch-modes legend { padding: 0; margin-bottom: 8px; font-size: 13px; font-weight: 600; }
+.planner-lunch-options { display: inline-flex; flex-wrap: wrap; gap: 8px; }
+.planner-lunch-options label { display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 6px 10px; border: 1px solid var(--line); border-radius: var(--radius-control); background: var(--surface-white); font-size: 13px; font-weight: 400; cursor: pointer; }
+.planner-lunch-options label:has(:checked) { background: var(--brand-soft); border-color: var(--brand); }
+.planner-lunch-options label:has(:focus-visible) { outline: 2px solid var(--brand); outline-offset: 2px; }
+.planner-add-rest { justify-self: start; }
+
+.planner-optimization-scope { margin-top: 18px; }
+.planner-preview-issues { padding: 12px; border-left: 3px solid var(--brand); background: var(--brand-soft); }
+.planner-preview-day { padding-block: 12px; border-bottom: 1px solid var(--line); }
+.planner-preview-choices { display: flex; flex-wrap: wrap; gap: 8px; margin-block: 8px; }
+.planner-preview-choices .ghost-button { width: auto; }
+.planner-preview-fields { margin: 12px 0 0; padding: 0; border: 0; min-width: 0; }
+.planner-preview-range { display: flex; flex-wrap: wrap; align-items: end; gap: 10px; margin-block: 10px; }
+.planner-preview-range > label { flex: 0 1 160px; min-width: 0; }
+
+/* Keep the welcome illustration beside the greeting, including when it wraps. */
+body[data-page="coach"] .coach-header-identity .coach-welcome-mascot {
+  display: block;
+  width: auto;
+  height: 48px;
+  filter: grayscale(1);
+  object-fit: contain;
+  flex: 0 0 auto;
+}
+body[data-page="coach"] .coach-welcome-row {
+  color: #575757;
+  gap: 12px;
+  align-items: center;
+  flex-shrink: 1;
+  min-width: 0;
+}
+body[data-page="coach"] .coach-welcome-row h2 {
+  min-width: 0;
+  color: inherit;
+  font-family: inherit;
+  font-size: 30px;
+  font-weight: 600;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+
+/* Native time segments need more room than the other compact form fields. */
+.planner-window > label:has(input[type="time"]),
+.planner-preview-range > label:has(input[type="time"]),
+.planner-lunch-fields > label:has(input[type="time"]) {
+  flex: 1 1 var(--time-control-width);
+  min-width: var(--time-control-width);
+  display: grid;
+  gap: 6px;
+}
+.planner-lunch-range { flex-basis: calc(2 * var(--time-control-width) + 24px); }
+.planner-lunch-range > div { flex-wrap: wrap; }
+.planner-lunch-range :is(input[type="time"], .time-control) { flex: 1 1 var(--time-control-width); }
+
+.coach-open-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.coach-open-actions > p { flex-basis: 100%; margin: 0; }
+.coach-open-actions button:disabled { opacity: .5; cursor: default; }
+/* Request time fields share the same readable column minimum as dialogs. */
+.coach-request-fields:has(input[type="time"]) {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, var(--time-control-width)), 1fr));
+}
+
+/* Shared scope controls beside the availability week navigation. */
+.availability-shared-week { position: relative; display: flex; align-items: center; flex-wrap: wrap; gap: 10px 16px; }
+.coach-editing-range { min-width: 0; }
+#coachEditingRangeTrigger { display: flex; flex-wrap: wrap; gap: 4px 10px; text-align: left; }
+#coachEditingRangeSummary { font-size: 12px; font-weight: 400; }
+.coach-editing-range-popover { position: absolute; top: calc(100% + 8px); left: 0; z-index: 30; display: grid; gap: 10px; width: min(590px, 100%); padding: 16px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); box-shadow: 0 12px 30px #292d201f; }
+.coach-editing-range-popover[hidden] { display: none; }
+/* Use the full range panel as the nested pickers' positioned parent, so the
+   shared picker can clamp either field to the viewport from a nonnegative origin. */
+.coach-editing-range-popover .planner-date-field { position: static; }
+.coach-editing-range-popover .coach-schedule-date-popover { max-width: calc(100% - 32px); }
+.coach-editing-range-popover .coach-filter-note { margin: 0; }
+.coach-editing-range-popover > button { justify-self: end; }
+#coachEditingRangeError { margin: 4px 0 0; }
+.availability-day-add { justify-self: start; }
+
+@media (max-width: 700px) {
+  .coach-editing-range { flex-basis: 100%; }
+  .coach-editing-range-popover .planner-scope-controls { flex-direction: column; align-items: stretch; }
+  .coach-editing-range-popover .planner-scope-controls > :is(label, .planner-date-field) { flex: 0 1 auto; }
 }

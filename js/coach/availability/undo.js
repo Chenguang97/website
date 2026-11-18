@@ -1,50 +1,19 @@
-import { setAvailabilityDirty, showFormMessage } from "./status.js";
-import {
-  clearUndoHistory,
-  cloneUndoData,
-  isUndoShortcut,
-  popLatestUndoSnapshot,
-  pushUndoSnapshot,
-} from "../../core/undo-history.js";
+import { renderAvailabilityStatus, showFormMessage, showCalendarFeedback } from "./status.js";
+import { isUndoShortcut } from "../../ui/undo-shortcut.js";
 import {
   renderDragCalendar,
-  renderDropdownOpenSlots,
-  renderDropdownWeekSlots,
-} from "./render.js";
+  } from "./render.js";
 import { renderExceptionDragCalendar } from "../bookings/calendar-render.js";
-import { replaceBlockedExceptions, replaceSlots, state } from "../../core/state.js";
-
-export function captureAvailabilityUndoState() {
-  return {
-    type: "availability",
-    slots: cloneUndoData(state.slots),
-    blockedExceptions: cloneUndoData(state.blockedExceptions),
-    unsavedAddedSlotIds: [...state.unsavedAddedSlotIds],
-    unsavedBlockedCellKeys: [...state.unsavedBlockedCellKeys],
-    unsavedRecurringCellKeys: [...state.unsavedRecurringCellKeys],
-    unsavedBlockExceptionIds: [...state.unsavedBlockExceptionIds],
-    pendingDeletedSlots: cloneUndoData([...state.pendingDeletedSlots.entries()]),
-    hasUnsavedAvailabilityChanges: state.hasUnsavedAvailabilityChanges,
-  };
-}
-
-export function pushAvailabilityUndoState(snapshot = captureAvailabilityUndoState()) {
-  pushUndoSnapshot(snapshot);
-}
-
-export function clearAvailabilityUndoHistory() {
-  clearUndoHistory("availability");
-}
+import { undoAvailabilityDraft } from "../../core/state.js";
+import { resetSchedulingSettingsEditor } from "./planner-render.js";
 
 export function undoAvailabilityChange() {
-  const snapshot = popLatestUndoSnapshot("availability");
-  if (!snapshot) {
-    showFormMessage("没有可以撤销的开放时间更改。");
-    return;
-  }
-  restoreAvailabilitySnapshot(snapshot);
+  const result = undoAvailabilityDraft();
+  if (!result.ok) { showCalendarFeedback("没有可撤销的修改", true); return; }
+  renderAvailabilityStatus();
   renderAvailabilityAfterUndo();
-  showFormMessage("已撤销上一步更改。");
+  showFormMessage("");
+  showCalendarFeedback("已撤销");
 }
 
 export function handleAvailabilityUndoKeydown(event) {
@@ -53,27 +22,8 @@ export function handleAvailabilityUndoKeydown(event) {
   undoAvailabilityChange();
 }
 
-function restoreAvailabilitySnapshot(snapshot) {
-  replaceSlots(cloneUndoData(snapshot.slots));
-  replaceBlockedExceptions(cloneUndoData(snapshot.blockedExceptions));
-  replaceSetContents(state.unsavedAddedSlotIds, snapshot.unsavedAddedSlotIds);
-  replaceSetContents(state.unsavedBlockedCellKeys, snapshot.unsavedBlockedCellKeys);
-  replaceSetContents(state.unsavedRecurringCellKeys, snapshot.unsavedRecurringCellKeys);
-  replaceSetContents(state.unsavedBlockExceptionIds, snapshot.unsavedBlockExceptionIds);
-  state.pendingDeletedSlots.clear();
-  cloneUndoData(snapshot.pendingDeletedSlots).forEach(([key, value]) => state.pendingDeletedSlots.set(key, value));
-  setAvailabilityDirty(snapshot.hasUnsavedAvailabilityChanges);
-}
-
-function replaceSetContents(target, values) {
-  target.clear();
-  values.forEach((value) => target.add(value));
-}
-
 function renderAvailabilityAfterUndo() {
+  resetSchedulingSettingsEditor();
   renderDragCalendar();
   renderExceptionDragCalendar();
-  renderDropdownOpenSlots();
-  renderDropdownWeekSlots();
 }
-

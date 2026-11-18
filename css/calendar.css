@@ -20,73 +20,6 @@
   margin-bottom: 0;
 }
 
-.dropdown-open-list,
-.week-open-grid {
-  display: grid;
-  gap: 10px;
-}
-
-.week-open-grid {
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-}
-
-.open-slot-row,
-.week-day-card {
-  padding: 12px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: #ffffff;
-}
-
-.open-slot-row {
-  display: grid;
-  grid-template-columns: minmax(120px, 0.8fr) minmax(180px, 1.2fr) auto;
-  gap: 10px;
-  align-items: center;
-}
-
-.open-slot-row.booked {
-  background: #fff7ed;
-  border-color: #fed7aa;
-}
-
-.open-slot-row strong,
-.open-slot-row span,
-.week-day-card strong,
-.week-day-card span {
-  display: block;
-}
-
-.open-slot-row span,
-.week-day-card span {
-  color: var(--muted);
-  font-size: 13px;
-}
-
-.week-day-card {
-  display: grid;
-  gap: 8px;
-  align-content: start;
-}
-
-.week-day-card .time-chip {
-  display: inline-flex;
-  flex-direction: column;
-  width: fit-content;
-  margin: 2px 4px 2px 0;
-  padding: 4px 7px;
-  border-radius: 6px;
-  color: #166534;
-  font-size: 12px;
-  font-weight: 900;
-}
-
-.week-day-card .time-chip small {
-  color: #334155;
-  font-size: 10px;
-  font-weight: 800;
-}
-
 .availability-actions {
   display: flex;
   flex-wrap: wrap;
@@ -457,3 +390,174 @@ label {
 
 
 }
+
+/* Coach appointment date controls share one aligned field row. */
+.coach-schedule-week-navigation { position: relative; display: grid; flex: 0 1 auto; grid-template-columns: 44px minmax(230px, 320px) 44px; align-items: center; gap: 8px; min-width: 0; }
+.coach-schedule-week-navigation .calendar-side-arrow { width: 44px; height: 44px; min-height: 44px; border-radius: 8px; }
+.coach-schedule-week-range { margin: 0; color: var(--text); font-size: 16px; font-weight: 600; text-align: center; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.coach-schedule-date-picker { display: flex; align-items: center; justify-content: center; gap: 8px; min-width: 0; height: 44px; padding: 8px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface-white); color: var(--text); cursor: pointer; }
+.coach-schedule-date-picker:hover { border-color: #c8c0b3; background: #faf8f3; }
+.coach-schedule-date-picker:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+.coach-schedule-date-popover { position: absolute; top: calc(100% + 8px); left: 52px; z-index: 35; width: min(340px, calc(100vw - 32px)); padding: 14px; border: 1px solid #d8d1c5; border-radius: 14px; background: #fffdf8; box-shadow: 0 18px 48px rgba(58, 52, 43, 0.2); }
+.coach-schedule-date-popover[hidden] { display: none; }
+.coach-date-picker-heading { display: grid; grid-template-columns: 36px minmax(0, 1fr) 36px; align-items: center; gap: 8px; margin-bottom: 12px; }
+.coach-date-picker-heading > button { display: grid; place-items: center; width: 36px; height: 36px; padding: 0; border: 1px solid var(--line); border-radius: 8px; background: #faf7f0; color: var(--text); font-size: 20px; cursor: pointer; }
+.coach-date-picker-heading > button:hover { border-color: #bcb39f; background: var(--brand-soft); }
+.coach-date-picker-selects { display: flex; justify-content: center; gap: 6px; }
+.coach-date-picker-selects select { width: auto; min-width: 88px; height: 36px; padding: 4px 26px 4px 9px; border-color: var(--line); border-radius: 8px; background-color: #fffdf8; font-size: 13px; font-weight: 600; }
+.coach-date-picker-selects select:first-child { min-width: 72px; }
+.coach-date-picker-weekdays, .coach-date-picker-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 3px; }
+.coach-date-picker-weekdays { margin-bottom: 4px; color: var(--muted); font-size: 11px; font-weight: 600; text-align: center; }
+.coach-date-picker-weekdays span { padding: 5px 0; }
+.coach-date-picker-grid button { display: grid; place-items: center; aspect-ratio: 1; min-width: 0; padding: 0; border: 1px solid transparent; border-radius: 8px; background: transparent; color: var(--text); font-size: 12px; cursor: pointer; }
+.coach-date-picker-grid button:hover { background: #f1eee6; }
+.coach-date-picker-grid button.is-outside { color: #aaa399; }
+.coach-date-picker-grid button.is-today { border-color: var(--brand); color: var(--brand-hover); font-weight: 700; }
+.coach-date-picker-grid button.is-selected { border-color: var(--brand); background: var(--brand); color: #fff; font-weight: 700; }
+.coach-date-picker-grid button:focus-visible { outline: 2px solid #7e8d5b; outline-offset: 1px; }
+.coach-week-calendar {
+  grid-template-columns: 72px repeat(7, minmax(112px, 1fr));
+  grid-template-rows: 56px;
+  grid-auto-rows: 1.2px;
+  max-height: 640px;
+  overscroll-behavior-y: auto;
+  touch-action: pan-x pan-y;
+  border-color: #d9d2c7;
+  border-radius: 12px;
+  background: #fffdfa;
+}
+.coach-week-calendar > :where(.calendar-corner, .calendar-day, .calendar-time, .calendar-cell) { min-height: 0; border-color: #ded8ce; border-radius: 0; }
+.coach-week-calendar .calendar-corner,
+.coach-week-calendar .calendar-day { background: #f7f4ee; }
+.coach-week-calendar .calendar-day { z-index: 5; gap: 3px; padding: 8px 6px; color: var(--text); font-size: 13px; font-weight: 500; }
+.coach-week-calendar .calendar-day strong { font-size: 14px; font-weight: 650; }
+.coach-week-calendar .calendar-day span { color: var(--muted); font-size: 11px; font-weight: 500; }
+.coach-week-calendar .calendar-day.is-today { color: var(--brand-hover); background: #eaf4dc; box-shadow: inset 0 -2px var(--brand); }
+.coach-week-calendar .calendar-day.is-today span { color: var(--brand-hover); }
+.coach-week-calendar .calendar-time { z-index: 3; padding-top: 7px; background: #faf8f3; color: #625e55; font-size: 12px; font-weight: 500; font-variant-numeric: tabular-nums; }
+.coach-week-calendar .calendar-cell { position: relative; height: auto; background: #fffdfa; }
+.coach-week-calendar .calendar-location-watermark {
+  position: relative;
+  z-index: 1;
+  overflow: hidden;
+  pointer-events: none;
+  user-select: none;
+}
+.coach-week-calendar .calendar-location-watermark-text {
+  position: absolute;
+  top: var(--watermark-top);
+  left: var(--watermark-left);
+  color: rgba(63, 69, 57, 0.14);
+  font-family: Arial, "PingFang SC", "Microsoft YaHei", sans-serif;
+  font-size: 18px;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: 0.035em;
+  white-space: nowrap;
+  transform: translate(-50%, -50%) rotate(-31deg);
+  transform-origin: center;
+}
+.coach-week-calendar .calendar-cell.has-slot,
+.coach-week-calendar .calendar-cell.has-booking { background: linear-gradient(rgba(255, 255, 255, 0.5), rgba(255, 255, 255, 0.5)), var(--rink-color, #bbf7d0); }
+.coach-week-calendar .calendar-cell.has-blocked { background: #efede9; }
+.coach-week-calendar .calendar-cell.is-filtered-booking { box-shadow: none; }
+.coach-week-calendar .coach-calendar-booking {
+  z-index: 2;
+  min-width: 0;
+  min-height: 0;
+  margin: 2px 4px;
+  overflow: hidden;
+  display: grid;
+  align-content: center;
+  justify-items: start;
+  gap: 1px;
+  padding: 4px 7px 4px 10px;
+  border: 0;
+  border-left: 4px solid var(--booking-accent, var(--brand));
+  border-radius: 5px;
+  background: linear-gradient(rgba(255, 255, 255, 0.78), rgba(255, 255, 255, 0.78)), var(--booking-accent, var(--brand));
+  color: #263127;
+  text-align: left;
+  line-height: 1.15;
+  box-shadow: 0 1px 2px rgba(58, 52, 43, 0.12);
+}
+.coach-week-calendar button.coach-calendar-booking { cursor: pointer; }
+.coach-week-calendar button.coach-calendar-booking:hover { background: linear-gradient(rgba(255, 255, 255, 0.68), rgba(255, 255, 255, 0.68)), var(--booking-accent, var(--brand)); }
+.coach-week-calendar button.coach-calendar-booking:focus-visible { z-index: 4; outline: 2px solid var(--booking-accent, var(--brand)); outline-offset: 1px; }
+.coach-week-calendar .coach-calendar-booking strong,
+.coach-week-calendar .coach-calendar-booking span { display: block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.coach-week-calendar .coach-calendar-booking-primary { display: flex; align-items: center; gap: 4px; width: 100%; min-width: 0; }
+.coach-week-calendar .coach-calendar-booking strong { flex: 1 1 auto; min-width: 0; font-size: 12px; font-weight: 700; }
+.coach-week-calendar .coach-calendar-booking span { font-size: 11px; font-weight: 500; }
+.coach-week-calendar .coach-calendar-location-change { flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center; height: 16px; padding: 0 3px; border: 1px solid rgba(104, 76, 37, 0.3); border-radius: 999px; background: #fff8e8; color: #705021; font-size: 10px; font-weight: 650; line-height: 1; text-overflow: clip; }
+.coach-week-calendar .coach-calendar-booking-meta { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: baseline; gap: 4px; width: 100%; min-width: 0; }
+.coach-week-calendar .coach-calendar-booking-time { flex: 0 0 auto; }
+.coach-week-calendar .coach-calendar-booking-rink { min-width: 0; }
+.coach-week-calendar .coach-calendar-booking.is-compact { grid-template-rows: minmax(0, 1fr) minmax(0, 1fr); align-content: stretch; gap: 0; margin-inline: 1px; padding: 2px; border-left-width: 2px; }
+.coach-week-calendar .coach-calendar-booking.is-compact .coach-calendar-booking-primary,
+.coach-week-calendar .coach-calendar-booking.is-compact .coach-calendar-booking-meta { align-self: center; }
+.coach-week-calendar .coach-calendar-booking.is-compact strong { font-size: 11.5px; line-height: 1; }
+.coach-week-calendar .coach-calendar-booking.is-compact .coach-calendar-booking-meta { gap: 2px; font-size: 10.25px; line-height: 1; }
+.coach-week-calendar .coach-calendar-booking.is-compact .coach-calendar-booking-meta span { font-size: 10.25px; line-height: 1; }
+.coach-week-calendar .coach-calendar-booking.is-compact .coach-calendar-location-change { height: 15px; padding-inline: 2px; font-size: 10px; }
+.coach-week-calendar .coach-calendar-booking.is-short { grid-template-rows: minmax(0, 1fr); margin-block: 1px; padding-block: 1px; }
+.coach-week-calendar .coach-calendar-booking.is-short .coach-calendar-booking-meta { display: none; }
+.coach-week-calendar .coach-calendar-booking.is-short .coach-calendar-location-change { height: 13px; font-size: 9px; }
+.coach-week-calendar .coach-calendar-booking.is-filtered { border-left-color: #88847b; background: #d9d6d0; color: #57534c; box-shadow: none; }
+#exceptionDragCalendar .calendar-cell { cursor: default; }
+#exceptionDragCalendar .calendar-cell:hover { background: #fffdfa; }
+#exceptionDragCalendar .calendar-cell.has-slot:hover,
+#exceptionDragCalendar .calendar-cell.has-booking:hover { background: linear-gradient(rgba(255, 255, 255, 0.5), rgba(255, 255, 255, 0.5)), var(--rink-color, #bbf7d0); }
+#exceptionDragCalendar .calendar-cell.has-blocked:hover { background: #efede9; }
+#dragCalendar .calendar-cell { cursor: crosshair; }
+#dragCalendar .calendar-cell.has-booking { cursor: crosshair; }
+#dragCalendar .coach-calendar-booking.is-availability-booking { pointer-events: none; }
+#dragCalendar .calendar-cell.is-editing { box-shadow: none; }
+#dragCalendar .calendar-cell.has-slot.is-editing { background: linear-gradient(rgba(255, 255, 255, 0.38), rgba(255, 255, 255, 0.38)), var(--rink-color, #bbf7d0); }
+#dragCalendar .calendar-cell.selecting:not(.has-booking) { background: linear-gradient(rgba(255, 255, 255, 0.28), rgba(255, 255, 255, 0.28)), var(--selection-color, #bfdbfe); box-shadow: inset 0 0 0 2px #5f4a2c; }
+#dragCalendar .calendar-cell.removing:not(.has-booking) { background: #e0ddd7; box-shadow: inset 0 0 0 2px #706b62; }
+#dragCalendar .calendar-cell.is-past:not(.has-booking) { filter: saturate(0.7) brightness(0.9); }
+#dragCalendar .calendar-cell.is-past:focus,
+#dragCalendar .calendar-cell.is-past:focus-visible,
+#dragCalendar .calendar-cell.is-past:active { outline: none; box-shadow: none; }
+.coach-schedule-week-range span { display: inline-block; white-space: nowrap; }
+
+/* Transparent hit targets preserve the existing cell colors, grid and location watermarks. */
+#dragCalendar .calendar-open-block { position: relative; z-index: 2; min-width: 0; min-height: 0; margin: 0; padding: 0; border: 0; border-radius: 0; background: transparent; cursor: crosshair; user-select: none; touch-action: none; }
+#dragCalendar .calendar-open-block:focus-visible { outline: 2px solid var(--brand-hover); outline-offset: -2px; }
+#dragCalendar .calendar-day.is-open-day-selected { background: var(--brand-soft); box-shadow: inset 0 -1px var(--sage); }
+#dragCalendar .calendar-open-drop { z-index: 4; min-width: 0; min-height: 0; padding: 0; border: 0; outline: 1.5px dashed var(--sage); outline-offset: -1.5px; background: transparent; box-shadow: none; pointer-events: none; }
+.coach-open-context-menu { position: fixed; z-index: 80; display: grid; gap: 2px; min-width: 190px; max-width: 320px; padding: 6px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); box-shadow: 0 8px 28px #29271f24; }
+.coach-open-context-menu[hidden] { display: none; }
+.coach-open-context-menu > button { min-height: 32px; padding: 6px 10px; border: 0; border-radius: 4px; background: transparent; text-align: left; color: var(--text); font-size: 13px; }
+.coach-open-context-menu > button:hover:not(:disabled), .coach-open-context-menu > button:focus-visible { background: var(--brand-soft); }
+.coach-open-menu-note { margin: 2px 8px 6px; color: var(--muted); font-size: 11px; line-height: 1.5; }
+#coachOpenOperationMessage[data-tone="error"] { color: var(--red); }
+#coachOpenOperationMessage:empty { display: none; }
+#coachOpenOperationMessage { position: static; margin: 0; padding: 0; border: 0; background: transparent; box-shadow: none; color: var(--muted); font-size: 12px; line-height: 1.6; }
+.coach-calendar-feedback-row { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 16px; min-height: 20px; }
+#coachOpenOperationMessage[hidden] { display: none; }
+
+#dragCalendar .calendar-cell[data-precise-availability]:not(.selecting):not(.removing) { background: var(--precise-cell-background); }
+.coach-date-picker-grid button:disabled { opacity: .45; cursor: not-allowed; }
+.coach-date-picker-grid button:disabled:hover { background: transparent; }
+
+/* One perimeter per selection; the original venue colors stay visible. */
+#dragCalendar.has-open-selection:focus { outline: none; }
+#dragCalendar .calendar-cell.is-open-range-covered, #dragCalendar .calendar-open-block.is-open-range-covered, #dragCalendar .calendar-cell.is-open-range-covered:focus-visible, #dragCalendar .calendar-open-block.is-open-range-covered:focus-visible { outline: none; box-shadow: none; }
+#dragCalendar .calendar-open-selection { position: relative; z-index: 4; min-width: 0; min-height: 0; outline: none; border: 0; background: transparent; box-shadow: none; pointer-events: none; }
+#dragCalendar .calendar-open-move { position: absolute; right: 3px; top: var(--open-handle-top, 50%); transform: translateY(-50%); width: 14px; min-width: 0; min-height: 0; height: 18px; padding: 2px 3px; border: 0; border-radius: 2px; background: var(--surface); color: var(--sage); box-shadow: none; opacity: 0; cursor: grab; pointer-events: none; touch-action: none; }
+#dragCalendar .calendar-open-move svg { display: block; width: 8px; height: 12px; fill: currentColor; }
+#dragCalendar .calendar-open-selection.is-hovered .calendar-open-move, #dragCalendar .calendar-open-move:focus-visible { opacity: 1; pointer-events: auto; }
+#dragCalendar .calendar-open-move:focus-visible { outline: 1px solid var(--sage); outline-offset: 1px; }
+#dragCalendar .calendar-open-move:active { cursor: grabbing; }
+#dragCalendar[data-open-gesture] .calendar-open-move { opacity: 0; pointer-events: none; }
+#dragCalendar[data-open-gesture="move"] .calendar-open-selection { outline: none; }
+
+.coach-open-context-menu > button { display: flex; align-items: center; justify-content: space-between; gap: 20px; }
+.coach-open-menu-shortcut { flex: 0 0 auto; padding: 0; border: 0; background: transparent; color: var(--muted); font: inherit; font-size: 11px; white-space: nowrap; }
+
+/* Draw only the union boundary, independently of grid cells, venue colors and bookings. */
+#dragCalendar .calendar-contours { position: relative; z-index: 4; width: 100%; height: 100%; min-width: 0; min-height: 0; overflow: visible; pointer-events: none; fill: none; stroke: var(--sage); stroke-width: 1.5px; stroke-linejoin: round; }
+#dragCalendar .calendar-edit-contours { z-index: 3; }
+#dragCalendar[data-open-gesture="move"] .calendar-selection-contours { visibility: hidden; }

@@ -1,18 +1,20 @@
-import { restoreBookingUndoSnapshot } from "../../core/booking-undo.js";
-import { isUndoShortcut, popLatestUndoSnapshot } from "../../core/undo-history.js";
+import { coachUsesService } from "../service-controller.js";
+import { undoRemoteCoachBooking } from "./service-commands.js";
+import { synchronizeCoachBookingRequests } from "./request-sync.js";
+import { undoLatestBookingChange } from "../../core/booking-undo.js";
+import { isUndoShortcut } from "../../ui/undo-shortcut.js";
 import { showFormMessage } from "../availability/status.js";
-import { renderCoachBookingChanges } from "./refresh.js";
-import { saveSlots } from "../../core/state.js";
+import { receiveCoachBookingChanges } from "./refresh.js";
 
 export function undoCoachBookingChange() {
-  const snapshot = popLatestUndoSnapshot("booking");
-  if (!snapshot) {
-    showFormMessage("没有可以撤销的预约更改。");
+  if (coachUsesService()) return undoRemoteCoachBooking();
+  const result = undoLatestBookingChange();
+  if (!result.ok) {
+    showFormMessage(result.reason === 'empty' ? '没有可以撤销的预约更改。' : '撤销未能保存或预约已变化，请检查后重试。', result.reason !== 'empty');
     return;
   }
-  restoreBookingUndoSnapshot(snapshot);
-  saveSlots();
-  renderCoachBookingChanges();
+  synchronizeCoachBookingRequests();
+  receiveCoachBookingChanges({ resetRequest: true });
   showFormMessage("已撤销上一步预约更改。");
 }
 

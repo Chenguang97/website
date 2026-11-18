@@ -7,13 +7,14 @@ export const bookingRequestStatuses = Object.freeze({
   ended: "ended",
 });
 
-export function getProposalStart(proposal) {
+export function getProposalStart(proposal, resolveInstant) {
+  if (resolveInstant) return resolveInstant(proposal?.date, proposal?.start);
   return new Date(`${proposal?.date || ""}T${proposal?.start || ""}`);
 }
 
-export function calculateRequestExpiry(from, proposal) {
+export function calculateRequestExpiry(from, proposal, resolveInstant) {
   const extendedUntil = new Date(new Date(from).getTime() + bookingRequestDurationMs);
-  const lessonStart = getProposalStart(proposal);
+  const lessonStart = getProposalStart(proposal, resolveInstant);
   return new Date(Math.min(extendedUntil.getTime(), lessonStart.getTime())).toISOString();
 }
 
@@ -42,11 +43,11 @@ export function expireBookingRequest(request, now = new Date()) {
   };
 }
 
-export function extendBookingRequest(request, actorRole, now = new Date()) {
+export function extendBookingRequest(request, actorRole, now = new Date(), resolveInstant) {
   if (getBookingRequestStatus(request, now) !== bookingRequestStatuses.negotiating) return request;
   return {
     ...request,
-    expiresAt: calculateRequestExpiry(now, request.proposal),
+    expiresAt: calculateRequestExpiry(now, request.proposal, resolveInstant),
     events: [...(request.events || []), {
       type: "request-extended",
       actorRole,
@@ -73,7 +74,7 @@ export function addBookingRequestMessage(request, actorRole, actorName, message,
   };
 }
 
-export function proposeBookingRequestVersion(request, proposal, actorRole, now = new Date()) {
+export function proposeBookingRequestVersion(request, proposal, actorRole, now = new Date(), resolveInstant) {
   const otherRole = actorRole === "coach" ? "student" : "coach";
   return {
     ...request,
@@ -82,7 +83,7 @@ export function proposeBookingRequestVersion(request, proposal, actorRole, now =
     proposerRole: actorRole,
     acceptedBy: [actorRole],
     waitingFor: otherRole,
-    expiresAt: calculateRequestExpiry(now, proposal),
+    expiresAt: calculateRequestExpiry(now, proposal, resolveInstant),
     events: [...(request.events || []), {
       type: "proposal-created",
       actorRole,
